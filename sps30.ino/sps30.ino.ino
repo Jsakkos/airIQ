@@ -14,8 +14,7 @@ const bool hasPM = true;
 const bool hasCO2 = false;
 const bool hasSHT = false;
 
-const char* ssid = "LavSakIoT";
-const char* password = "adieux fell septate agleam";
+
 
 const int port = 9926;
 
