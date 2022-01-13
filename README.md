@@ -1,5 +1,5 @@
-# airQ
-Air quality meter
+# airIQ
+Indoor Air quality meter that measures CO_2, particulates, VOCs, temperature, humidity, and pressure. LED indicator displays the PM2.5 AQI by color.
 
 ## Parts list
 
@@ -164,4 +164,4 @@ light:
               call.set_rgb(1, 0, 0.22);
             }    
             call.perform();
-            ```
+```
