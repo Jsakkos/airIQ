@@ -21,6 +21,10 @@ Indoor Air quality meter that measures CO_2, particulates, VOCs, temperature, hu
 ### Indicator LED
 [NeoPixel 5050](https://www.adafruit.com/product/1655) - $4.50 for 10
 
+## PCB Design
+<IMG SRC="images/pcb_top.svg" WIDTH=100%></IMG>
+<IMG SRC="images/pcb_bottom.svg" WIDTH=100%></IMG>
+[Gerber files](pcb/Gerber_PCB_AirQv2_2022-01-16.zip)
 
 #### Inspired by:
 https://www.jeffgeerling.com/blog/2021/airgradient-diy-air-quality-monitor-co2-pm25 and https://howtomechatronics.com/projects/diy-air-quality-monitor-pm2-5-co2-voc-ozone-temp-hum-arduino-meter/
