@@ -91,6 +91,7 @@ _NOTE_KEYS = {"text", "at", "size"}
 _PART_KEYS = {"symbol", "at", "rot", "mirror", "stub", "value", "footprint", "lcsc", "dnp",
               "fields", "pins"}
 _LAYOUT_KEYS = {"board", "rules", "netclasses", "drc_severities", "custom_rules", "placement"}
+_BOARD_KEYS = {"width", "height", "outline", "cutouts", "origin", "thickness"}
 PAPERS = {"A4": (297.0, 210.0), "A3": (420.0, 297.0)}
 
 
@@ -172,6 +173,31 @@ def _part(ref: str, d, where: str, problems: list[str]) -> PartSrc | None:
                    fields={str(k): str(v) for k, v in fields.items()}, pins=pins, **opt)
 
 
+def _polygon(v, where: str, problems: list[str]) -> None:
+    if not isinstance(v, list) or len(v) < 3:
+        problems.append(f"{where}: expected a list of at least 3 [x, y] points")
+        return
+    for i, p in enumerate(v):
+        _number_pair(p, f"{where} point {i}", problems)
+
+
+def _check_board(board, problems: list[str]) -> None:
+    """layout.yaml `board`: a width x height rectangle or an `outline` polygon, plus cutouts."""
+    if not isinstance(board, dict):
+        problems.append("layout.yaml: `board` must be a mapping")
+        return
+    _unknown(board, _BOARD_KEYS, "layout.yaml: board", problems)
+    rect = "width" in board or "height" in board
+    if rect == ("outline" in board):
+        problems.append("layout.yaml: board needs either `width` and `height` or `outline`")
+    elif rect and not all(isinstance(board.get(k), (int, float)) for k in ("width", "height")):
+        problems.append("layout.yaml: board `width` and `height` must both be numbers (mm)")
+    elif not rect:
+        _polygon(board["outline"], "layout.yaml: board outline", problems)
+    for i, c in enumerate(board.get("cutouts") or []):
+        _polygon(c, f"layout.yaml: board cutout {i + 1}", problems)
+
+
 def _sheet(name: str, path: Path, problems: list[str]) -> SheetSrc:
     data = _load_yaml(path, problems)
     _unknown(data, _SHEET_KEYS, str(path), problems)
@@ -220,6 +246,8 @@ def load_design(src_dir: Path) -> Design:
     layout_path = src_dir / "layout.yaml"
     layout = _load_yaml(layout_path, problems) if layout_path.exists() else {}
     _unknown(layout, _LAYOUT_KEYS, "layout.yaml", problems)
+    if "board" in layout:
+        _check_board(layout["board"], problems)
     if problems:
         raise DesignError(problems)
     return Design(

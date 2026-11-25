@@ -1,4 +1,4 @@
-from gen_pcb import footprint_node, generate_board, read_netlist
+from gen_pcb import edge_uid, footprint_node, generate_board, read_netlist
 from sexpr import atom, child, children, parse
 
 NETLIST = """(export (version "E")
@@ -80,39 +80,74 @@ def _board(libs, existing=None, layout=LAYOUT):
 
 
 def test_board_outline_origin_and_placement(libs):
-    text, unplaced = _board(libs)
-    tree = parse(text)
+    b = _board(libs)
+    tree = parse(b.text)
     assert atom(tree, "version") == "20260206"
     rect = child(tree, "gr_rect")
     assert child(rect, "start") == ["start", "100", "50"] and child(rect, "end") == ["end", "140", "70"]
+    assert atom(rect, "uuid") == edge_uid("tp", 0)
     setup = child(tree, "setup")
     assert child(setup, "aux_axis_origin") == ["aux_axis_origin", "100", "70"]   # CPL origin
     fps = {next(p[2] for p in children(f, "property") if p[1] == "Reference"): f
            for f in children(tree, "footprint")}
     assert child(fps["U1"], "at") == ["at", "110", "55", "90"]
-    assert unplaced == ["R1"] and child(fps["R1"], "at")[1:3] == ["150", "50"]   # parked
-    assert text == _board(libs)[0]
+    assert b.unplaced == ["R1"] and child(fps["R1"], "at")[1:3] == ["150", "50"]   # parked
+    assert b.hand_edges == [] and b.text == _board(libs).text
 
 
 def test_regeneration_keeps_routing_and_replaces_owned_items(libs):
-    first, _ = _board(libs)
-    routed = first.rstrip()[:-1] + """
+    routed = _board(libs).text.rstrip()[:-1] + """
   (segment (start 1 2) (end 3 4) (width 0.2) (layer "F.Cu") (net "GND") (uuid "s1"))
   (via (at 3 4) (size 0.6) (drill 0.3) (layers "F.Cu" "B.Cu") (net "GND") (uuid "v1"))
   (zone (net "GND") (layer "B.Cu") (uuid "z1") (polygon (pts (xy 0 0) (xy 1 0) (xy 1 1))))
-  (gr_line (start 0 0) (end 9 9) (layer "Edge.Cuts") (uuid "old-edge"))
   (gr_text "note" (at 1 1 0) (layer "F.SilkS") (uuid "t1"))
 )
 """
     moved = routed.replace('(at 150 50)', '(at 160 60 45)')   # R1, unplaced, moved by hand
-    text, _ = _board(libs, moved)
-    tree = parse(text)
+    b = _board(libs, moved)
+    tree = parse(b.text)
     assert [atom(i, "uuid") for i in children(tree, "segment")] == ["s1"]
     assert [atom(i, "uuid") for i in children(tree, "via")] == ["v1"]
     assert [atom(i, "uuid") for i in children(tree, "zone")] == ["z1"]
     assert [atom(i, "uuid") for i in children(tree, "gr_text")] == ["t1"]
-    assert children(tree, "gr_line") == [] and len(children(tree, "gr_rect")) == 1
     r1 = next(f for f in children(tree, "footprint") if f[1] == "test:R_TEST")
     assert child(r1, "at") == ["at", "160", "60", "45"]    # kept where it was moved to
-    again, _ = _board(libs, text)
-    assert again == text
+    assert _board(libs, b.text).text == b.text
+
+
+POLY_LAYOUT = {"board": {"outline": [[0, 0], [40, 0], [40, 20], [5, 20], [0, 15]],
+                         "cutouts": [[[10, 5], [12, 5], [12, 10], [10, 10]],
+                                     [[20, 5], [22, 5], [22, 10], [20, 10]]],
+                         "origin": [100, 50]}}
+
+
+def _edges(text: str) -> list:
+    return [i for i in parse(text)[1:] if isinstance(i, list) and str(i[0]).startswith("gr_")
+            and atom(i, "layer") == "Edge.Cuts"]
+
+
+def test_polygon_outline_and_cutouts(libs):
+    b = _board(libs, layout=POLY_LAYOUT)
+    edges = _edges(b.text)
+    assert [e[0] for e in edges] == ["gr_poly"] * 3
+    assert [atom(e, "uuid") for e in edges] == [edge_uid("tp", i) for i in range(3)]
+    assert child(edges[0], "pts")[-1] == ["xy", "100", "65"]          # notched corner (0, 15)
+    assert child(edges[1], "pts")[2] == ["xy", "112", "55"]
+    setup = child(parse(b.text), "setup")
+    assert child(setup, "aux_axis_origin") == ["aux_axis_origin", "100", "70"]
+
+
+def test_hand_drawn_edge_cuts_are_kept_and_stale_generated_ones_dropped(libs):
+    before = _board(libs, layout=POLY_LAYOUT).text                    # outline + 2 cutouts
+    drawn = before.rstrip()[:-1] + """
+  (gr_line (start 130 52) (end 130 58) (stroke (width 0.05) (type default)) (layer "Edge.Cuts") (uuid "slot-1"))
+  (gr_line (start 0 0) (end 9 9) (layer "F.SilkS") (uuid "silk-1"))
+)
+"""
+    one_cutout = {"board": {**POLY_LAYOUT["board"], "cutouts": POLY_LAYOUT["board"]["cutouts"][:1]}}
+    b = _board(libs, drawn, layout=one_cutout)
+    assert [atom(e, "uuid") for e in _edges(b.text)] == [edge_uid("tp", 0), edge_uid("tp", 1), "slot-1"]
+    assert b.hand_edges == ["slot-1"]
+    assert [atom(i, "uuid") for i in children(parse(b.text), "gr_line")] == ["slot-1", "silk-1"]
+    rect = _board(libs, b.text)                                       # back to the rectangle
+    assert [atom(e, "uuid") for e in _edges(rect.text)] == [edge_uid("tp", 0), "slot-1"]

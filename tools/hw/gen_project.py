@@ -5,9 +5,13 @@ design uses, so the project opens with all symbols and footprints resolved even 
 global library tables are not set up (as on the machine this was built on). A stock entry has
 the same name and path as in KiCad's default global table, so it shadows it harmlessly.
 
-The .kicad_pro is merged, not replaced: keys this generator owns (rules, net classes, rule
-severities, ERC settings) are set, everything else KiCad or the owner saved is kept. KiCad writes
-the file as JSON with sorted keys and two-space indent; so does this.
+The .kicad_pro is merged: the sections this generator owns are replaced whole from the source,
+so a rule or severity deleted from the source is gone from the project and KiCad's default applies:
+`board.design_settings.rules`, `board.design_settings.rule_severities`, `erc.rule_severities`,
+`net_settings.classes` and `net_settings.netclass_patterns`. Everything else KiCad or the owner
+saved (track and via presets, plot settings, ...) is kept. The file is written as JSON with sorted
+keys and two-space indent, like KiCad's, but is not byte-for-byte what a KiCad save writes: after
+a save in the KiCad GUI, rebuild once and commit the result.
 """
 from __future__ import annotations
 
@@ -89,18 +93,17 @@ def kicad_dru(design: Design) -> str:
 
 
 def kicad_pro(design: Design, existing: str | None) -> str:
+    """`existing` with the sections this generator owns replaced (see the module docstring)."""
     pro = json.loads(existing) if existing else {}
     pro["meta"] = {"filename": f"{design.name}.kicad_pro", "version": 3}
-    erc = pro.setdefault("erc", {}).setdefault("rule_severities", {})
-    erc.update({k: "error" for k in ERC_ERRORS})
-    erc.update(design.erc_severities)
+    pro.setdefault("erc", {})["rule_severities"] = {**{k: "error" for k in ERC_ERRORS},
+                                                    **design.erc_severities}
     ds = pro.setdefault("board", {}).setdefault("design_settings", {})
-    ds.setdefault("rules", {}).update(design.layout.get("rules") or {})
-    sev = ds.setdefault("rule_severities", {})
-    sev.update({k: "error" for k in DRC_ERRORS})
-    sev.update(design.layout.get("drc_severities") or {})
+    ds["rules"] = dict(design.layout.get("rules") or {})
+    ds["rule_severities"] = {**{k: "error" for k in DRC_ERRORS},
+                             **(design.layout.get("drc_severities") or {})}
     classes, patterns = _netclasses(design.layout)
     ns = pro.setdefault("net_settings", {})
     ns["classes"], ns["netclass_patterns"] = classes, patterns
     ns.setdefault("meta", {"version": 4})
-    return json.dumps(pro, indent=2, sort_keys=True) + "\n"
+    return json.dumps(pro, indent=2, sort_keys=True, ensure_ascii=False) + "\n"

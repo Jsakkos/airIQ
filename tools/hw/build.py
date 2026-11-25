@@ -11,7 +11,8 @@ Steps (outputs other than the KiCad project go to build/):
  4. export the netlist: build/<board>.net;
  5. write the board from the netlist and layout.yaml (gen_pcb.py), keeping the routing of the
     current board, and let KiCad re-save it (`kicad-cli pcb upgrade --force`);
- 6. ERC and DRC with schematic parity: build/<board>-erc.json and -drc.json, summary printed;
+ 6. ERC, and DRC with schematic parity after refilling the zones; DRC saves the board, so the
+    committed zone fills always match the footprints (build/<board>-erc.json, -drc.json);
  7. JLC BOM and CPL (build/<board>-bom.csv, -cpl.csv) and Specctra DSN (build/<board>.dsn).
 
 Exit status 1 if ERC reports an error, or DRC reports an error other than unrouted
@@ -30,7 +31,7 @@ from pathlib import Path
 
 import kicad_env
 from design import DesignError, load_design
-from gen_pcb import generate_board, read_netlist
+from gen_pcb import Board, generate_board, read_netlist
 from gen_project import kicad_dru, kicad_pro, lib_tables
 from gen_sch import generate_schematics, resolve_design
 from jlc import BOM_ARGS, cpl_from_pos
@@ -62,36 +63,37 @@ def upgrade_libraries(design, cache: Path) -> Libraries:
     return Libraries(syms, fps, kicad_env.stock_symbol_dir(), kicad_env.stock_footprint_dir())
 
 
-def build_schematic(design, libs: Libraries) -> Path:
+def build_schematic(design, libs: Libraries) -> tuple[Path, list[Path]]:
+    """Write the schematic and project files; return the root sheet and every file written."""
     out = design.out_dir
     out.mkdir(parents=True, exist_ok=True)
     placed = resolve_design(design, libs)
     pro = out / f"{design.name}.kicad_pro"
     _write(pro, kicad_pro(design, pro.read_text(encoding="utf-8") if pro.exists() else None))
-    _write(out / f"{design.name}.kicad_dru", kicad_dru(design))
-    for name, text in lib_tables(design, placed, libs).items():
-        _write(out / name, text)
+    files = {pro.name: None, f"{design.name}.kicad_dru": kicad_dru(design),
+             **lib_tables(design, placed, libs)}
     sheets = generate_schematics(design, libs)
-    for name, text in sheets.items():
-        _write(out / name, text)
+    for name, text in {**files, **sheets}.items():
+        if text is not None:
+            _write(out / name, text)
     for name in sheets:
         kicad_env.run_cli("sch", "upgrade", "--force", out / name)
         if name != f"{design.name}.kicad_sch":  # re-saving a sub-sheet alone leaves these
             for junk in (out / name).with_suffix(".kicad_prl"), (out / name).with_suffix(".kicad_pro"):
                 junk.unlink(missing_ok=True)
-    return out / f"{design.name}.kicad_sch"
+    return out / f"{design.name}.kicad_sch", [out / n for n in {**files, **sheets}]
 
 
-def build_board(design, libs: Libraries, netlist: Path) -> tuple[Path, list[str]]:
+def build_board(design, libs: Libraries, netlist: Path) -> tuple[Path, Board]:
     pcb = design.out_dir / f"{design.name}.kicad_pcb"
     existing = pcb.read_text(encoding="utf-8") if pcb.exists() else None
     comps = read_netlist(netlist.read_text(encoding="utf-8"))
-    text, unplaced = generate_board(design.name, design.title, design.rev, design.company,
-                                    design.rel(design.src_dir / "layout.yaml"), comps,
-                                    design.layout, libs, existing)
-    _write(pcb, text)
+    board = generate_board(design.name, design.title, design.rev, design.company,
+                           design.rel(design.src_dir / "layout.yaml"), comps, design.layout, libs,
+                           existing)
+    _write(pcb, board.text)
     kicad_env.run_cli("pcb", "upgrade", "--force", pcb)
-    return pcb, unplaced
+    return pcb, board
 
 
 def _summary(items: list[dict]) -> Counter:
@@ -105,8 +107,9 @@ def run_erc(sch: Path, report: Path) -> Counter:
 
 
 def run_drc(pcb: Path, report: Path) -> Counter:
+    """DRC on freshly filled zones; the board is saved with those fills (deterministic)."""
     kicad_env.run_cli("pcb", "drc", "--format", "json", "--severity-all", "--schematic-parity",
-                      "-o", report, pcb)
+                      "--refill-zones", "--save-board", "-o", report, pcb)
     data = json.loads(report.read_text(encoding="utf-8"))
     return _summary(data.get("violations", []) + data.get("unconnected_items", [])
                     + data.get("schematic_parity", []))
@@ -133,8 +136,10 @@ def export_fab(sch: Path, pcb: Path, build: Path, board: str) -> None:
 class BuildResult:
     sch: Path
     pcb: Path
+    written: list[Path]       # every KiCad project file the generator owns (what to commit)
     unplaced: list[str]
-    erc: Counter   # (severity, violation type) -> count
+    hand_edges: list[str]     # UUIDs of Edge.Cuts items not from layout.yaml (kept)
+    erc: Counter              # (severity, violation type) -> count
     drc: Counter
 
     def errors(self, routed: bool) -> int:
@@ -148,14 +153,14 @@ def build(src_dir: Path, build_dir: Path, board: str) -> BuildResult:
     """Run every step for the design in `src_dir`; exports go to `build_dir`/<board>*."""
     design = load_design(src_dir)
     libs = upgrade_libraries(design, build_dir / "kicad-lib")
-    sch = build_schematic(design, libs)
+    sch, written = build_schematic(design, libs)
     netlist = build_dir / f"{board}.net"
     kicad_env.run_cli("sch", "export", "netlist", "--format", "kicadsexpr", "-o", netlist, sch)
-    pcb, unplaced = build_board(design, libs, netlist)
+    pcb, layout = build_board(design, libs, netlist)
     erc = run_erc(sch, build_dir / f"{board}-erc.json")
     drc = run_drc(pcb, build_dir / f"{board}-drc.json")
     export_fab(sch, pcb, build_dir, board)
-    return BuildResult(sch, pcb, unplaced, erc, drc)
+    return BuildResult(sch, pcb, [*written, pcb], layout.unplaced, layout.hand_edges, erc, drc)
 
 
 def main(argv: list[str]) -> int:
@@ -172,6 +177,9 @@ def main(argv: list[str]) -> int:
     print(f"schematic: {res.sch.relative_to(REPO)}\nboard:     {res.pcb.relative_to(REPO)}")
     if res.unplaced:
         print("no placement entry (kept or parked beside the board): " + ", ".join(res.unplaced))
+    if res.hand_edges:
+        print(f"Edge.Cuts items drawn in KiCad, kept (move them into layout.yaml): "
+              f"{len(res.hand_edges)}")
     _print_counts("ERC", res.erc)
     _print_counts("DRC", res.drc)
     print(f"exports:   build/{args.board}.net, -bom.csv, -cpl.csv, .dsn, -erc.json, -drc.json")

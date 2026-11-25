@@ -85,3 +85,22 @@ def test_unknown_layout_key_is_reported(tmp_path):
     with pytest.raises(DesignError) as e:
         load_design(_write(tmp_path, layout="placment: {}\n"))
     assert any("unknown key 'placment'" in p for p in e.value.problems)
+
+
+def test_polygon_outline_with_cutouts_loads(tmp_path):
+    layout = "board:\n  outline: [[0, 0], [10, 0], [10, 5], [0, 5]]\n  cutouts: [[[1, 1], [2, 1], [2, 2]]]\n"
+    assert load_design(_write(tmp_path, layout=layout)).layout["board"]["cutouts"][0][2] == [2, 2]
+
+
+@pytest.mark.parametrize("board,expected", [
+    ("{width: 10}", "board `width` and `height` must both be numbers"),
+    ("{width: 10, height: 5, outline: [[0, 0], [1, 0], [1, 1]]}", "either `width` and `height` or `outline`"),
+    ("{origin: [0, 0]}", "either `width` and `height` or `outline`"),
+    ("{outline: [[0, 0], [1, 0]]}", "at least 3 [x, y] points"),
+    ("{width: 10, height: 5, cutouts: [[[0, 0], [1, 0], 7]]}", "cutout 1 point 2"),
+    ("{width: 10, height: 5, corners: 1}", "unknown key 'corners'"),
+])
+def test_board_shape_problems(tmp_path, board, expected):
+    with pytest.raises(DesignError) as e:
+        load_design(_write(tmp_path, layout=f"board: {board}\n"))
+    assert any(expected in p for p in e.value.problems), e.value.problems

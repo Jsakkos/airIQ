@@ -8,10 +8,12 @@ what KiCad derives from the schematic, so DRC's schematic-parity check holds by 
 
 Regeneration contract (hardware/README.md, "Toolchain"):
 - owned, rebuilt on every run: the footprints (fresh from the library, placed from
-  layout.yaml), the board outline on Edge.Cuts, the title block and page setup;
+  layout.yaml), the Edge.Cuts outline and cutouts of layout.yaml (recognised on the old board by
+  their UUIDs, see edge_uid), the title block and page setup;
 - kept from the existing board: everything else, namely tracks, arcs, vias, zones (ground
-  pours, keep-outs), other drawings and text. Routing therefore survives a re-run; tracks of
-  a net that a schematic change removed show up as DRC errors to fix.
+  pours, keep-outs), other drawings and text, and Edge.Cuts items drawn by hand (reported, so
+  they move into layout.yaml). Routing therefore survives a re-run; tracks of a net that a
+  schematic change removed show up as DRC errors to fix.
 A footprint without a placement entry keeps its position on the existing board, else it is
 parked beside the outline (reported, so it gets a placement entry).
 """
@@ -200,12 +202,29 @@ def _title_block(title: str, rev: str, company: str, source: str) -> list:
     return tb
 
 
-def _existing(existing: str | None) -> tuple[list[list], dict[str, tuple[float, float, float]]]:
-    """Items to keep from the current board, and the current footprint positions by reference."""
+MAX_EDGE_ITEMS = 256  # generated Edge.Cuts items: the outline plus at most 255 cutouts
+
+
+def edge_uid(project: str, i: int) -> QStr:
+    """UUID of the i-th generated Edge.Cuts item (0 = the outline, then the cutouts)."""
+    return uid(project, "outline") if i == 0 else uid(project, "outline", str(i))
+
+
+@dataclass
+class Board:
+    text: str
+    unplaced: list[str]      # references without a placement entry
+    hand_edges: list[str]    # UUIDs of kept Edge.Cuts items that layout.yaml did not generate
+
+
+def _existing(project: str, existing: str | None) -> tuple[list[list], dict, list[str]]:
+    """Items to keep from the current board, footprint positions by reference, and the UUIDs of
+    kept Edge.Cuts items drawn by hand (the generated ones are recognised by edge_uid)."""
     if not existing:
-        return [], {}
+        return [], {}, []
+    generated = {edge_uid(project, i) for i in range(MAX_EDGE_ITEMS)}
     tree = parse(existing)
-    kept, pos = [], {}
+    kept, pos, hand = [], {}, []
     for item in tree[1:]:
         if not isinstance(item, list):
             continue
@@ -214,20 +233,53 @@ def _existing(existing: str | None) -> tuple[list[list], dict[str, tuple[float, 
             at = child(item, "at")
             if ref and at:
                 pos[ref] = (float(at[1]), float(at[2]), float(at[3]) if len(at) > 3 else 0.0)
-        elif item[0] in _KEPT and not (item[0].startswith("gr_") and atom(item, "layer") == "Edge.Cuts"):
+        elif item[0] in _KEPT:
+            if item[0].startswith("gr_") and atom(item, "layer") == "Edge.Cuts":
+                if atom(item, "uuid") in generated:
+                    continue  # rebuilt from layout.yaml
+                hand.append(str(atom(item, "uuid")))
             kept.append(item)
-    return kept, pos
+    return kept, pos, hand
+
+
+def _poly(points: list, ox: float, oy: float, key: QStr) -> list:
+    return ["gr_poly", ["pts", *[["xy", num(ox + float(x), 6), num(oy + float(y), 6)]
+                                 for x, y in points]],
+            ["stroke", ["width", "0.05"], ["type", "default"]], ["fill", "no"],
+            ["layer", QStr("Edge.Cuts")], ["uuid", key]]
+
+
+def outline_items(project: str, board: dict) -> tuple[list[list], tuple[float, float, float, float]]:
+    """Generated Edge.Cuts items (outline, then cutouts) and the outline's bounding box
+    (min x, min y, max x, max y, relative to the board origin)."""
+    ox, oy = (float(v) for v in board.get("origin", (100, 100)))
+    if "outline" in board:
+        pts = [(float(x), float(y)) for x, y in board["outline"]]
+        items = [_poly(pts, ox, oy, edge_uid(project, 0))]
+        box = (min(x for x, _ in pts), min(y for _, y in pts),
+               max(x for x, _ in pts), max(y for _, y in pts))
+    else:
+        w, h = float(board["width"]), float(board["height"])
+        items = [["gr_rect", ["start", num(ox, 6), num(oy, 6)], ["end", num(ox + w, 6), num(oy + h, 6)],
+                  ["stroke", ["width", "0.05"], ["type", "default"]], ["fill", "no"],
+                  ["layer", QStr("Edge.Cuts")], ["uuid", edge_uid(project, 0)]]]
+        box = (0.0, 0.0, w, h)
+    cutouts = board.get("cutouts") or []
+    if len(cutouts) >= MAX_EDGE_ITEMS:
+        raise ValueError(f"at most {MAX_EDGE_ITEMS - 1} cutouts")
+    items += [_poly(c, ox, oy, edge_uid(project, i)) for i, c in enumerate(cutouts, 1)]
+    return items, box
 
 
 def generate_board(project: str, title: str, rev: str, company: str, source: str,
                    comps: list[Comp], layout: dict, libs: Libraries,
-                   existing: str | None) -> tuple[str, list[str]]:
-    """The .kicad_pcb text, and the references that have no placement entry."""
+                   existing: str | None) -> Board:
+    """The .kicad_pcb text, plus what the caller should report."""
     board = layout.get("board") or {}
-    w, h = float(board["width"]), float(board["height"])
     ox, oy = (float(v) for v in board.get("origin", (100, 100)))
+    edges, (x0, _, x1, y1) = outline_items(project, board)
     placement = layout.get("placement") or {}
-    kept, old_pos = _existing(existing)
+    kept, old_pos, hand_edges = _existing(project, existing)
     unplaced = []
     fps = []
     parked = 0
@@ -239,13 +291,10 @@ def generate_board(project: str, title: str, rev: str, company: str, source: str
             x, y, rot = old_pos[comp.ref]
             unplaced.append(comp.ref)
         else:
-            x, y, rot = ox + w + 10 + (parked % 5) * 8, oy + (parked // 5) * 8, 0.0
+            x, y, rot = ox + x1 + 10 + (parked % 5) * 8, oy + (parked // 5) * 8, 0.0
             parked += 1
             unplaced.append(comp.ref)
         fps.append(footprint_node(project, comp, libs.footprint(comp.footprint), x, y, rot))
-    outline = ["gr_rect", ["start", num(ox, 6), num(oy, 6)], ["end", num(ox + w, 6), num(oy + h, 6)],
-               ["stroke", ["width", "0.05"], ["type", "default"]], ["fill", "no"],
-               ["layer", QStr("Edge.Cuts")], ["uuid", uid(project, "outline")]]
     node = ["kicad_pcb", ["version", PCB_VERSION], ["generator", QStr("pcbnew")],
             ["generator_version", QStr("10.0")],
             ["general", ["thickness", num(float(board.get("thickness", 1.6)))],
@@ -254,10 +303,10 @@ def generate_board(project: str, title: str, rev: str, company: str, source: str
             ["layers", *_LAYERS],
             ["setup", ["pad_to_mask_clearance", "0"],
              ["allow_soldermask_bridges_in_footprints", "no"],
-             ["aux_axis_origin", num(ox, 6), num(oy + h, 6)],
+             ["aux_axis_origin", num(ox + x0, 6), num(oy + y1, 6)],
              ["grid_origin", num(ox, 6), num(oy, 6)]],
-            *fps, outline, *kept, ["embedded_fonts", "no"]]
-    return dumps(node) + "\n", unplaced
+            *fps, *edges, *kept, ["embedded_fonts", "no"]]
+    return Board(dumps(node) + "\n", unplaced, hand_edges)
 
 
 def _natural(ref: str) -> tuple:

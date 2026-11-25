@@ -25,16 +25,22 @@ def test_kicad_pro_merges_into_existing_settings(make_design):
                              "Default": {"clearance": 0.15}}}
     d = make_design({"a": []}, layout=layout)
     d.erc_severities = {"pin_to_pin": "error"}
-    existing = json.dumps({"board": {"design_settings": {"rules": {"min_track_width": 0.2}}},
-                           "text_variables": {"X": "1"}})
+    # as a KiCad GUI save leaves it: full rule sets, a since-removed severity, other settings
+    existing = json.dumps({"board": {"design_settings": {
+                               "rules": {"min_track_width": 0.2, "min_clearance": 0.3},
+                               "rule_severities": {"clearance": "error", "track_width": "ignore"},
+                               "track_widths": [0.0, 0.3]}},
+                           "erc": {"rule_severities": {"pin_not_driven": "warning"}},
+                           "text_variables": {"X": "µ"}})
     pro = json.loads(kicad_pro(d, existing))
     ds = pro["board"]["design_settings"]
-    assert ds["rules"] == {"min_track_width": 0.2, "min_clearance": 0.15}
-    assert all(ds["rule_severities"][k] == "error" for k in DRC_ERRORS)
-    assert ds["rule_severities"]["silk_overlap"] == "ignore"
-    assert all(pro["erc"]["rule_severities"][k] == "error" for k in ERC_ERRORS)
-    assert pro["erc"]["rule_severities"]["pin_to_pin"] == "error"
-    assert pro["text_variables"] == {"X": "1"} and pro["meta"]["filename"] == "tp.kicad_pro"
+    # owned sections are replaced whole: what the source no longer lists is gone
+    assert ds["rules"] == {"min_clearance": 0.15}
+    assert ds["rule_severities"] == {**{k: "error" for k in DRC_ERRORS}, "silk_overlap": "ignore"}
+    assert pro["erc"]["rule_severities"] == {**{k: "error" for k in ERC_ERRORS}, "pin_to_pin": "error"}
+    # everything else is kept, UTF-8 as KiCad writes it
+    assert ds["track_widths"] == [0.0, 0.3] and pro["text_variables"] == {"X": "µ"}
+    assert "µ" in kicad_pro(d, existing) and pro["meta"]["filename"] == "tp.kicad_pro"
     classes = {c["name"]: c for c in pro["net_settings"]["classes"]}
     assert classes["Default"]["clearance"] == 0.15 and classes["Power"]["track_width"] == 0.4
     assert pro["net_settings"]["netclass_patterns"] == [{"netclass": "Power", "pattern": "+5V"},

@@ -1,6 +1,7 @@
 """End-to-end checks that need KiCad 10 (kicad-cli); skipped where it is not installed (CI)."""
 import csv
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -60,15 +61,41 @@ def test_dnp_and_fields_reach_the_netlist(make_design, libs, tmp_path):
     assert r1.dnp and r1.fields["Role"] == "J_X" and r1.path.count("/") == 2
 
 
+def _tracked() -> list[str]:
+    """Names of the committed (git-tracked) files in hardware/kicad/main."""
+    out = subprocess.run(["git", "ls-files", "hardware/kicad/main"], cwd=REPO,
+                         capture_output=True, text=True)
+    if out.returncode != 0:
+        pytest.skip("git is not available")
+    return sorted(Path(line).name for line in out.stdout.splitlines())
+
+
+def _scratch_repo(root: Path) -> Path:
+    """The main-board source, the airq library and the committed KiCad project, in `root`.
+
+    Starting from the committed project (not from nothing) is what a rebuild does in the
+    repository: the board keeps its routing, the .kicad_pro its KiCad settings.
+    """
+    shutil.copytree(REPO / "hardware/src/main", root / "hardware/src/main")
+    lib = root / "hardware/kicad/lib"
+    lib.mkdir(parents=True)
+    shutil.copy(REPO / "hardware/kicad/lib/airq.kicad_sym", lib)
+    shutil.copytree(REPO / "hardware/kicad/lib/airq.pretty", lib / "airq.pretty")
+    (root / "hardware/kicad/main").mkdir()
+    for name in _tracked():
+        shutil.copy(REPO / "hardware/kicad/main" / name, root / "hardware/kicad/main" / name)
+    return root
+
+
+def _text(path: Path) -> bytes:
+    return path.read_bytes().replace(b"\r\n", b"\n")
+
+
 @pytest.fixture(scope="module")
 def main_build(tmp_path_factory):
-    """The real main-board source built in a scratch copy of the repository layout."""
+    """A rebuild of the committed main-board project in a scratch copy of the repository."""
     from build import build
-    root = tmp_path_factory.mktemp("repo")
-    shutil.copytree(REPO / "hardware/src/main", root / "hardware/src/main")
-    (root / "hardware/kicad/lib").mkdir(parents=True)
-    shutil.copy(REPO / "hardware/kicad/lib/airq.kicad_sym", root / "hardware/kicad/lib")
-    shutil.copytree(REPO / "hardware/kicad/lib/airq.pretty", root / "hardware/kicad/lib/airq.pretty")
+    root = _scratch_repo(tmp_path_factory.mktemp("repo"))
     return root, build(root / "hardware/src/main", root / "build", "main")
 
 
@@ -77,18 +104,21 @@ def test_main_board_is_clean_apart_from_routing(main_build):
     assert res.errors(routed=False) == 0, (res.erc, res.drc)
     assert not [k for (sev, k) in res.erc if sev == "error"]
     assert {k for (sev, k) in res.drc if sev == "error"} <= {"unconnected_items"}
-    assert res.unplaced == []
+    assert res.unplaced == [] and res.hand_edges == []
 
 
-def test_committed_kicad_files_are_up_to_date_with_the_source(main_build):
-    root, _ = main_build
-    built = root / "hardware/kicad/main"
-    names = sorted(p.name for p in built.iterdir() if p.suffix != ".kicad_prl")
-    committed = REPO / "hardware/kicad/main"
-    assert names == sorted(p.name for p in committed.iterdir() if p.suffix != ".kicad_prl")
-    stale = [n for n in names if (built / n).read_bytes().replace(b"\r\n", b"\n")
-             != (committed / n).read_bytes().replace(b"\r\n", b"\n")]
-    assert not stale, f"regenerate with tools/hw/build.py main and commit: {stale}"
+def test_rebuilding_the_committed_project_changes_nothing(main_build):
+    """The stale-output guard: the committed files are exactly what a rebuild leaves behind.
+
+    Fails when the source changed without a rebuild, after a KiCad GUI save that a rebuild
+    normalises, or when a generated file is not committed (or an obsolete one still is).
+    """
+    root, res = main_build
+    written = sorted(p.name for p in res.written)
+    assert written == _tracked(), "commit exactly the files tools/hw/build.py main writes"
+    stale = [n for n in written
+             if _text(root / "hardware/kicad/main" / n) != _text(REPO / "hardware/kicad/main" / n)]
+    assert not stale, f"run tools/hw/build.py main and commit: {stale}"
 
 
 def test_jlc_bom_cpl_and_dsn(main_build):
@@ -105,15 +135,34 @@ def test_jlc_bom_cpl_and_dsn(main_build):
     assert "(placement" in dsn and "(network" in dsn
 
 
-def test_routing_survives_a_rebuild(main_build):
+ROUTED = """
+  (segment (start 105 125) (end 115 125) (width 0.4) (layer "B.Cu") (net "GND")
+    (uuid "0d1f5b1e-0000-4000-8000-000000000001"))
+  (via (at 115 125) (size 0.6) (drill 0.3) (layers "F.Cu" "B.Cu") (net "GND")
+    (uuid "0d1f5b1e-0000-4000-8000-000000000002"))
+  (zone (net "GND") (layer "B.Cu") (uuid "0d1f5b1e-0000-4000-8000-000000000003") (hatch edge 0.5)
+    (connect_pads (clearance 0.2)) (min_thickness 0.2)
+    (fill yes (thermal_gap 0.3) (thermal_bridge_width 0.3))
+    (polygon (pts (xy 100 100) (xy 160 100) (xy 160 130) (xy 100 130))))
+  (gr_rect (start 140 120) (end 145 121) (stroke (width 0.05) (type default)) (fill no)
+    (layer "Edge.Cuts") (uuid "0d1f5b1e-0000-4000-8000-000000000004"))
+"""
+
+
+def test_routing_zones_and_drawn_cutouts_survive_rebuilds(tmp_path):
+    """A routed board (track, via, filled ground pour, a slot drawn in KiCad) is kept by a
+    rebuild, the pour is refilled and saved, and a second rebuild changes nothing."""
     from build import build
-    root, _ = main_build
+    root = _scratch_repo(tmp_path)
     pcb = root / "hardware/kicad/main/airq-main.kicad_pcb"
-    text = pcb.read_text(encoding="utf-8").rstrip()
-    seg = ('(segment (start 105 110) (end 106 110) (width 0.4) (layer "B.Cu") (net "GND") '
-           '(uuid "0d1f5b1e-0000-4000-8000-000000000001"))')
-    pcb.write_text(text[:-1] + seg + "\n)\n", encoding="utf-8")
-    build(root / "hardware/src/main", root / "build", "main")
-    segs = children(parse(pcb.read_text(encoding="utf-8")), "segment")
-    assert [atom(s, "uuid") for s in segs] == ["0d1f5b1e-0000-4000-8000-000000000001"]
-    assert atom(segs[0], "net") == "GND"
+    pcb.write_text(pcb.read_text(encoding="utf-8").rstrip()[:-1] + ROUTED + ")\n", encoding="utf-8")
+    first = build(root / "hardware/src/main", root / "build", "main")
+    tree = parse(pcb.read_text(encoding="utf-8"))
+    uuids = {str(atom(i, "uuid")) for i in tree[1:] if isinstance(i, list) and atom(i, "uuid")}
+    assert {f"0d1f5b1e-0000-4000-8000-00000000000{i}" for i in range(1, 5)} <= uuids
+    (zone,) = children(tree, "zone")
+    assert child(zone, "filled_polygon") is not None          # filled by DRC, saved
+    assert first.hand_edges == ["0d1f5b1e-0000-4000-8000-000000000004"]
+    snapshot = {p.name: p.read_bytes() for p in first.written}
+    second = build(root / "hardware/src/main", root / "build", "main")
+    assert {p.name: p.read_bytes() for p in second.written} == snapshot

@@ -24,7 +24,7 @@ on this machine without a system change.
 | Criterion | How it is met |
 |---|---|
 | 1. Diffable source the assistant edits reliably | Short YAML files: parts, their pins → net names, page and board positions. The generator rejects unknown keys, pins without a net, off-grid or touching pins with one message per problem. |
-| 2. Native KiCad 10 schematic **and** board | KiCad itself re-saves every generated file (`kicad-cli sch/pcb upgrade --force`), so they are exactly what KiCad 10.0 writes. The project's library tables resolve every symbol and footprint. |
+| 2. Native KiCad 10 schematic **and** board | KiCad itself saves the schematic sheets and the board (`kicad-cli sch/pcb upgrade --force`, then DRC's `--save-board`), so those files are in KiCad 10.0's own format. The project's library tables resolve every symbol and footprint. |
 | 3. ERC and DRC with `kicad-cli` | `kicad-cli sch erc` and `kicad-cli pcb drc --schematic-parity` run on the generated project. |
 | 4. JLC BOM and CPL with LCSC numbers | Every part carries an `LCSC` field. `kicad-cli sch export bom` writes JLC's columns, and `pcb export pos` gives the CPL (`tools/hw/jlc.py`). |
 | 5. Runs on this Windows machine | Plain Python (uv) + KiCad 10 for Windows. No WSL. |
@@ -57,8 +57,10 @@ uv run --with pyyaml python tools/hw/build.py main
 
 It takes about 4 s. It rewrites `hardware/kicad/main/` and writes to `build/` (not committed):
 `main.net` (netlist), `main-erc.json`, `main-drc.json`, `main-bom.csv` (JLC BOM), `main-cpl.csv` (JLC CPL),
-`main.dsn` (Specctra DSN for Freerouting). It prints an ERC/DRC summary and exits 1 on any ERC error or
-any DRC error other than unrouted connections; add `--routed` once the board is routed.
+`main.dsn` (Specctra DSN for Freerouting). It prints an ERC/DRC summary, lists parts without a placement
+entry and Edge.Cuts items drawn in KiCad, and exits 1 on any ERC error or any DRC error other than unrouted
+connections; add `--routed` once the board is routed. Afterwards `git status` shows only what the source
+change caused; a rebuild without source changes leaves it clean.
 
 The plan's gates, run on the result (`kicad-cli` = the full path above on Windows):
 
@@ -81,31 +83,45 @@ To look at the result without the GUI: `kicad-cli sch export pdf -o build/main-s
 2. The project libraries are copied into `build/kicad-lib/` in the current KiCad format (`kicad-cli sym/fp
    upgrade`); `airq` is kept in easyeda2kicad's older format in the repository.
 3. `gen_sch.py` writes the root sheet (one sheet symbol per source sheet) and the sheets; `gen_project.py`
-   writes the library tables, `.kicad_pro` and `.kicad_dru`. KiCad re-saves each sheet.
+   writes the library tables, `.kicad_pro` and `.kicad_dru` (these are written by the generator, not
+   re-saved by KiCad). KiCad re-saves each sheet.
 4. kicad-cli exports the netlist.
 5. `gen_pcb.py` builds the board **from that netlist**, like KiCad's "Update PCB from Schematic": every pad
    net, value, field and schematic link (`path`) is what KiCad derives from the schematic, so DRC's
    schematic-parity check holds. Footprints come fresh from the libraries. KiCad re-saves the board.
-6. ERC, DRC (with parity), BOM, CPL and DSN (`kicad_dsn.py`, the only code that needs `pcbnew`).
+6. ERC; DRC with parity after refilling every zone (`--refill-zones --save-board`: the board is saved with
+   the new fills, so its pours always match its footprints); BOM, CPL and DSN (`kicad_dsn.py`, the only
+   code that needs `pcbnew`).
 
-The output is deterministic: every UUID is a uuid5 of a stable name (project, reference, pin), so the same
-source gives byte-identical files and a rebuild without source changes leaves `git diff` empty.
+The output is deterministic: every UUID is a uuid5 of a stable name (project, reference, pin), and KiCad's
+zone fill is repeatable, so a rebuild without source changes leaves the committed files byte-identical,
+routed or not.
 
 ### Regeneration contract
 
-- **Generated, do not edit:** the `.kicad_sch` files, `sym-lib-table`, `fp-lib-table`, `.kicad_dru`. Change the
-  source and rebuild. The owner can still open, annotate and inspect them in KiCad; edits are lost on rebuild.
-- **`.kicad_pro`** is merged: the generator sets design rules, net classes, ERC/DRC severities and keeps every
-  other setting saved by KiCad.
-- **Board (`.kicad_pcb`)**: the generator owns the footprints (re-made from the library, placed from
-  `layout.yaml`), the Edge.Cuts outline, the title block and page setup. **Everything else is kept**:
-  tracks, arcs, vias, zones (pours, keep-outs), other drawings and text. Routing from Freerouting or by hand
-  survives a rebuild. A schematic change that moves a net leaves its old tracks in place, and DRC reports them.
+| File | Written by | Owned by the generator (rebuilt from the source) | Kept on rebuild |
+|---|---|---|---|
+| `*.kicad_sch` | generator, then saved by KiCad | everything | nothing: edits made in KiCad are lost |
+| `sym-lib-table`, `fp-lib-table`, `*.kicad_dru` | generator | everything | nothing |
+| `*.kicad_pro` | generator (JSON, sorted keys, 2-space indent) | `board.design_settings.rules` and `.rule_severities`, `erc.rule_severities`, `net_settings.classes` and `.netclass_patterns`: replaced whole, so a rule or severity removed from the source is removed here and KiCad's default applies | every other setting (track/via presets, plot settings, ...) |
+| `*.kicad_pcb` | generator, then saved by KiCad (upgrade, then DRC with zone refill) | footprints (re-made from the library, placed from `layout.yaml`), the Edge.Cuts outline and cutouts of `layout.yaml`, title block, page setup | tracks, arcs, vias, zones (pours, keep-outs) with fresh fills, other drawings and text, Edge.Cuts items drawn in KiCad |
+
+- **Routed boards.** After Task 5 the committed board holds the routing. A rebuild keeps it, so the
+  committed board stays what a rebuild produces. A schematic change that moves a net leaves its old tracks
+  in place, and DRC reports them.
 - **Placement** lives in `layout.yaml`. A part moved by hand in KiCad must be copied back there, or the
   next rebuild moves it back. A part without a placement entry keeps its board position, or is parked
   to the right of the outline; the build lists it.
-- Commit the regenerated `hardware/kicad/<board>/` files with the source change.
-  `tests/hardware/test_kicad_pipeline.py` rebuilds in a scratch folder and fails if they are stale.
+- **Board edges.** The outer outline (a rectangle, or a polygon for notched corners) and internal cutouts
+  (milled slots) belong in `layout.yaml`. The generator recognises its own Edge.Cuts items by their UUIDs; any
+  other Edge.Cuts item (drawn in KiCad) is never deleted: the build keeps it and lists it, so it can be moved
+  into `layout.yaml`.
+- **KiCad GUI saves.** A save in KiCad can rewrite any of these files; it rewrites `.kicad_pro` with its full
+  settings set in its own JSON layout. Rebuild once afterwards (the table says what the rebuild resets and
+  what it keeps) and commit the result; the guard test below fails until then.
+- **Commit** the regenerated `hardware/kicad/<board>/` files with the source change.
+  `tests/hardware/test_kicad_pipeline.py` copies the committed project into a scratch folder, rebuilds it,
+  and fails if any file changes or if the committed set differs from the files the build writes.
 
 ### Design source format
 
@@ -133,11 +149,13 @@ otherwise, or a no-connect flag. **A net name is one net across the whole board*
 e.g. `BUCK_SW`, so two sheets never share a name by accident). ERC power flags are ordinary parts:
 `"#FLG01": {symbol: power:PWR_FLAG, at: …, pins: [+5V]}`.
 
-`src/<board>/layout.yaml`: `board` (`width`, `height`, `origin` = page position of the top-left corner,
-`thickness`), `rules` (KiCad board constraints, mm), `netclasses` (`Default` plus named classes with `nets`
+`src/<board>/layout.yaml`: `board` (`width` and `height` for a rectangle, or `outline`: a list of `[x, y]`
+points for any other shape such as notched corners; `cutouts`: a list of such polygons for internal slots;
+`origin` = page position of the coordinate origin; `thickness`), `rules` (KiCad board constraints, mm), `netclasses` (`Default` plus named classes with `nets`
 patterns), `drc_severities`, `custom_rules` (KiCad custom DRC rules, written to `<project>.kicad_dru`) and
 `placement` (`REF: [x, y, rotation]`, mm from the board's top-left corner, Y down; KiCad's grid origin is set
-there). The JLC CPL is measured from the bottom-left corner (KiCad's drill/place origin), Y up.
+there). The JLC CPL is measured from the bottom-left corner of the outline's bounding box (KiCad's
+drill/place origin), Y up.
 
 ### What the generator adds to every project
 
@@ -155,4 +173,6 @@ there). The JLC CPL is measured from the bottom-left corner (KiCad's drill/place
 - Symbols: single unit, no derived (`extends`) symbols. Footprints: on F.Cu, and no zones or groups inside a
   footprint (KiCad's stock `RF_Module:ESP32-C6-MINI-1` has a keep-out zone: support it if ruling R22 reverts).
 - Footprint edits made in KiCad (moved silkscreen text) are not kept; the footprint is re-made from the library.
+- Edge.Cuts shapes from `layout.yaml` are straight-sided polygons (no arcs): a milled slot gets the router
+  bit's radius at its ends anyway.
 - Schematic readability is checked by eye: export the PDF after changing positions.
