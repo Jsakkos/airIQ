@@ -132,6 +132,59 @@ def test_cli_fresh_days(tmp_path, capsys):
     assert main(["--parts-only", str(new), "--fresh-days", "7"]) == 0
 
 
+HDR_BOARDS = "lcsc,mpn,library,economic,checked_on,stock,unit_usd,boards\n"
+
+
+def _ext_rows(start, n, boards):
+    return "".join(f"C{start + i},EXT-{start + i},Extended,yes,2026-11-20,100,0.10,{boards}\n"
+                   for i in range(n))
+
+
+def test_boards_column_applies_extended_cap_per_board(tmp_path):
+    # main uses 13 + 2 shared = 15, tongue uses 3 + 2 shared = 5; the union is 18 (> 15).
+    text = (HDR_BOARDS + _ext_rows(3000, 13, "main") + _ext_rows(3100, 3, "tongue")
+            + _ext_rows(3200, 2, "main tongue") + "C25804,R,Basic,yes,2026-11-20,9,0.001,main tongue\n")
+    assert check_parts(_parts(tmp_path, text)) == []
+
+
+def test_boards_column_over_cap_names_the_board(tmp_path):
+    text = HDR_BOARDS + _ext_rows(3000, 15, "main") + _ext_rows(3200, 1, "main tongue")
+    errors = check_parts(_parts(tmp_path, text))
+    assert len(errors) == 1
+    assert "main" in errors[0] and "16" in errors[0] and "tongue" not in errors[0]
+
+
+def test_boards_column_cap_is_configurable(tmp_path):
+    text = HDR_BOARDS + _ext_rows(3000, 3, "tongue")
+    assert check_parts(_parts(tmp_path, text), max_extended=3) == []
+    assert any("tongue" in e for e in check_parts(_parts(tmp_path, text), max_extended=2))
+
+
+def test_boards_column_empty_cell_reported(tmp_path):
+    text = HDR_BOARDS + "C1,X,Extended,yes,2026-11-20,5,0.01,\n"
+    assert any("C1" in e and "board" in e for e in check_parts(_parts(tmp_path, text)))
+
+
+def test_without_boards_column_cap_applies_to_whole_table(tmp_path):
+    # Same parts as the per-board test, but no boards column: the union of 18 is checked.
+    rows = "".join(f"C{3000 + i},EXT-{i},Extended,yes,2026-11-20,100,0.10\n" for i in range(18))
+    errors = check_parts(_parts(tmp_path, HDR + rows))
+    assert any("18" in e and "Extended" in e for e in errors)
+
+
+def test_cli_parts_only_with_boards_column(tmp_path, capsys):
+    ok = _parts(tmp_path, HDR_BOARDS + _ext_rows(3000, 15, "main") + _ext_rows(3100, 15, "tongue"))
+    assert main(["--parts-only", str(ok)]) == 0
+    assert capsys.readouterr().out == ""
+
+
+def test_bom_check_unaffected_by_boards_column(tmp_path):
+    parts = _parts(tmp_path, HDR_BOARDS + _ext_rows(3000, 16, "main"))
+    bom = tmp_path / "bom.csv"
+    bom.write_text("Reference,LCSC\nU1,C3000\n", encoding="utf-8")
+    assert check_bom(bom, parts) == []
+
+
 def test_cli_arity_errors():
     with pytest.raises(SystemExit) as e:
         main(["--parts-only", str(FX / "parts_ok.csv"), str(FX / "parts_ok.csv")])

@@ -1,0 +1,169 @@
+# airQ v3 KiCad parts library (`airq`)
+
+Project library for the main board and the sense tongue.
+
+| File | Contents |
+|---|---|
+| `airq.kicad_sym` | symbols (library nickname `airq`) |
+| `airq.pretty/` | footprints (library nickname `airq`) |
+| `airq.3dshapes/` | STEP models, referenced as `${KIPRJMOD}/../lib/airq.3dshapes/<name>.step`, so they resolve from both `hardware/kicad/main/` and `hardware/kicad/tongue/` |
+
+The part numbers, library class and JLC Economic status of every placed part are in `hardware/bom/parts.csv`
+(checked 2026-11-25; the `boards` column says which board uses each part).
+
+## How it was made
+
+Fetched on 2026-11-25 with easyeda2kicad 1.0.1, one LCSC number at a time, with a pause between parts
+(EasyEDA answers HTTP 403 when it is hit too fast):
+
+```
+easyeda2kicad --full --lcsc_id=<LCSC> --output hardware/kicad/lib/airq
+```
+
+Then the hand fixes listed below were applied. Every footprint was opened with KiCad 10
+(`kicad-cli fp export svg`, `kicad-cli sym export svg`), and a throwaway board holding all 19 footprints was
+exported with `kicad-cli pcb export step` from a `main/` sibling folder: every model resolved, with no
+missing-model warnings.
+
+EasyEDA footprints keep JLC's placement orientation, which keeps the CPL rotations simple (Task 7).
+
+## Provisional MCU and pressure sensor (ruling R22)
+
+The spec pins the ESP32-C6-MINI-1-N4 (C5736265) and the BMP585 (C18184976). JLC lists both as **"Standard Only"**
+for PCBA, so they would move the main-board order off the Economic tier. Ruling R22 is **PROVISIONAL**: the
+owner was asked to choose. Meanwhile the table uses two Economic-eligible substitutes:
+
+| Role | Provisional (Economic) | Swap-back (Standard tier) |
+|---|---|---|
+| MCU | ESP32-C6-WROOM-1-N8, C5366877: symbol `airq:ESP32-C6-WROOM-1-N8`, footprint `airq:WIRELM-SMD_ESP32-C6-WROOM-1` | ESP32-C6-MINI-1-N4, C5736265: stock `RF_Module:ESP32-C6-MINI-1` symbol and footprint (ruling R11; it carries Espressif's keep-out and a STEP model) |
+| Pressure | MS5611-01BA03, C15639: `airq:MS561101BA03-50` / `airq:SENSORS-SMD_MS5611-01BA03` | BMP585, C18184976: `airq:BMP585_C18184976` / `airq:LGA-9_L3.3-W3.3-P1.10-TL`. Kept in this library but not hand-checked; check its pad map if R22 reverts |
+
+To swap back, change the symbol, the footprint and the `LCSC` field, and replace the two parts.csv lines.
+Both substitutes expose the same interface nets: every GPIO in `interface.yaml` exists on the WROOM-1 (datasheet v1.4,
+Table 3-1). The MS5611 answers at I²C 0x77 (CSB low) or 0x76 (CSB high), not the BMP585's 0x46. Changing that address
+in `interface.yaml` and in the firmware is a separate, later task.
+
+## Parts in this library
+
+| LCSC | MPN | Symbol | Footprint | STEP | Board |
+|---|---|---|---|---|---|
+| C5366877 | ESP32-C6-WROOM-1-N8 | ESP32-C6-WROOM-1-N8 | WIRELM-SMD_ESP32-C6-WROOM-1 | ESP32-S3-WROOM-1_standin-for-ESP32-C6-WROOM-1 (see fixes) | main |
+| C15639 | MS561101BA03-50 | MS561101BA03-50 | SENSORS-SMD_MS5611-01BA03 | SENSORS-SMD_MS5611-01BA03 | main |
+| C2765186 | TYPE-C 16PIN 2MD(073) | TYPE-C16PIN2MD | USB-C-SMD_TYPE-C-16PIN-2MD-073 | USB-C-SMD_TYPE-C-6PIN-2MD-073 (EasyEDA's file name; it is the 16-pin body) | main |
+| C7519 | USBLC6-2SC6 (ST) | USBLC6-2SC6 | SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL | SOT-23-6_… | main |
+| C90061 | TPS562201DDCR | TPS562201DDCR | SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BR | SOT-23-6_… | main |
+| C98362 | WPN4020H3R3MT (3.3 µH) | WPN4020H3R3MT | IND-SMD_L4.0-W4.0_WPN4020H | IND-SMD_L4.0-W4.0_WPN4020H | main |
+| C5378721 | SK6812SIDE-A | SK6812SIDE-A_C5378721 | LED-SMD_4P-L4.0-W1.6-L | LED-SMD_4P-L4.0-W1.6-L | main |
+| C7484 | SN74AHCT1G125DBVR | SN74AHCT1G125DBVR | SOT-23-5_L3.0-W1.7-P0.95-LS2.8-BR | SOT-23-5_… | main |
+| C133065 | SM06B-GHS-TB (JST GH 6) | SM06B-GHS-TB | CONN-TH_SM06B-GHS-TB-LF-SN (all SMD, despite the name) | CONN-SMD_GH1.25-WS-6P | main |
+| C160404 | SM04B-SRSS-TB (JST SH 4, Qwiic) | SM04B-SRSS-TB | CONN-SMD_4P-P1.00_SM04B-SRSS-TB-LF-SN | CONN-SMD_SR1.00-WS-4P | main + tongue |
+| C160403 | SM03B-SRSS-TB (JST SH 3) | SM03B-SRSS-TB | CONN-SMD_SM03B-SRSS-TB-LF-SN-P | CONN-SMD_SR1.00-WS-3P | main |
+| C2856831 | FPC-05FB-24PH20 (XUNPU) | FPC-05FB-24PH20 | FPC-SMD_24P-P0.50_FPC-05FB-24PH20 | same name | main |
+| C110293 | SKRTLAE010 (Alps) | SKRTLAE010 | KEY-SMD_SKRTLAE010 | KEY-SMD_L4.6-W3.4-H3.4 | main |
+| C135276 | SMNR4030-470MT (47 µH, EPD boost) | SMNR4030-470MT | IND-SMD_L4.0-W4.0_SMNR4020 | IND-SMD_L4.0-W4.0-H2.0 | main |
+| C20917 | AO3400A (EPD Q1) | AO3400A | SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR | SOT-23-3P_… | main |
+| C8598 | B5819W SL (EPD D1–D3) | B5819W_C8598 | SOD-123_L2.7-W1.6-LS3.7-RD-1 | SOD-123_… | main |
+| C5221601 | SHT45-AD1B-R2 | SHT45-AD1B-R2 | DFN-4_L1.5-W1.5-P0.8-TL-EP (die pad removed, see fixes) | DFN-4_L1.5-W1.5-P0.8 | tongue |
+| C504893 | VEML7700-TR | VEML7700-TR | LED-SMD_4P-L6.8-W2.4_VEML7700-TR | same name | tongue |
+| C18184976 | BMP585 (swap-back only) | BMP585_C18184976 | LGA-9_L3.3-W3.3-P1.10-TL | same name | — |
+
+**Stock KiCad 10 libraries** (ruling R11): the passives use `Resistor_SMD:R_0402_1005Metric` / `R_0603_1608Metric` and
+`Capacitor_SMD:C_0402_1005Metric` / `C_0603_1608Metric` / `C_0805_2012Metric`, with the LCSC numbers in parts.csv
+(C25744, C25900, C25905, C25779, C22935, C22939, C1525, C15849, C1779, C15850, C45783). The swap-back MCU uses `RF_Module:ESP32-C6-MINI-1`.
+
+**VEML7700: -TR kept, not -TT** (ruling R25). Vishay's VEML7700 datasheet (doc. 84286, Rev. 1.5, 23-Mar-2021, Ordering
+Information) lists VEML7700-TR as "Tape and reel, MOQ 2300, **Side view**" and VEML7700-TT as "Tape and reel, MOQ 2200,
+**Top view**". It has separate "TAPING SIDE VIEW (-TR VERSION)" and "TAPING TOP VIEW (-TT VERSION)" drawings, and
+separate proposed pad layouts (side view: 4 × 0.7 × 1.4 mm; top view: 4 × 0.7 × 1.6 mm). The EasyEDA footprints differ to match
+(TR body 6.8 × 2.35 mm; TT body 6.8 × 3.0 mm with pad 1 at the opposite end). So -TT is a different mounting
+orientation, not just different packaging. The plan wants the sensor looking out of the front edge, which is the side-view -TR.
+Its stock is only 308 (enough for 10 boards plus attrition).
+
+## Hand fixes applied after the fetch
+
+1. **STEP models**: every footprint's `(model …)` points to `${KIPRJMOD}/../lib/airq.3dshapes/<name>.step` (EasyEDA wrote
+   a working-directory-relative `.wrl` path). The unreferenced `.wrl` files were deleted.
+2. **ESP32-C6-WROOM-1 EPAD vias**: the footprint had 12 unnumbered plated holes (0.3 mm drill, 0.5 mm pad) in the EPAD
+   ("Via for thermal pad" in the datasheet's Figure 11-1). They are now pad `29` (the EPAD/GND pin, like the 9 EPAD sub-pads 29–37),
+   copper only, with no paste and no mask opening. DRC and the netlist now see them as GND.
+3. **ESP32-C6-WROOM-1 3D body**: EasyEDA has no model for C5366877. The footprint uses a copy of KiCad 10's stock
+   `RF_Module.3dshapes/ESP32-S3-WROOM-1.step` as a mechanical stand-in, saved as
+   `ESP32-S3-WROOM-1_standin-for-ESP32-C6-WROOM-1.step`. Its body measures 18.0 × 25.5 × 3.1 mm (STEP extents),
+   the same as the C6-WROOM-1 datasheet's 18 ± 0.2 × 25.5 ± 0.2 × 3.1 ± 0.15 mm (Figure 10-1).
+   It is placed with offset (0, +2.99, 0) mm: the module's top edge is at footprint y = −15.74 and the body is 25.5 mm long, so its centre
+   is 2.99 mm above the footprint origin. A `kicad-cli pcb render` of a test board confirmed that the body sits on the
+   pads and silkscreen outline. It is a stand-in only: the S3 body has an extra row of castellations along the
+   bottom edge that the C6 module does not have. The model is from the KiCad library (CC BY-SA 4.0 with the KiCad libraries exception).
+4. **Locating pegs → non-plated**: the USB-C's 2 pegs (0.70 mm) and the SKRTLAE010's 2 guide-boss holes (0.90 mm) were
+   `thru_hole` with drill = pad size. They are now `np_thru_hole` (the Alps land pattern says "2-ø0.9 holes"; the
+   SHOU HAN drawing shows ø0.65 pegs, and EasyEDA's 0.70 holes are kept).
+5. **SHT45 land pattern**: the pads now follow Sensirion's recommended land pattern (SHT4x datasheet v3, April 2022, §5.3,
+   Fig. 13): 4 pads 0.5 × 0.3 mm, 0.8 mm pitch, 1.3 mm between pad centres. The EasyEDA **die pad (pad 5) was removed**: Sensirion
+   "recommends to not solder the central die pad" and says "there shall be no copper under the sensor other than at the pin pads".
+   Symbol pin 5 was removed with it.
+6. **USBLC6-2SC6 symbol pin names**: EasyEDA had named the pins "1"–"6". They now read I/O1, GND, I/O2, I/O2, VBUS, I/O1
+   (ST datasheet, Figure 1).
+
+## Pad maps checked by hand
+
+Each check compares the footprint's pad numbers and positions (from the `.kicad_mod`) and the symbol's pin names with the manufacturer's document.
+
+| Part | What was compared | Source | Result |
+|---|---|---|---|
+| ESP32-C6-WROOM-1 | Pin names 1–28 and EPAD; pad rows 17.5 mm apart, 1.27 mm pitch, pads 1.5 × 0.9 mm; pin 1 centre 7.49 mm from the antenna-end edge; EPAD centre 7.495 mm from the pin-1 side and 12.29 mm from the bottom edge; antenna strip 6.0 mm; numbering 1–14 down the left, 15–28 up the right | Espressif *ESP32-C6-WROOM-1 & WROOM-1U Datasheet* v1.4: Table 3-1, Fig. 10-1, Fig. 11-1 | **OK** (silkscreen body 25.58 mm vs 25.5 nominal) |
+| MS5611-01BA03 | Pin table (1 VDD, 2 PS, 3 GND, 4 CSB, 5 CSB internal, 6 SDO, 7 SDI/SDA, 8 SCLK); top-view counter-clockwise numbering with a pin-1 mark; 1.25 mm pitch; pad rows | TE *MS5611-01BA03* datasheet 06/2017, pin configuration p. 15, recommended pad layout p. 16 | **OK**. The pads are 1.5 mm long on 2.6 mm centres vs the datasheet's 1.1 mm on 2.2 mm: same inner gap, longer outer toe. Kept, and noted. |
+| SHT45-AD1B-R2 | Pins 1 SDA, 2 SCL, 3 VDD, 4 VSS; pin 1 top-left, counter-clockwise (transparent top view, Fig. 14); land pattern | Sensirion *SHT4x* datasheet v3, April 2022, §5.3–5.4 | **OK after fix 5** |
+| VEML7700-TR | Pins 1 SCL, 2 VDD, 3 GND, 4 SDA; 1.27 mm pitch; pad 0.8 × 1.8 mm vs proposed 0.7 × 1.4 mm (side view); the sensitive face is on the side opposite the terminals' toe, i.e. toward footprint **−y**. Pin 1 is at footprint +x, so facing the window, pin 1 is on the left, as in the datasheet photo | Vishay doc. 84286 Rev. 1.4/1.5 p. 1 (pinning, photo) and p. 8 (package dimensions, proposed pad layouts) | **OK**. When placing it, the footprint's −y side faces the board edge. |
+| USB-C (C2765186) | Pad names A1B12, A4B9, B8, A5, B7, A6, A7, B6, A8, B5, B4A9, B1A12 against the vendor's pin-assignment table; outer pads 6.40 apart, VBUS pads 4.80, signal pads 3.50, 0.5 mm pitch; shell legs 8.64 apart; pegs 5.78 apart | SHOU HAN *TYPE-C 16PIN 2MD(073)* drawing p. 1 (recommended PCB layout, pin assignments) | **OK**. A front/back mirror would only swap CC1↔CC2 and D+/D− pairs that are both used, so it would be harmless. |
+| FPC-05FB-24PH20 | Insertion side and pin 1 (see below) | XUNPU series drawing *FPC 0.5PH H2.0 后翻双面接* (part FPC-05FB-NPH20; dimension table includes 24P) | **OK**, read from the series drawing; the 24-pin part's own PDF is corrupt |
+| TPS562201DDCR | 1 GND, 2 SW, 3 VIN, 4 VFB, 5 EN, 6 VBST; counter-clockwise SOT-23-6, pin 6 opposite pin 1, pin-1 mark at pad 1 | TI SLVSD91D Table 4-1 / Fig. 4-1 | **OK** |
+| SK6812SIDE-A | 1 DIN, 2 VDD, 3 DOUT, 4 GND; terminal widths 0.75 / 0.6 / 0.35 / 0.65 mm with 0.55 mm gaps match pads 1–4 (1.00 / 0.70 / 0.45 / 1.00 mm, same positions); the side view puts the terminals opposite the lens, so light leaves toward footprint **+y**; facing the light, DIN is on the left | OPSCO *SK6812SIDE-A-012* Rev. B/2 §4–5 | **OK**. Place the footprint's +y side toward the front edge. |
+| SN74AHCT1G125DBVR | 1 OE, 2 A, 3 GND, 4 Y, 5 VCC; pin 5 opposite pin 1, pin 4 opposite pin 3 | TI SN74AHCT1G125 datasheet, DBV pinout | **OK** |
+| USBLC6-2SC6 | 1 I/O1, 2 GND, 3 I/O2, 4 I/O2, 5 VBUS, 6 I/O1, counter-clockwise | ST USBLC6-2 datasheet, Fig. 1 | **OK** (names fixed, fix 6) |
+| JST SM06B-GHS-TB | Circuit No. 1 is on the left in the side-entry front view (looking into the mating face). In the footprint the contact pads are at −y and the fitting tabs at +y (mating face toward +y); pad 1 at x = −3.13, i.e. on the left seen from the mating side; 1.25 mm pitch, A = 6.25 mm | JST *GH connector* catalogue p. 2 (shrouded header, side entry) and p. 1 (PC board layout) | **OK** |
+| JST SM04B-SRSS-TB | Same check; pad 1 at x = −1.50; 1.0 mm pitch, A = 3.0 mm | JST *SH connector* catalogue p. 2 (shrouded header, side entry) | **OK** |
+| JST SM03B-SRSS-TB | Same check; pad 1 at x = −1.00; A = 2.0 mm | JST *SH connector* catalogue p. 2 | **OK** |
+| SKRTLAE010 (extra) | Pins 1 and 3 are common, 2 is the switched contact; 4 and 5 are mounting tabs; pad span 3.2 mm, holes 4.25 mm apart | Alps *SKRTLAE010* basic information, land dimensions and circuit diagram | **OK**. In the schematic, BUTTON goes to pin 2 and GND to pins 1 and 3; pins 4 and 5 are mechanical. Keep copper tracks out of the hatched area between the holes. |
+| AO3400A, B5819W (extra) | SOT-23: 1 G, 2 S, 3 D; SOD-123 pad 1 = cathode with the marker | standard pinouts, EasyEDA symbol | **OK** |
+
+### FPC orientation (J_EPD, ruling R27)
+
+- Panel (GDEY029T94 spec, drawing dated 2021/03/15): the FPC contacts are on the **display side**, with the stiffener on the back. The tail is 0.3 mm
+  thick and 12.5 mm wide; with the display up and the tail pointing toward the connector, FPC pin 1 is on the right as seen from the panel. GoodDisplay's DESPI-C02 spec
+  (Rev. 2.0, §3.2/§4.5) inserts the FPC display-side up into a "top or top/bottom contact" connector.
+- Connector C2856831: XUNPU's series drawing (title "FPC 0.5PH H2.0 后翻双面接" = back-flip, double-sided contacts) shows
+  the solder tails and the flip lid at the rear and the FPC entering from the front. The pin-1 mark ("A") is on the **right**, both in the top view
+  (tails up) and in the front view looking into the mouth. The EasyEDA footprint matches: signal pads at y = −1.62, mounting
+  pads and mouth toward +y, pad 1 at x = +5.75. The EasyEDA 3D model puts the black lid over the pad side.
+- Result: with the panel FPC inserted **unfolded, display side up** (GoodDisplay's arrangement), FPC pin *i* lands on connector
+  pin *i*, so the `J_EPD` order in `interface.yaml` maps 1:1. If the enclosure folds the FPC 180° behind the panel, the
+  double-sided contacts still mate, but the pin order reverses (pin 1 ↔ 24). The schematic would then have to mirror the map.
+- Source caveat: LCSC's PDF for C2856831 itself is corrupt (pdf.js: "Invalid or corrupted PDF file"). The check used the identical
+  series drawing in the FPC-05FB-6PH20 (C2856827) datasheet, whose dimension table lists FPC-05FB-24PH20.
+
+## Antenna keep-out for Task 5 (ESP32-C6-WROOM-1)
+
+From Espressif's *ESP32-C6 Hardware Design Guidelines*, "Positioning a Module on a Base Board", figure "Keepout Zone for
+ESP32-C6 Module's Antenna (Antenna feed point on the right)", units mm:
+
+- The 6.00 mm antenna strip at the module's end is the clearance area. It extends **at least 15 mm** past the module edge on the side away from
+  the feed point, and **at most 2 mm** past the module edge on the feed-point side, where the board edge must be.
+  The antenna end may sit **at most 1 mm** inside the board edge. No copper on any layer, no components, no traces in the clearance area.
+- Preferred: the antenna strip overhangs the board edge (the guideline strongly recommends the antenna "outside the base board").
+  Otherwise cut the board away beside and below the antenna. Put dense ground vias along the ground copper next to the clearance.
+- In the end product, keep at least 15 mm clearance around the antenna in all directions inside the housing.
+- On this module the feed point is on the **+x side** (pins 15–28): the EasyEDA antenna silkscreen's feed stub is at x ≈ +7.2…+7.6 mm.
+  So the ≥ 15 mm extension goes toward −x (the pin 1–14 side). Check this against Espressif's module drawing when placing it.
+
+## Open for owner review
+
+- **R22 is provisional**: WROOM-1-N8 + MS5611 (Economic) vs MINI-1-N4 + BMP585 (Standard tier). See above.
+- **FPC contact side and fold**: verified from the series drawing for the unfolded, display-up insertion only. Confirm the enclosure's FPC
+  routing in the Task 5 owner review; a 180° fold mirrors the pin order.
+- **Side-emitting LED and side-looking VEML7700 directions** were derived from 2-D drawings: SK6812SIDE-A light toward footprint +y,
+  VEML7700 window toward footprint −y. Confirm in the KiCad 3D viewer, and against a physical part if one is at hand,
+  before the board is ordered.
+- **SKRTLAE010 actuator direction**: not checked against the drawing. Confirm in 3D at placement.
+- The WROOM-1 3D body is a stand-in (the S3-WROOM-1 body with the same outline). Good enough for the enclosure STEP, not for a photo-real render.
+- Licence: the EasyEDA-derived symbols, footprints and models come from the LCSC/EasyEDA library through easyeda2kicad.
+  Their redistribution terms are EasyEDA's, not CC BY-SA. The owner should confirm that is acceptable for a public repository.

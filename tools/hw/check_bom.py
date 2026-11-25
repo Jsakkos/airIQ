@@ -5,12 +5,16 @@ Usage:
     python tools/hw/check_bom.py --parts-only PARTS [--fresh-days N] [--max-extended N]
 
 PARTS is a CSV with columns lcsc,mpn,library,economic,checked_on,stock,unit_usd where
-`library` is Basic / Preferred / Extended (JLCPCB assembly part classes).
+`library` is Basic / Preferred / Extended (JLCPCB assembly part classes). An optional 8th
+column `boards` lists, space-separated, the boards a part is placed on (e.g. `main`, `tongue`,
+`main tongue`).
 
 Rules for every checked part line: economic is yes/true, stock > 0, checked_on is no older
 than --fresh-days (when given), and at most --max-extended (default 15) distinct Extended parts.
-`--parts-only` applies them to the whole table; with a BOM they apply only to the LCSC numbers
-the BOM uses, and every BOM row (except DNP rows) must carry an LCSC number that is in PARTS.
+`--parts-only` applies them to the whole table; when the table has a `boards` column the
+Extended cap is applied per board instead (each board is a separate JLC order) and every
+row must name at least one board. With a BOM the rules apply only to the LCSC numbers the BOM
+uses, and every BOM row (except DNP rows) must carry an LCSC number that is in PARTS.
 The BOM's LCSC column is found by header (/lcsc|jlcpcb part/i); a row is DNP when a `DNP`
 column is truthy or any cell contains "DNP".
 
@@ -38,6 +42,7 @@ def _read_csv(path: Path) -> tuple[list[str], list[dict[str, str]]]:
 
 
 PARTS_COLUMNS = ("lcsc", "mpn", "library", "economic", "checked_on", "stock", "unit_usd")
+BOARDS_COLUMN = "boards"  # optional
 
 
 def _load_parts(parts_csv: Path) -> tuple[dict[str, dict[str, str]], list[str]]:
@@ -62,8 +67,17 @@ def _load_parts(parts_csv: Path) -> tuple[dict[str, dict[str, str]], list[str]]:
     return parts, errors
 
 
-def _check_lines(lines: list[dict[str, str]], max_extended: int, fresh_days: int | None,
+def _check_extended_cap(lines: list[dict[str, str]], max_extended: int, scope: str = "") -> list[str]:
+    extended = sorted({r["lcsc"] for r in lines if r.get("library", "").lower() == "extended"})
+    if len(extended) > max_extended:
+        return [f"{scope}{len(extended)} distinct Extended parts exceed the limit of {max_extended}: "
+                f"{', '.join(extended)}"]
+    return []
+
+
+def _check_lines(lines: list[dict[str, str]], max_extended: int | None, fresh_days: int | None,
                  today: date | None) -> list[str]:
+    """Per-line rules, plus the Extended cap over all `lines` unless max_extended is None."""
     today = today or date.today()
     errors: list[str] = []
     for r in lines:
@@ -85,18 +99,29 @@ def _check_lines(lines: list[dict[str, str]], max_extended: int, fresh_days: int
                 if checked < today - timedelta(days=fresh_days):
                     errors.append(f"{lcsc}: stale, checked_on {checked} is more than "
                                   f"{fresh_days} days before {today}")
-    extended = sorted({r["lcsc"] for r in lines if r.get("library", "").lower() == "extended"})
-    if len(extended) > max_extended:
-        errors.append(f"{len(extended)} distinct Extended parts exceed the limit of {max_extended}: "
-                      f"{', '.join(extended)}")
+    if max_extended is not None:
+        errors += _check_extended_cap(lines, max_extended)
     return errors
 
 
 def check_parts(parts_csv: Path, max_extended: int = 15, fresh_days: int | None = None,
                 today: date | None = None) -> list[str]:
-    """Check the whole parts table."""
+    """Check the whole parts table; with a `boards` column the Extended cap is per board."""
     parts, errors = _load_parts(parts_csv)
-    return errors + _check_lines(list(parts.values()), max_extended, fresh_days, today)
+    lines = list(parts.values())
+    if not any(BOARDS_COLUMN in r for r in lines):
+        return errors + _check_lines(lines, max_extended, fresh_days, today)
+    errors += _check_lines(lines, None, fresh_days, today)
+    per_board: dict[str, list[dict[str, str]]] = {}
+    for r in lines:
+        boards = r.get(BOARDS_COLUMN, "").split()
+        if not boards:
+            errors.append(f"{r['lcsc']}: no board named in the '{BOARDS_COLUMN}' column")
+        for b in boards:
+            per_board.setdefault(b, []).append(r)
+    for b in sorted(per_board):
+        errors += _check_extended_cap(per_board[b], max_extended, scope=f"board {b}: ")
+    return errors
 
 
 def check_bom(bom_csv: Path, parts_csv: Path, **kw) -> list[str]:
