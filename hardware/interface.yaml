@@ -26,16 +26,28 @@ i2c_addresses:
 # Net name on each pin, in pin order. NC = not connected.
 connectors:
   # Sensirion SEN6x, JST GH 6-pin. Supply is 3.3 V (SEN66 runs on 3.15-3.45 V, spec section 3).
-  # TODO verify pin order against SEN6x datasheet (could not fetch the PDF).
-  J_SEN66: [+3V3, GND, I2C_SDA, I2C_SCL, GND, NC]
+  # Pin order: Sensirion "SEN6x Datasheet" Version 0.5 (October 2024), section 4 Hardware
+  # Interface Description, Table 16 "SEN6x pin assignment": 1 VDD, 2 GND, 3 SDA, 4 SCL,
+  # 5 "GND or NC", 6 "VDD or NC" (5 is internally tied to 2, 6 to 1). Pins 5 and 6 are left NC.
+  J_SEN66: [+3V3, GND, I2C_SDA, I2C_SCL, NC, NC]
   J_QWIIC_TONGUE: [GND, +3V3, I2C_SDA, I2C_SCL]
   J_QWIIC_AUX: [GND, +3V3, I2C_SDA, I2C_SCL]
   J_LED_EXT: [+5V, LED_DOUT_5V, GND]
-  J_AUX_UART: [GND, +3V3, AUX_UART_TX, AUX_UART_RX]
-  # GoodDisplay GDEY029T94, 24-pin 0.5 mm FPC.
-  # TODO verify against the GDEY029T94 specification (could not fetch the PDF);
-  # pins 8-14 follow the BS1/BUSY/RES/DC/CS/SCK/SDI order seen in a third-party listing.
-  J_EPD: [NC, EPD_GDR, EPD_RESE, EPD_VSH2, NC, NC, NC, GND, EPD_BUSY, EPD_RST, EPD_DC, EPD_CS, EPD_CLK, EPD_MOSI, +3V3, +3V3, GND, EPD_VDD, EPD_VPP, EPD_VSH1, EPD_VGH, EPD_VSL, EPD_VGL, EPD_VCOM]
+  # EN = ESP32-C6 chip-enable net, BUTTON = GPIO9/BOOT: with pins 1-4 they give ROM-UART
+  # recovery (hold BUTTON low, pulse EN) and take a future mmWave sensor.
+  J_AUX_UART: [GND, +3V3, AUX_UART_TX, AUX_UART_RX, EN, BUTTON]
+  # GoodDisplay GDEY029T94, 24-pin 0.5 mm FPC. Pin order: GoodDisplay "GDEY029T94 Product
+  # Specifications" Rev 1.0 (2021/03/15; download "GDEY029T94_Specification(24.10.22)"), section 5
+  # "Input/Output Pin Assignment" and the section 4 drawing's pin strip; identical to the
+  # Waveshare "2.9inch e-Paper V2" Specification Rev 2.1 (2020/02/10), section 1.5. Pins 1 and 4
+  # are NC, 5 = VSH2, 6/7 = TSCL/TSDA (unused, NC), 8 = BS1 (low = 4-wire SPI, hence GND),
+  # 15 VDDIO and 16 VCI both +3V3, 17 VSS. NOT compatible with the older Waveshare 2.9" V1
+  # (2017, IL3820-class) panel, whose pins 4/5 are VGL/VGH.
+  # FPC contacts: on the front (viewing) face, stiffener on the back, per the GoodDisplay side
+  # view "CONTACT SIDE"/"STIFFENER" labels (Waveshare V2 drawing: "CONNECT SIDE" on FRONT).
+  # The datasheets have no assembly drawing, so the board connector contact type is chosen in
+  # Task 3 (dual-contact recommended).
+  J_EPD: [NC, EPD_GDR, EPD_RESE, NC, EPD_VSH2, NC, NC, GND, EPD_BUSY, EPD_RST, EPD_DC, EPD_CS, EPD_CLK, EPD_MOSI, +3V3, +3V3, GND, EPD_VDD, EPD_VPP, EPD_VSH1, EPD_VGH, EPD_VSL, EPD_VGL, EPD_VCOM]
 
 mechanical: {}  # filled by the PCB plan (board outlines, mounting holes)
 

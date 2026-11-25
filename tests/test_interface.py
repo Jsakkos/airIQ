@@ -62,3 +62,32 @@ def test_sen66_connector_on_3v3(iface):
     # SEN66 runs on 3.15-3.45 V (spec section 3): never wire it to 5 V.
     pins = iface["connectors"]["J_SEN66"]
     assert "+3V3" in pins and "+5V" not in pins
+
+
+def test_aux_uart_pinout(iface):
+    assert iface["connectors"]["J_AUX_UART"] == [
+        "GND", "+3V3", "AUX_UART_TX", "AUX_UART_RX", "EN", "BUTTON"]
+
+
+def test_epd_connector(iface, sig):
+    pins = iface["connectors"]["J_EPD"]
+    assert len(pins) == 24
+    assert pins[7] == "GND"  # pin 8 = BS1, low = 4-wire SPI
+    for net in ["EPD_BUSY", "EPD_RST", "EPD_DC", "EPD_CS", "EPD_CLK", "EPD_MOSI"]:
+        assert pins.count(net) == 1
+        assert net in sig
+    # GDEY029T94 spec Rev 1.0 s5 / Waveshare V2 spec Rev 2.1 s1.5: pin 4 NC, pin 5 VSH2.
+    assert pins[3] == "NC" and pins[4] == "EPD_VSH2"
+    # TSCL/TSDA (pins 6, 7) unused.
+    assert pins[5] == "NC" and pins[6] == "NC"
+
+
+def test_sen66_connector_pins(iface):
+    pins = iface["connectors"]["J_SEN66"]
+    assert len(pins) == 6
+    assert pins.count("I2C_SDA") == 1 and pins.count("I2C_SCL") == 1
+    assert pins == ["+3V3", "GND", "I2C_SDA", "I2C_SCL", "NC", "NC"]
+
+
+def test_no_todo_in_interface_yaml():
+    assert "TODO" not in IFACE_PATH.read_text(encoding="utf-8")
