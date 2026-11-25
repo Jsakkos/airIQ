@@ -15,7 +15,7 @@ def q(s):
     return '"' + str(s).replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def netlist(comps, nets):
+def netlist(comps, nets, bare=False):
     """comps: [(ref, value, {field: value})]; nets: [(name, [(ref, pin, pinfunction|None)])]."""
     o = ["(export", '\t(version "E")', "\t(design", '\t\t(source "fixture.kicad_sch")',
          '\t\t(tool "Eeschema 10.0.8")', "\t)", "\t(components"]
@@ -30,7 +30,8 @@ def netlist(comps, nets):
         for ref, pin, func in nodes:
             o += ["\t\t\t(node", f"\t\t\t\t(ref {q(ref)})", f"\t\t\t\t(pin {q(pin)})"]
             if func:
-                o.append(f"\t\t\t\t(pinfunction {q(func)})")
+                # KiCad 10 writes "<pin name>_<pin number>"; `bare` keeps the plain name
+                o.append(f"\t\t\t\t(pinfunction {q(func if bare else func + '_' + pin)})")
             o += ['\t\t\t\t(pintype "passive")', "\t\t\t)"]
         o.append("\t\t)")
     o += ["\t)", ")", ""]
@@ -64,8 +65,8 @@ def base():
     return comps, nets
 
 
-def write(name, comps, nets):
-    text = netlist([(r, *comps[r]) for r in comps], list(nets.items()))
+def write(name, comps, nets, bare=False):
+    text = netlist([(r, *comps[r]) for r in comps], list(nets.items()), bare)
     (HERE / name).write_text(text, encoding="utf-8", newline="\n")
 
 
@@ -96,6 +97,7 @@ def footprint(ref, layer, x, y):
 def main():
     c, n = base()
     write("good.net", c, n)
+    write("good_bare_pinfunction.net", c, n, bare=True)  # older / hand-made form: plain pin names
 
     c, n = base()  # rule 1: MCU IO6 / IO7 land on the swapped nets
     n["I2C_SDA"][0], n["I2C_SCL"][0] = ("U1", "7", "IO7"), ("U1", "6", "IO6")

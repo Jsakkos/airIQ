@@ -95,7 +95,7 @@
 			(node
 				(ref "U1")
 				(pin "2")
-				(pinfunction "3V3")
+				(pinfunction "3V3_2")
 				(pintype "passive")
 			)
 			(node
@@ -145,7 +145,7 @@
 			(node
 				(ref "U1")
 				(pin "1")
-				(pinfunction "GND")
+				(pinfunction "GND_1")
 				(pintype "passive")
 			)
 			(node
@@ -190,7 +190,7 @@
 			(node
 				(ref "U1")
 				(pin "6")
-				(pinfunction "IO6")
+				(pinfunction "IO6_6")
 				(pintype "passive")
 			)
 			(node
@@ -210,7 +210,7 @@
 			(node
 				(ref "U1")
 				(pin "7")
-				(pinfunction "IO7")
+				(pinfunction "IO7_7")
 				(pintype "passive")
 			)
 			(node
@@ -230,7 +230,7 @@
 			(node
 				(ref "U1")
 				(pin "9")
-				(pinfunction "IO9")
+				(pinfunction "IO9_9")
 				(pintype "passive")
 			)
 			(node
@@ -245,7 +245,7 @@
 			(node
 				(ref "U1")
 				(pin "15")
-				(pinfunction "IO15")
+				(pinfunction "IO15_15")
 				(pintype "passive")
 			)
 			(node
@@ -297,7 +297,7 @@
 			(node
 				(ref "U1")
 				(pin "8")
-				(pinfunction "IO8")
+				(pinfunction "IO8_8")
 				(pintype "passive")
 			)
 			(node

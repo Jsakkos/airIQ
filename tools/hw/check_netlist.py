@@ -40,6 +40,14 @@ STRAP_GPIOS = (8, 15)
 _EPS = 1e-12
 
 
+def _pin_name(pinfunction: str | None, pin: str | None) -> str | None:
+    """KiCad 10 writes pinfunction as "<pin name>_<pin number>"; strip that suffix (only that one)."""
+    suffix = f"_{pin}"
+    if pinfunction and pin and pinfunction.endswith(suffix) and len(pinfunction) > len(suffix):
+        return pinfunction[: -len(suffix)]
+    return pinfunction
+
+
 class Netlist:
     """Components and nets of a kicadsexpr netlist."""
 
@@ -61,7 +69,7 @@ class Netlist:
             nodes = []
             for node in children(net, "node"):
                 ref, pin = atom(node, "ref"), atom(node, "pin")
-                nodes.append((ref, pin, atom(node, "pinfunction")))
+                nodes.append((ref, pin, _pin_name(atom(node, "pinfunction"), pin)))
                 self.pin_net[(ref, pin)] = name
             self.nets[name] = nodes
 

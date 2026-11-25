@@ -2,7 +2,7 @@ from pathlib import Path
 
 import yaml
 
-from check_netlist import check_netlist, main
+from check_netlist import Netlist, check_netlist, main
 
 FX = Path(__file__).parent / "fixtures"
 IFACE = FX / "iface.yaml"
@@ -122,3 +122,29 @@ def test_cli_clean_and_violating(capsys):
 
 def test_cli_wrong_arity_exits_2(capsys):
     assert main([str(FX / "good.net")]) == 2
+
+
+def test_kicad10_name_number_pinfunction_is_normalised():
+    # good.net uses the real "NAME_NUMBER" form (IO6_6 on pin 6)
+    assert 'pinfunction "IO6_6"' in (FX / "good.net").read_text(encoding="utf-8")
+    nl = Netlist((FX / "good.net").read_text(encoding="utf-8"))
+    assert ("U1", "6", "IO6") in nl.nets["I2C_SDA"]
+    assert errs("good.net") == []
+
+
+def test_bare_pinfunction_still_works():
+    assert errs("good_bare_pinfunction.net") == []
+
+
+def test_mismatched_pinfunction_suffix_is_not_stripped(tmp_path):
+    text = (FX / "good.net").read_text(encoding="utf-8").replace('"IO6_6"', '"IO6_7"')
+    p = tmp_path / "odd.net"
+    p.write_text(text, encoding="utf-8")
+    assert ("U1", "6", "IO6_7") in Netlist(text).nets["I2C_SDA"]
+    assert any("IO6" in e for e in check_netlist(p, IFACE))  # IO6_7 is not read as GPIO6
+
+
+def test_only_the_pin_number_suffix_is_stripped():
+    text = '(export (nets (net (name "N") (node (ref "U") (pin "2") (pinfunction "FB+_2")) ' \
+           '(node (ref "U") (pin "3") (pinfunction "A_B")))))'
+    assert Netlist(text).nets["N"] == [("U", "2", "FB+"), ("U", "3", "A_B")]
