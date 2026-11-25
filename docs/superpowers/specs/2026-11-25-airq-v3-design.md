@@ -2,7 +2,7 @@
 
 - **Date:** 2026-11-25
 - **Status:** draft, awaiting owner approval. A builder-check review has been done, and the owner's answers to it are included.
-- **Research behind this design:** [`reports/Air quality monitor refresh.md`](../../../reports/Air%20quality%20monitor%20refresh.md), with the supporting notes in `research_notes/Air quality monitor refresh/`
+- **Research behind this design:** [`docs/research/reports/Air quality monitor refresh.md`](../../research/reports/Air%20quality%20monitor%20refresh.md), with the supporting notes in `docs/research/notes/Air quality monitor refresh/`
 
 > Marked **(owner decision)**: decided by the project owner in the design conversation.
 > Marked **(designer's call)**: a proposal the owner hasn't explicitly approved yet; open to change.
