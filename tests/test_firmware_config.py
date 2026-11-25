@@ -154,9 +154,11 @@ def test_lux_smoothed(sensors):
     assert any("sliding_window_moving_average" in f for f in filters)
 
 
-def test_co2_asc_switch(sensors):
-    sw = next(s for s in sensors["switch"] if s["id"] == "co2_asc")
-    assert sw["restore_mode"] == "RESTORE_DEFAULT_ON"
+def test_co2_asc_substitution(sensors, board):
+    sen6x = next(s for s in sensors["sensor"] if s["platform"] == "sen6x")
+    assert sen6x["co2"]["automatic_self_calibration"] == "${co2_asc}"
+    assert board["substitutions"]["co2_asc"] == "true"
+    assert "switch" not in sensors
 
 
 def test_model_bundles_include_base():

@@ -6,6 +6,8 @@ substitutions:
   led_count: "4"
   light_cap: "0.5"
   epd_model: none
+  # Rooms that rarely get fresh air should set co2_asc: "false" in their unit file and use forced recalibration outdoors (implemented in a later task).
+  co2_asc: "true"
 
 esphome:
   name: ${name}

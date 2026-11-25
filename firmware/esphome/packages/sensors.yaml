@@ -37,7 +37,7 @@ sensor:
     co2:
       id: co2
       name: ${friendly_name} CO2
-      automatic_self_calibration: true
+      automatic_self_calibration: ${co2_asc}
       # Compensate CO2 for ambient pressure from the BMP585.
       ambient_pressure_compensation_source: room_p
     pm_1_0:
@@ -78,14 +78,3 @@ sensor:
       t2: 300
       k: 20
       p: 20
-
-switch:
-  # NOTE: ESPHome's sen6x only supports ASC as a compile-time option
-  # (automatic_self_calibration above), so this switch records the user's
-  # intent and is restored after reboot; it is not yet wired to the sensor.
-  - platform: template
-    id: co2_asc
-    name: ${friendly_name} CO2 auto-calibration
-    entity_category: config
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_ON
