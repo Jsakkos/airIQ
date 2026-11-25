@@ -1,0 +1,7 @@
+# Example device file for the airQ (e-ink). Copy, rename and adjust.
+substitutions:
+  name: airq
+  friendly_name: airQ
+
+packages:
+  model: !include packages/model-airq.yaml

@@ -1,0 +1,7 @@
+# Example device file for the airQ mini (no screen). Copy, rename and adjust.
+substitutions:
+  name: airq-mini
+  friendly_name: airQ mini
+
+packages:
+  model: !include packages/model-mini.yaml

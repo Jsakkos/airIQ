@@ -1,0 +1,58 @@
+# Platform, connectivity and offline-safety base shared by both models.
+substitutions:
+  name: airq
+  friendly_name: airQ
+  sen6x_model: SEN66
+  led_count: "4"
+  light_cap: "0.5"
+  epd_model: none
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  # Path is relative to the top-level device YAML in firmware/esphome/.
+  includes:
+    - include/airq_logic.h
+
+esp32:
+  board: esp32-c6-devkitm-1
+  variant: esp32c6
+  cpu_frequency: 80MHz
+  framework:
+    type: esp-idf
+
+logger:
+  # GPIO16/17 (UART0) are the aux UART header, so log over USB serial/JTAG.
+  hardware_uart: USB_SERIAL_JTAG
+
+# Offline safety: never reboot just because Home Assistant or Wi-Fi is gone.
+api:
+  encryption:
+    key: !secret api_key
+  reboot_timeout: 0s
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: LIGHT
+  reboot_timeout: 0s
+  ap:
+    ssid: ${name}-setup
+
+captive_portal:
+
+safe_mode:
+
+button:
+  - platform: safe_mode
+    id: safe_mode_btn
+    name: ${friendly_name} Safe mode
+
+i2c:
+  sda: ${pin_i2c_sda}
+  scl: ${pin_i2c_scl}
+  frequency: 100kHz

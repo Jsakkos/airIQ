@@ -1,0 +1,5 @@
+# airQ mini (no screen). Later tasks add light and button packages.
+packages:
+  pins: !include pins.yaml
+  board: !include board.yaml
+  sensors: !include sensors.yaml

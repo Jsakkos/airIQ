@@ -40,6 +40,6 @@ connectors:
 mechanical: {}  # filled by the PCB plan (board outlines, mounting holes)
 
 # GPIOs the design must not use.
-# GPIO12/13 are USB D-/D+. GPIO10/11 (in-module flash) are not exposed by the module,
+# GPIO12/13 are USB D-/D+. GPIO10/11 are not exposed by the ESP32-C6-MINI-1 module,
 # so they cannot appear in `signals` anyway.
 reserved: [GPIO12, GPIO13]

@@ -1,0 +1,91 @@
+# Sensors. SHT45 is the published room temperature/humidity; the SEN66's own
+# T/RH is diagnostic only (self-heating from the fan and electronics).
+sensor:
+  - platform: sht4x
+    address: ${addr_sht45}
+    temperature:
+      id: room_t
+      name: ${friendly_name} Temperature
+    humidity:
+      id: room_rh
+      name: ${friendly_name} Humidity
+    update_interval: 10s
+
+  - platform: bmp581_i2c
+    address: ${addr_bmp585}
+    pressure:
+      id: room_p
+      name: ${friendly_name} Pressure
+    update_interval: 30s
+
+  - platform: veml7700
+    address: ${addr_veml7700}
+    update_interval: 5s
+    ambient_light:
+      id: room_lux
+      name: ${friendly_name} Illuminance
+      filters:
+        # 6 samples x 5 s = 30 s sliding window.
+        - sliding_window_moving_average:
+            window_size: 6
+            send_every: 1
+
+  - platform: sen6x
+    type: ${sen6x_model}
+    address: ${addr_sen6x}
+    update_interval: 10s
+    co2:
+      id: co2
+      name: ${friendly_name} CO2
+      automatic_self_calibration: true
+      # Compensate CO2 for ambient pressure from the BMP585.
+      ambient_pressure_compensation_source: room_p
+    pm_1_0:
+      id: pm_1_0
+      name: ${friendly_name} PM1.0
+    pm_2_5:
+      id: pm_2_5
+      name: ${friendly_name} PM2.5
+    pm_4_0:
+      id: pm_4_0
+      name: ${friendly_name} PM4.0
+    pm_10_0:
+      id: pm_10_0
+      name: ${friendly_name} PM10
+    voc_index:
+      id: voc_index
+      name: ${friendly_name} VOC Index
+    nox_index:
+      id: nox_index
+      name: ${friendly_name} NOx Index
+    temperature:
+      id: sen_t
+      name: ${friendly_name} SEN66 Temperature
+      entity_category: diagnostic
+    humidity:
+      id: sen_rh
+      name: ${friendly_name} SEN66 Humidity
+      entity_category: diagnostic
+    # Compensation block enabled with ESPHome defaults (no offset); tune after
+    # characterising the enclosure's self-heating.
+    temperature_compensation:
+      offset: 0
+      normalized_offset_slope: 0
+      time_constant: 0
+    # Sensirion "Light (IAQM)" acceleration preset.
+    temperature_acceleration:
+      t1: 100
+      t2: 300
+      k: 20
+      p: 20
+
+switch:
+  # NOTE: ESPHome's sen6x only supports ASC as a compile-time option
+  # (automatic_self_calibration above), so this switch records the user's
+  # intent and is restored after reboot; it is not yet wired to the sensor.
+  - platform: template
+    id: co2_asc
+    name: ${friendly_name} CO2 auto-calibration
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
