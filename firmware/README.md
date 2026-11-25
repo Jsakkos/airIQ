@@ -4,7 +4,7 @@ Two models share one code base: **airQ** (e-ink display) and **airQ mini** (no d
 
 ## Setup and flashing
 
-1. Copy `firmware/esphome/secrets.example.yaml` to `firmware/esphome/secrets.yaml` and fill in your values. `secrets.yaml` must sit next to the device files. It is gitignored. **Generate your own `api_key` and set your own `ap_password`** (the example values are public placeholders; the fallback setup hotspot and its `/update` page are protected only by `ap_password`):
+1. Copy `firmware/esphome/secrets.example.yaml` to `firmware/esphome/secrets.yaml` and fill in your values. `secrets.yaml` must sit next to the device files. It is gitignored. **Generate your own `api_key` and set your own `ap_password`.** The example `api_key` is deliberately invalid, so ESPHome won't build until you replace it; that way no two devices ever share a published key. The other example values are public placeholders, and the fallback setup hotspot and its `/update` page are protected only by `ap_password`:
 
    ```
    python -c "import base64,os;print(base64.b64encode(os.urandom(32)).decode())"   # api_key (or: openssl rand -base64 32)

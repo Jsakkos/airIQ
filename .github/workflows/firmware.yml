@@ -43,9 +43,12 @@ jobs:
           key: esphome-2026.11.1-${{ hashFiles('firmware/esphome/**/*.yaml') }}
           restore-keys: esphome-2026.11.1-
       - run: pip install esphome==2026.11.1
-      - name: Use example secrets
+      - name: Use example secrets with a throwaway API key
         working-directory: firmware/esphome
-        run: cp secrets.example.yaml secrets.yaml
+        run: |
+          cp secrets.example.yaml secrets.yaml
+          KEY=$(python -c "import base64,os;print(base64.b64encode(os.urandom(32)).decode())")
+          sed -i "s|^api_key:.*|api_key: \"$KEY\"|" secrets.yaml
       - name: Validate the HCHO option
         working-directory: firmware/esphome
         run: |

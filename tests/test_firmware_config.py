@@ -213,6 +213,20 @@ def test_fallback_ap_has_password(board):
     assert len(secrets["ap_password"]) >= 8
 
 
+def test_example_api_key_is_not_a_usable_key():
+    """The committed example must never hold a valid 32-byte key: a published key
+    copied unchanged would be shared by every device (and trips secret scanners)."""
+    import base64
+    import binascii
+
+    key = load_yaml(ESPHOME_DIR / "secrets.example.yaml")["api_key"]
+    try:
+        usable = len(base64.b64decode(key, validate=True)) == 32
+    except (binascii.Error, ValueError):
+        usable = False
+    assert not usable
+
+
 def test_entity_names_are_bare():
     """HA already prefixes entities with the device friendly_name (R24)."""
     for f in PKG.glob("*.yaml"):
