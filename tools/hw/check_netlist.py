@@ -185,14 +185,22 @@ def _resistors_to(nl: Netlist, net: str, rail: str, target: float, tol: float) -
             if nl.is_net(nl.other_pin_net(r, net), rail) and _within(nl.value(r), target, tol)]
 
 
+def _shorted_cc_nets(nl: Netlist) -> list[str]:
+    """Nets that carry both CC pins (A5 and B5) of the same connector."""
+    return sorted({net for (ref, pin), net in nl.pin_net.items()
+                   if pin == "A5" and nl.pin_net.get((ref, "B5")) == net})
+
+
 def check_usb_cc(nl: Netlist, iface: dict) -> list[str]:
     errors: list[str] = []
+    shorted = _shorted_cc_nets(nl)
+    if shorted:  # a real violation, not an unfinished schematic: do not say "missing"
+        return [f"USB_CC1 and USB_CC2 are shorted together (A5 and B5 share net {n}); "
+                f"CC2 needs its own net and 5.1 k resistor" for n in shorted]
     used: set[str] = set()
     for cc in ("USB_CC1", "USB_CC2"):
         net = nl.net(cc, errors, "USB-C CC pin")
         if net is None:
-            if cc == "USB_CC2" and not nl.find_nets(cc):
-                errors[-1] += "; if CC1 and CC2 are tied together they need two separate nets"
             continue
         own = [r for r in _resistors_to(nl, net, "GND", CC_OHMS, CC_TOL) if r not in used]
         if not own:

@@ -37,8 +37,29 @@ def _read_csv(path: Path) -> tuple[list[str], list[dict[str, str]]]:
             {k: (v or "").strip() for k, v in row.items() if k is not None} for row in reader]
 
 
-def _load_parts(parts_csv: Path) -> dict[str, dict[str, str]]:
-    return {r["lcsc"]: r for r in _read_csv(parts_csv)[1] if r.get("lcsc")}
+PARTS_COLUMNS = ("lcsc", "mpn", "library", "economic", "checked_on", "stock", "unit_usd")
+
+
+def _load_parts(parts_csv: Path) -> tuple[dict[str, dict[str, str]], list[str]]:
+    """The parts table keyed by LCSC number, plus structural errors (header, empty, duplicates)."""
+    header, rows = _read_csv(parts_csv)
+    header = [h.strip() for h in header]
+    absent = [c for c in PARTS_COLUMNS if c not in header]
+    if absent:
+        return {}, [f"{parts_csv}: parts table is missing column(s): {', '.join(absent)}"]
+    parts: dict[str, dict[str, str]] = {}
+    errors: list[str] = []
+    for i, r in enumerate(rows, 2):
+        r = {k.strip(): v for k, v in r.items()}
+        if not r.get("lcsc"):
+            errors.append(f"{parts_csv} line {i}: parts row has no LCSC number")
+        elif r["lcsc"] in parts:
+            errors.append(f"{parts_csv} line {i}: duplicate LCSC number {r['lcsc']}")
+        else:
+            parts[r["lcsc"]] = r
+    if not parts and not errors:
+        errors.append(f"{parts_csv}: parts table is empty")
+    return parts, errors
 
 
 def _check_lines(lines: list[dict[str, str]], max_extended: int, fresh_days: int | None,
@@ -74,19 +95,22 @@ def _check_lines(lines: list[dict[str, str]], max_extended: int, fresh_days: int
 def check_parts(parts_csv: Path, max_extended: int = 15, fresh_days: int | None = None,
                 today: date | None = None) -> list[str]:
     """Check the whole parts table."""
-    return _check_lines(list(_load_parts(parts_csv).values()), max_extended, fresh_days, today)
+    parts, errors = _load_parts(parts_csv)
+    return errors + _check_lines(list(parts.values()), max_extended, fresh_days, today)
 
 
 def check_bom(bom_csv: Path, parts_csv: Path, **kw) -> list[str]:
     """Check a BOM against the parts table; `kw` are check_parts' keyword arguments."""
-    parts = _load_parts(parts_csv)
+    parts, parts_errors = _load_parts(parts_csv)
+    if not parts:
+        return parts_errors
     header, rows = _read_csv(bom_csv)
     lcsc_col = next((h for h in header if _LCSC_HEADER.search(h)), None)
     if lcsc_col is None:
         return [f"{bom_csv}: no LCSC column (expected a header matching 'LCSC' or 'JLCPCB Part')"]
     ref_col = next((h for h in header if _REF_HEADER.search(h)), None)
     dnp_col = next((h for h in header if h.lower() == "dnp"), None)
-    errors: list[str] = []
+    errors: list[str] = list(parts_errors)
     used: dict[str, dict[str, str]] = {}
     for i, row in enumerate(rows, 2):  # line 1 is the header
         if dnp_col and row.get(dnp_col, "").lower() in _TRUE | {"dnp", "x"}:

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import yaml
 
-from check_netlist import check_netlist
+from check_netlist import check_netlist, main
 
 FX = Path(__file__).parent / "fixtures"
 IFACE = FX / "iface.yaml"
@@ -84,6 +84,12 @@ def test_absent_things_are_reported_as_missing(tmp_path):
 def test_real_violations_do_not_start_with_missing():
     assert not any(e.startswith("missing") for e in errs("swapped_i2c.net"))
     assert not any(e.startswith("missing") for e in errs("mirrored_sen66.net"))
+    assert not any(e.startswith("missing") for e in errs("shared_cc.net"))
+
+
+def test_shorted_cc_pins_reported_as_short():
+    e = errs("shared_cc.net")
+    assert len(e) == 1 and "CC2" in e[0] and "short" in e[0]
 
 
 def test_nc_pin_on_a_real_net_is_reported():
@@ -105,3 +111,14 @@ def test_unknown_check_group_reported(tmp_path):
     p = tmp_path / "i.yaml"
     p.write_text("checks: [bogus]\nsignals: {}\nconnectors: {}\n", encoding="utf-8")
     assert any("bogus" in e for e in check_netlist(FX / "good.net", p))
+
+
+def test_cli_clean_and_violating(capsys):
+    assert main([str(FX / "good.net"), str(IFACE)]) == 0
+    assert capsys.readouterr().out == ""
+    assert main([str(FX / "swapped_i2c.net"), str(IFACE)]) == 1
+    assert "IO6" in capsys.readouterr().out
+
+
+def test_cli_wrong_arity_exits_2(capsys):
+    assert main([str(FX / "good.net")]) == 2

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from check_board import check_board
+from check_board import check_board, main
 
 FX = Path(__file__).parent / "fixtures"
 
@@ -76,3 +76,13 @@ def test_footprint_edge_shape_is_rotated_and_translated(tmp_path):
 
 def test_no_outline_reported(tmp_path):
     assert any("Edge.Cuts" in e for e in check_board(board(tmp_path, ""), 60, 30))
+
+
+def test_cli_clean_and_violating(capsys):
+    ok = str(FX / "board_ok.kicad_pcb")
+    assert main([ok, "--max-w", "60", "--max-h", "30"]) == 0
+    assert capsys.readouterr().out == ""
+    assert main([str(FX / "board_bottom_part.kicad_pcb"), "--max-w", "60", "--max-h", "30"]) == 1
+    assert "B.Cu" in capsys.readouterr().out
+    assert main([str(FX / "board_61x30.kicad_pcb"), "--max-w", "60", "--max-h", "30"]) == 1
+    assert "width" in capsys.readouterr().out

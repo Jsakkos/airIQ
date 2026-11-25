@@ -1,7 +1,9 @@
 from datetime import date
 from pathlib import Path
 
-from check_bom import check_bom, check_parts
+import pytest
+
+from check_bom import check_bom, check_parts, main
 
 FX = Path(__file__).parent / "fixtures"
 
@@ -80,3 +82,59 @@ def test_bom_without_lcsc_column_reported(tmp_path):
     bom = tmp_path / "bom.csv"
     bom.write_text("Reference,Value\nR1,10k\n", encoding="utf-8")
     assert check_bom(bom, FX / "parts_ok.csv") != []
+
+
+HDR = "lcsc,mpn,library,economic,checked_on,stock,unit_usd\n"
+
+
+def _parts(tmp_path, text):
+    p = tmp_path / "parts.csv"
+    p.write_text(text, encoding="utf-8")
+    return p
+
+
+def test_parts_header_typo_reported(tmp_path):
+    p = _parts(tmp_path, HDR.replace("lcsc", "LCSC") + "C1,X,Basic,yes,2026-11-20,5,0.01\n")
+    assert any("lcsc" in e and "column" in e for e in check_parts(p))
+    assert any("column" in e for e in check_bom(FX / "bom_ok.csv", p))
+
+
+def test_empty_parts_table_reported(tmp_path):
+    assert any("empty" in e for e in check_parts(_parts(tmp_path, HDR)))
+
+
+def test_duplicate_lcsc_reported(tmp_path):
+    row = "C1,X,Basic,yes,2026-11-20,5,0.01\n"
+    assert any("duplicate" in e and "C1" in e for e in check_parts(_parts(tmp_path, HDR + row + row)))
+
+
+def test_row_without_lcsc_reported(tmp_path):
+    p = _parts(tmp_path, HDR + "C1,X,Basic,yes,2026-11-20,5,0.01\n,Y,Basic,yes,2026-11-20,5,0.01\n")
+    assert any("no LCSC" in e for e in check_parts(p))
+
+
+def test_cli_bom_and_parts_only(capsys):
+    assert main([str(FX / "bom_ok.csv"), str(FX / "parts_ok.csv")]) == 0
+    assert capsys.readouterr().out == ""
+    assert main([str(FX / "bom_missing.csv"), str(FX / "parts_ok.csv")]) == 1
+    assert "no LCSC" in capsys.readouterr().out
+    assert main(["--parts-only", str(FX / "parts_ok.csv")]) == 0
+    assert capsys.readouterr().out == ""
+    assert main(["--parts-only", str(FX / "parts_standard_only.csv")]) == 1
+    assert "C999" in capsys.readouterr().out
+
+
+def test_cli_fresh_days(tmp_path, capsys):
+    old = _parts(tmp_path, HDR + "C1,X,Basic,yes,2000-01-01,5,0.01\n")
+    assert main(["--parts-only", str(old), "--fresh-days", "7"]) == 1
+    assert "stale" in capsys.readouterr().out
+    new = _parts(tmp_path, HDR + f"C1,X,Basic,yes,{date.today()},5,0.01\n")
+    assert main(["--parts-only", str(new), "--fresh-days", "7"]) == 0
+
+
+def test_cli_arity_errors():
+    with pytest.raises(SystemExit) as e:
+        main(["--parts-only", str(FX / "parts_ok.csv"), str(FX / "parts_ok.csv")])
+    assert e.value.code == 2
+    with pytest.raises(SystemExit):
+        main([str(FX / "bom_ok.csv")])
