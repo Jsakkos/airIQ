@@ -50,3 +50,15 @@ The spec covers three subsystems. Each can be built and tested on its own, so ea
   - Spec §6.4 asks for both "every ~3 min, sooner on a band change" and "never more often than 180 s", which conflict.
   - The plan uses: **refresh when the displayed values have changed and at least 180 s have passed since the last refresh**, with a full refresh replacing every 6th refresh. That's about 3 minutes, and the 180 s floor always wins.
 - **Light changes are smoothed** with a small hysteresis margin (CO₂ 25 ppm, PM2.5 0.5 µg/m³), so the light doesn't flicker when a reading sits right on a threshold. The spec is silent on this; a reasonable owner would expect it.
+
+## Decisions made while executing Plan 1
+
+- **R24, bare entity names.** Entities are named `CO2`, `PM2.5`, `Status light`, ... without the `friendly_name` prefix, because Home Assistant's ESPHome integration already prefixes the device name; otherwise HA shows "airQ airQ CO2".
+- **R25, ASC switch in Home Assistant via a boot-time setter plus restart.** The spec §6.10 CO₂ self-calibration switch exists again; `sen6x` only reads the setting in its setup chain, so the switch value is copied into the component in an `on_boot` hook (priority 700, between the switch restore at 798 and sen6x setup at 600) and a user change restarts the unit after 2 s.
+- **R26, placeholder-to-value refresh bypass.** The first e-ink paint happens while the sensors are still starting and shows "--"; the 180 s floor is skipped once real numbers replace the placeholders, so the display is not blank for 3 minutes after every boot.
+- **R27, a short press clears Night mode.** While Night mode is on the light is dark, so a short press used to do nothing visible; it now leaves Night mode and turns the light on.
+- **R28, `sen6x_has_co2`.** SEN62/SEN65/SEN68 have no CO₂, which left the airQ light dark whenever PM was green; with `sen6x_has_co2: "false"` the single light follows PM2.5 alone (on the mini the CO₂ half stays dark).
+- **R29, colour bands as substitutions.** The spec §6.5 thresholds are the defaults of `co2_yellow` ... `pm25_purple_max`, so owners can retune the bands without touching C++.
+- **Stale-reading guard.** Every sensor output has a 120 s `timeout` filter (publishes NaN), because the sen6x driver never publishes NaN on I²C failure and a loose cable would otherwise freeze the light and display on the last value (possibly green).
+- **Fallback access point has a password** (`ap_password` secret), since the captive portal exposes an unauthenticated firmware upload.
+- **FRC implementation.** ESPHome's `sen6x` has no FRC action, so the button script suspends the component and sends the raw SEN66 command 0x6707 over the shared I²C bus; it is refused unless uptime is at least 180 s (3 min of measurement, R19).

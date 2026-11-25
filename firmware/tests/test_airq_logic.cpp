@@ -102,6 +102,7 @@ int main() {
     auto cmd = sen6x_frc_command(420);
     CHECK(cmd[0] == 0x67); CHECK(cmd[1] == 0x07); CHECK(cmd[2] == 0x01); CHECK(cmd[3] == 0xA4);
     CHECK(cmd[4] == sensirion_crc8(cmd.data() + 2, 2));
+    CHECK(sen6x_frc_command(420)[4] == 0x4D);  // literal CRC of {0x01, 0xA4}
     int corr = 12345;
     const uint8_t good_w[2] = {0x80, 0x0A};  // 0x800A -> +10 ppm
     uint8_t good[3] = {0x80, 0x0A, sensirion_crc8(good_w, 2)};
@@ -132,6 +133,43 @@ int main() {
   CHECK(decide_refresh(180000, 0, true, true, 5) == Refresh::Full);
   CHECK(decide_refresh(100000, 4294900000u, true, true, 0) == Refresh::None);  // millis() wrap: 167 296 ms elapsed
   CHECK(decide_refresh(200000, 4294900000u, true, true, 0) == Refresh::Partial);  // wrap, 267 296 ms elapsed
+
+  // R26: placeholder -> value bypasses the 180 s floor; nothing else does
+  CHECK(decide_refresh(10000, 0, true, true, 0, true, false) == Refresh::Partial);
+  CHECK(decide_refresh(10000, 0, true, true, 5, true, false) == Refresh::Full);
+  CHECK(decide_refresh(10000, 0, true, false, 0, true, false) == Refresh::None);  // unchanged
+  CHECK(decide_refresh(10000, 0, true, true, 0, false, false) == Refresh::None);  // shown has no placeholder
+  CHECK(decide_refresh(10000, 0, true, true, 0, true, true) == Refresh::None);    // new still has one
+  CHECK(decide_refresh(10000, 0, true, true, 0, false, true) == Refresh::None);   // value -> placeholder waits
+  CHECK(has_placeholder("--")); CHECK(has_placeholder("-- --")); CHECK(!has_placeholder("612"));
+
+  // R29: custom band thresholds shift the boundaries
+  {
+    const Co2Bands cb{600.0f, 900.0f, 1200.0f};
+    CHECK(co2_band(700, cb) == Band::Yellow);   CHECK(co2_band(700) == Band::Green);
+    CHECK(co2_band(599, cb) == Band::Green);    CHECK(co2_band(600, cb) == Band::Yellow);
+    CHECK(co2_band(900, cb) == Band::Orange);   CHECK(co2_band(1200, cb) == Band::Red);
+    CHECK(co2_band(1300) == Band::Orange);
+    CHECK(co2_band_hyst(610, Band::Green, cb) == Band::Green);
+    CHECK(co2_band_hyst(626, Band::Green, cb) == Band::Yellow);
+    CHECK(co2_band_hyst(NAN, Band::Green, cb) == Band::Unknown);
+    const Pm25Bands pb{5.0f, 15.0f, 30.0f, 60.0f, 100.0f};
+    CHECK(pm25_band(7.0f, pb) == Band::Yellow); CHECK(pm25_band(7.0f) == Band::Green);
+    CHECK(pm25_band(5.0f, pb) == Band::Green);  CHECK(pm25_band(15.0f, pb) == Band::Yellow);
+    CHECK(pm25_band(30.1f, pb) == Band::Red);   CHECK(pm25_band(60.1f, pb) == Band::Purple);
+    CHECK(pm25_band(100.1f, pb) == Band::Maroon);
+    CHECK(pm25_band_hyst(5.3f, Band::Green, pb) == Band::Green);
+    CHECK(pm25_band_hyst(5.6f, Band::Green, pb) == Band::Yellow);
+    const Co2Bands cd;
+    const Pm25Bands pd;
+    CHECK(cd.yellow == 800.0f && cd.orange == 1000.0f && cd.red == 1500.0f);
+    CHECK(pd.green_max == 9.0f && pd.yellow_max == 35.4f && pd.orange_max == 55.4f &&
+          pd.red_max == 125.4f && pd.purple_max == 225.4f);
+  }
+
+  // non-finite text
+  CHECK(co2_text(INFINITY) == "--"); CHECK(co2_text(-INFINITY) == "--");
+  CHECK(pm25_text(INFINITY) == "--"); CHECK(pm25_text(-INFINITY) == "--");
 
   // forced recalibration needs >= 3 min of measurement
   CHECK(!frc_allowed(0)); CHECK(!frc_allowed(179999)); CHECK(frc_allowed(180000));

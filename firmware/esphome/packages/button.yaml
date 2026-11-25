@@ -1,5 +1,5 @@
 # One mechanical button, press-duration actions (airq::classify_press):
-#   <1 s toggle light, 5-15 s forced CO2 recalibration, >=15 s safe-mode reboot.
+#   <1 s toggle light (or leave Night mode if it is on), 5-15 s forced CO2 recalibration, >=15 s safe-mode reboot.
 binary_sensor:
   - platform: gpio
     id: front_button
@@ -15,7 +15,16 @@ binary_sensor:
     on_release:
       - lambda: |-
           switch (airq::classify_press(millis() - id(button_down_ms))) {
-            case airq::Press::ToggleLight: id(status_light).toggle(); break;
+            case airq::Press::ToggleLight:
+              // R27: while Night mode is on the light is dark, so a short press
+              // must visibly do something: leave Night mode and light up.
+              if (id(night_mode).state) {
+                id(night_mode).turn_off();
+                id(status_light).turn_on();
+              } else {
+                id(status_light).toggle();
+              }
+              break;
             case airq::Press::ForceCo2Calibration: id(co2_frc).execute(); break;
             case airq::Press::SafeModeReboot: id(safe_mode_btn).press(); break;
             case airq::Press::None: default: break;

@@ -17,23 +17,35 @@ struct Rgb {
   float r, g, b;
 };
 
-// CO2 bands (ppm): <800, <1000, <1500, >=1500. NaN or negative -> Unknown.
-inline Band co2_band(float ppm) {
+// Band thresholds (spec 6.5). The defaults are the spec values; the firmware
+// passes the user-overridable substitutions (co2_yellow, ..., pm25_purple_max).
+// CO2 (ppm): Green below `yellow`, Yellow below `orange`, Orange below `red`, else Red.
+struct Co2Bands {
+  float yellow = 800.0f, orange = 1000.0f, red = 1500.0f;
+};
+
+// PM2.5 (ug/m3): each *_max is the inclusive upper edge of that band; above purple_max is Maroon.
+struct Pm25Bands {
+  float green_max = 9.0f, yellow_max = 35.4f, orange_max = 55.4f, red_max = 125.4f, purple_max = 225.4f;
+};
+
+// CO2 bands (ppm). NaN or negative -> Unknown.
+inline Band co2_band(float ppm, Co2Bands b = {}) {
   if (std::isnan(ppm) || ppm < 0.0f) return Band::Unknown;
-  if (ppm < 800.0f) return Band::Green;
-  if (ppm < 1000.0f) return Band::Yellow;
-  if (ppm < 1500.0f) return Band::Orange;
+  if (ppm < b.yellow) return Band::Green;
+  if (ppm < b.orange) return Band::Yellow;
+  if (ppm < b.red) return Band::Orange;
   return Band::Red;
 }
 
-// PM2.5 bands (ug/m3): <=9.0, <=35.4, <=55.4, <=125.4, <=225.4, above.
-inline Band pm25_band(float ugm3) {
+// PM2.5 bands (ug/m3). NaN or negative -> Unknown.
+inline Band pm25_band(float ugm3, Pm25Bands b = {}) {
   if (std::isnan(ugm3) || ugm3 < 0.0f) return Band::Unknown;
-  if (ugm3 <= 9.0f) return Band::Green;
-  if (ugm3 <= 35.4f) return Band::Yellow;
-  if (ugm3 <= 55.4f) return Band::Orange;
-  if (ugm3 <= 125.4f) return Band::Red;
-  if (ugm3 <= 225.4f) return Band::Purple;
+  if (ugm3 <= b.green_max) return Band::Green;
+  if (ugm3 <= b.yellow_max) return Band::Yellow;
+  if (ugm3 <= b.orange_max) return Band::Orange;
+  if (ugm3 <= b.red_max) return Band::Red;
+  if (ugm3 <= b.purple_max) return Band::Purple;
   return Band::Maroon;
 }
 
@@ -51,16 +63,16 @@ inline Band apply_hyst(Band raw, Band lo, Band hi, Band prev) {
 }
 }  // namespace detail
 
-inline Band co2_band_hyst(float ppm, Band prev) {
+inline Band co2_band_hyst(float ppm, Band prev, Co2Bands b = {}) {
   if (std::isnan(ppm) || ppm < 0.0f) return Band::Unknown;
   const float margin = 25.0f;
-  return detail::apply_hyst(co2_band(ppm), co2_band(ppm - margin), co2_band(ppm + margin), prev);
+  return detail::apply_hyst(co2_band(ppm, b), co2_band(ppm - margin, b), co2_band(ppm + margin, b), prev);
 }
 
-inline Band pm25_band_hyst(float ugm3, Band prev) {
+inline Band pm25_band_hyst(float ugm3, Band prev, Pm25Bands b = {}) {
   if (std::isnan(ugm3) || ugm3 < 0.0f) return Band::Unknown;
   const float margin = 0.5f;
-  return detail::apply_hyst(pm25_band(ugm3), pm25_band(ugm3 - margin), pm25_band(ugm3 + margin), prev);
+  return detail::apply_hyst(pm25_band(ugm3, b), pm25_band(ugm3 - margin, b), pm25_band(ugm3 + margin, b), prev);
 }
 
 // Worst of two bands; a known band always beats Unknown.
@@ -142,27 +154,36 @@ inline bool sen6x_frc_correction(const uint8_t resp[3], int* correction_ppm) {
   return true;
 }
 
+// "--" for anything that is not a finite, non-negative reading (NaN, +-inf, negative).
 inline std::string co2_text(float ppm) {
-  if (std::isnan(ppm) || ppm < 0.0f) return "--";
+  if (!std::isfinite(ppm) || ppm < 0.0f) return "--";
   return std::to_string(std::lround(ppm));
 }
 
 inline std::string pm25_text(float ugm3) {
-  if (std::isnan(ugm3) || ugm3 < 0.0f) return "--";
+  if (!std::isfinite(ugm3) || ugm3 < 0.0f) return "--";
   return std::to_string(std::lround(ugm3));
 }
 
 enum class Refresh : uint8_t { None, Partial, Full };
 
+// True if the display text still shows a "--" placeholder.
+inline bool has_placeholder(const std::string& s) { return s.find("--") != std::string::npos; }
+
 // Refresh only if text changed and >=180000 ms since last refresh; every 6th
 // refresh is full. The first paint is always Full. uint32 subtraction handles
 // millis() wrap-around.
+// Exception (R26): the first paint happens while the sensors are still starting
+// and shows "--". When the shown text has a placeholder and the new text has
+// none, the 180 s floor is skipped so real numbers appear promptly.
 inline Refresh decide_refresh(uint32_t now_ms, uint32_t last_ms, bool ever_refreshed, bool changed,
-                              uint8_t partials_since_full) {
+                              uint8_t partials_since_full, bool shown_has_placeholder = false,
+                              bool new_has_placeholder = false) {
   if (!ever_refreshed) return Refresh::Full;
   if (!changed) return Refresh::None;
   const uint32_t elapsed = now_ms - last_ms;
-  if (elapsed < 180000u) return Refresh::None;
+  const bool bypass = shown_has_placeholder && !new_has_placeholder;
+  if (elapsed < 180000u && !bypass) return Refresh::None;
   return partials_since_full >= 5 ? Refresh::Full : Refresh::Partial;
 }
 

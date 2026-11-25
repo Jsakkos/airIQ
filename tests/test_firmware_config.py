@@ -1,4 +1,5 @@
 """Static checks of the ESPHome packages (no ESPHome install needed)."""
+import re
 from pathlib import Path
 
 import pytest
@@ -168,7 +169,91 @@ def test_co2_asc_substitution(sensors, board):
     sen6x = next(s for s in sensors["sensor"] if s["platform"] == "sen6x")
     assert sen6x["co2"]["automatic_self_calibration"] == "${co2_asc}"
     assert board["substitutions"]["co2_asc"] == "true"
-    assert "switch" not in sensors
+    # R25: the HA switch exists; its boot-time setter runs after the switch restores
+    # (798) and before sen6x setup (600).
+    sw = next(x for x in sensors["switch"] if x["id"] == "co2_asc_sw")
+    assert sw["name"] == "CO2 auto-calibration"
+    assert sw["optimistic"] is True
+    assert sw["entity_category"] == "config"
+    assert "RESTORE_DEFAULT_ON" in sw["restore_mode"]
+    on_boot = sensors["esphome"]["on_boot"][0]
+    assert 600 < on_boot["priority"] < 798
+    assert "set_automatic_self_calibration(id(co2_asc_sw).state)" in on_boot["then"][0]["lambda"]
+    assert "asc_armed" in str(sw["on_turn_on"]) and "asc_armed" in str(sw["on_turn_off"])
+    assert "delay" in str(sw["on_turn_on"]) and "safe_reboot" in str(sw["on_turn_on"])
+
+
+SEN6X_OUTPUTS = ["pm_1_0", "pm_2_5", "pm_4_0", "pm_10_0", "co2", "voc_index", "nox_index",
+                 "sen_t", "sen_rh"]
+
+
+def _all_outputs(sensors):
+    """Yield (id, output config) for every sensor output in sensors.yaml."""
+    for plat in sensors["sensor"]:
+        for key, val in plat.items():
+            if isinstance(val, dict) and "id" in val and key != "i2c":
+                yield val["id"], val
+
+
+def test_stale_readings_time_out_to_nan(sensors):
+    outs = dict(_all_outputs(sensors))
+    expected = SEN6X_OUTPUTS + ["room_t", "room_rh", "room_p", "room_lux"]
+    for oid in expected:
+        assert oid in outs, oid
+        assert {"timeout": "120s"} in outs[oid].get("filters", []), oid
+    # the timeout filter must stay the last filter (its NaN goes straight to the sensor)
+    for oid in expected:
+        assert outs[oid]["filters"][-1] == {"timeout": "120s"}, oid
+
+
+def test_fallback_ap_has_password(board):
+    ap = board["wifi"]["ap"]
+    assert ap.get("password") == "ap_password"  # `!secret ap_password` loads as the raw key
+    secrets = load_yaml(ESPHOME_DIR / "secrets.example.yaml")
+    assert len(secrets["ap_password"]) >= 8
+
+
+def test_entity_names_are_bare():
+    """HA already prefixes entities with the device friendly_name (R24)."""
+    for f in PKG.glob("*.yaml"):
+        for line in f.read_text(encoding="utf-8").splitlines():
+            code = line.split("#")[0]
+            assert not re.search(r"^\s*(- )?name:\s*\$\{friendly_name\}", code), (f.name, line)
+    sensors = load_yaml(PKG / "sensors.yaml")
+    names = {oid: o["name"] for oid, o in _all_outputs(sensors)}
+    assert names == {
+        "room_t": "Temperature", "room_rh": "Humidity", "room_p": "Pressure", "room_lux": "Illuminance",
+        "co2": "CO2", "pm_1_0": "PM1.0", "pm_2_5": "PM2.5", "pm_4_0": "PM4.0", "pm_10_0": "PM10",
+        "voc_index": "VOC Index", "nox_index": "NOx Index",
+        "sen_t": "SEN66 Temperature", "sen_rh": "SEN66 Humidity",
+    }
+    assert switch("status_light")["name"] == "Status light"
+    assert switch("night_mode")["name"] == "Night mode"
+    assert load_yaml(PKG / "hcho.yaml")["sensor"][0]["formaldehyde"]["name"] == "Formaldehyde"
+
+
+def test_band_substitutions(board):
+    subs = board["substitutions"]
+    assert {k: subs[k] for k in ("co2_yellow", "co2_orange", "co2_red")} == {
+        "co2_yellow": "800", "co2_orange": "1000", "co2_red": "1500"}
+    assert [subs[k] for k in ("pm25_green_max", "pm25_yellow_max", "pm25_orange_max",
+                              "pm25_red_max", "pm25_purple_max")] == ["9.0", "35.4", "55.4", "125.4", "225.4"]
+    assert subs["sen6x_has_co2"] == "true"
+    for f in ("light-worst.yaml", "light-split.yaml"):
+        text = (PKG / f).read_text(encoding="utf-8")
+        for k in ("co2_yellow", "co2_orange", "co2_red", "pm25_green_max", "pm25_purple_max"):
+            assert "${%s}" % k in text, (f, k)
+    assert "${sen6x_has_co2}" in (PKG / "light-worst.yaml").read_text(encoding="utf-8")
+
+
+def test_short_press_clears_night_mode():
+    text = (PKG / "button.yaml").read_text(encoding="utf-8")
+    assert "id(night_mode).turn_off()" in text and "id(status_light).turn_on()" in text
+
+
+def test_display_passes_placeholder_flags():
+    text = (PKG / "display.yaml").read_text(encoding="utf-8")
+    assert "has_placeholder" in text and "shown_ph, new_ph" in text
 
 
 def test_model_bundles_include_base():

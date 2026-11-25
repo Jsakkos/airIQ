@@ -8,7 +8,7 @@ substitutions:
 light:
   - platform: partition
     id: worst_light
-    name: ${friendly_name} Light
+    name: Light
     internal: true
     default_transition_length: 1s
     segments:
@@ -20,11 +20,16 @@ interval:
   - interval: 2s
     then:
       - lambda: |-
-          id(co2_band_g) = (int) airq::co2_band_hyst(id(co2).state, (airq::Band) id(co2_band_g));
-          id(pm_band_g) = (int) airq::pm25_band_hyst(id(pm_2_5).state, (airq::Band) id(pm_band_g));
+          const airq::Co2Bands co2_bands{${co2_yellow}, ${co2_orange}, ${co2_red}};
+          const airq::Pm25Bands pm_bands{${pm25_green_max}, ${pm25_yellow_max}, ${pm25_orange_max}, ${pm25_red_max}, ${pm25_purple_max}};
+          id(co2_band_g) = (int) airq::co2_band_hyst(id(co2).state, (airq::Band) id(co2_band_g), co2_bands);
+          id(pm_band_g) = (int) airq::pm25_band_hyst(id(pm_2_5).state, (airq::Band) id(pm_band_g), pm_bands);
           if (id(light_override_until_ms) != 0 && (int32_t) (millis() - id(light_override_until_ms)) < 0) return;
           const bool off = id(night_mode).state || !id(status_light).state;
-          const airq::Band band = airq::glance_band((airq::Band) id(co2_band_g), (airq::Band) id(pm_band_g));
+          // sen6x_has_co2 "false" (SEN62/65/68): no CO2 reading exists, follow PM2.5 alone.
+          const airq::Band band = ${sen6x_has_co2}
+              ? airq::glance_band((airq::Band) id(co2_band_g), (airq::Band) id(pm_band_g))
+              : (airq::Band) id(pm_band_g);
           const airq::Rgb c = airq::band_color(band);
           const float br = airq::light_brightness(id(room_lux).state, ${light_cap});
           const bool on = !off && band != airq::Band::Unknown;

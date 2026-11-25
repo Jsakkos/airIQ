@@ -1,4 +1,5 @@
 # airQ mini: the light is split in two halves, CO2 left and PM2.5 right.
+# On a SEN62/65/68 (no CO2) the CO2 half stays dark; the PM2.5 half still works.
 # ESPHome substitutions cannot do arithmetic, so the segment bounds are
 # explicit for the default 4 LEDs; override all four with led_count.
 substitutions:
@@ -10,7 +11,7 @@ substitutions:
 light:
   - platform: partition
     id: co2_light
-    name: ${friendly_name} CO2 light
+    name: CO2 light
     internal: true
     default_transition_length: 1s
     segments:
@@ -19,7 +20,7 @@ light:
         to: ${led_co2_last}
   - platform: partition
     id: pm_light
-    name: ${friendly_name} PM2.5 light
+    name: PM2.5 light
     internal: true
     default_transition_length: 1s
     segments:
@@ -31,8 +32,10 @@ interval:
   - interval: 2s
     then:
       - lambda: |-
-          id(co2_band_g) = (int) airq::co2_band_hyst(id(co2).state, (airq::Band) id(co2_band_g));
-          id(pm_band_g) = (int) airq::pm25_band_hyst(id(pm_2_5).state, (airq::Band) id(pm_band_g));
+          const airq::Co2Bands co2_bands{${co2_yellow}, ${co2_orange}, ${co2_red}};
+          const airq::Pm25Bands pm_bands{${pm25_green_max}, ${pm25_yellow_max}, ${pm25_orange_max}, ${pm25_red_max}, ${pm25_purple_max}};
+          id(co2_band_g) = (int) airq::co2_band_hyst(id(co2).state, (airq::Band) id(co2_band_g), co2_bands);
+          id(pm_band_g) = (int) airq::pm25_band_hyst(id(pm_2_5).state, (airq::Band) id(pm_band_g), pm_bands);
           if (id(light_override_until_ms) != 0 && (int32_t) (millis() - id(light_override_until_ms)) < 0) return;
           const bool off = id(night_mode).state || !id(status_light).state;
           const float br = airq::light_brightness(id(room_lux).state, ${light_cap});

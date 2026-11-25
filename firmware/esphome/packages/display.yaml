@@ -2,7 +2,7 @@
 # left and PM2.5 (ug/m3) on the right, each with a label and unit, and nothing else.
 #
 # Refresh policy (airq::decide_refresh): redraw only when the shown text changed AND at
-# least 180 s passed since the last refresh. The component itself makes every 6th refresh a
+# least 180 s passed since the last refresh (except placeholder "--" -> real numbers, which is shown at once). The component itself makes every 6th refresh a
 # full one (full_update_every: 6); the rest are partial.
 spi:
   clk_pin: ${pin_epd_clk}
@@ -69,8 +69,12 @@ interval:
           const std::string pm_s = airq::pm25_text(id(pm_2_5).state);
           const bool changed = co2_s != id(epd_shown_co2) || pm_s != id(epd_shown_pm);
           const uint32_t now = millis();
+          // R26: after boot the first paint shows "--"; once real numbers exist, repaint
+          // without waiting out the 180 s floor.
+          const bool shown_ph = airq::has_placeholder(id(epd_shown_co2)) || airq::has_placeholder(id(epd_shown_pm));
+          const bool new_ph = airq::has_placeholder(co2_s) || airq::has_placeholder(pm_s);
           const airq::Refresh r = airq::decide_refresh(
-              now, id(epd_last_ms), id(epd_ever), changed, id(epd_partials));
+              now, id(epd_last_ms), id(epd_ever), changed, id(epd_partials), shown_ph, new_ph);
           if (r == airq::Refresh::None) return;
           id(epd_last_ms) = now;
           id(epd_ever) = true;

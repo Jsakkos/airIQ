@@ -42,6 +42,8 @@ def test_no_reserved_gpio_used(iface, sig):
 
 def test_strapping_pins_only_button(sig):
     assert {g for g in sig.values() if g in {"GPIO8", "GPIO15"}} == set()
+    # GPIO4 (MTMS) / GPIO5 (MTDI) are strapping/JTAG pins too; keep them unused unless deliberate.
+    assert {g for g in sig.values() if g in {"GPIO4", "GPIO5"}} == set()
     assert sig["BUTTON"] == "GPIO9"
 
 
@@ -54,3 +56,9 @@ def test_i2c_addresses_unique_7bit(addr):
 def test_qwiic_pinout(iface):
     c = iface["connectors"]
     assert c["J_QWIIC_TONGUE"] == ["GND", "+3V3", "I2C_SDA", "I2C_SCL"] == c["J_QWIIC_AUX"]
+
+
+def test_sen66_connector_on_3v3(iface):
+    # SEN66 runs on 3.15-3.45 V (spec section 3): never wire it to 5 V.
+    pins = iface["connectors"]["J_SEN66"]
+    assert "+3V3" in pins and "+5V" not in pins

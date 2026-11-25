@@ -6,8 +6,26 @@ substitutions:
   led_count: "4"
   light_cap: "0.5"
   epd_model: waveshare-2.9in-v2
-  # Rooms that rarely get fresh air should set co2_asc: "false" in their unit file and use forced recalibration outdoors (implemented in a later task).
+  # CO2 automatic self-calibration (ASC) default. The "CO2 auto-calibration"
+  # Home Assistant switch (sensors.yaml) restores its last state at boot and then
+  # overrides this; "false" here only changes that switch's first-boot default.
+  # Rooms that rarely get fresh air should set "false" and use forced
+  # recalibration outdoors (hold the button 5-15 s).
   co2_asc: "true"
+  # Set to "false" for SEN62 / SEN65 / SEN68 (no CO2): the airQ light then
+  # follows PM2.5 alone. (On the mini the CO2 half simply stays dark.)
+  sen6x_has_co2: "true"
+  # Colour bands (spec 6.5). CO2 in ppm: green below co2_yellow, yellow below
+  # co2_orange, orange below co2_red, red from there. PM2.5 in ug/m3: each
+  # *_max is the inclusive upper edge of its band; above pm25_purple_max is maroon.
+  co2_yellow: "800"
+  co2_orange: "1000"
+  co2_red: "1500"
+  pm25_green_max: "9.0"
+  pm25_yellow_max: "35.4"
+  pm25_orange_max: "55.4"
+  pm25_red_max: "125.4"
+  pm25_purple_max: "225.4"
 
 esphome:
   name: ${name}
@@ -44,6 +62,8 @@ wifi:
   reboot_timeout: 0s
   ap:
     ssid: ${name}-setup
+    # Fallback AP (and the captive portal's /update upload) must not be open.
+    password: !secret ap_password
 
 captive_portal:
 
@@ -52,7 +72,7 @@ safe_mode:
 button:
   - platform: safe_mode
     id: safe_mode_btn
-    name: ${friendly_name} Safe mode
+    name: Safe mode
 
 i2c:
   id: i2c_bus
