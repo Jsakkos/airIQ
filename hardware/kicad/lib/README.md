@@ -38,7 +38,11 @@ owner was asked to choose. Meanwhile the table uses two Economic-eligible substi
 | MCU | ESP32-C6-WROOM-1-N8, C5366877: symbol `airq:ESP32-C6-WROOM-1-N8`, footprint `airq:WIRELM-SMD_ESP32-C6-WROOM-1` | ESP32-C6-MINI-1-N4, C5736265: stock `RF_Module:ESP32-C6-MINI-1` symbol and footprint (ruling R11; it carries Espressif's keep-out and a STEP model) |
 | Pressure | MS5611-01BA03, C15639: `airq:MS561101BA03-50` / `airq:SENSORS-SMD_MS5611-01BA03` | BMP585, C18184976: `airq:BMP585_C18184976` / `airq:LGA-9_L3.3-W3.3-P1.10-TL`. Kept in this library but not hand-checked; check its pad map if R22 reverts |
 
-To swap back, change the symbol, the footprint and the `LCSC` field, and replace the two parts.csv lines.
+To swap back:
+- **MCU:** copy the stock `RF_Module:ESP32-C6-MINI-1` symbol into `airq.kicad_sym` and rename its pins 30 `RXD0` → `IO17` and
+  31 `TXD0` → `IO16`, as was done for the WROOM (fix 7). `check_netlist` recognises MCU pins only by `IO<n>`/`GPIO<n>` names,
+  and every other interface pin of that symbol is already named `IO<n>`. Keep the stock footprint `RF_Module:ESP32-C6-MINI-1`.
+- Then set the footprint and the `LCSC` field, and replace the two parts.csv lines.
 Both substitutes expose the same interface nets: every GPIO in `interface.yaml` exists on the WROOM-1 (datasheet v1.4,
 Table 3-1). The MS5611 answers at I²C 0x77 (CSB low) or 0x76 (CSB high), not the BMP585's 0x46. Changing that address
 in `interface.yaml` and in the firmware is a separate, later task.
@@ -103,6 +107,18 @@ Its stock is only 308 (enough for 10 boards plus attrition).
    Symbol pin 5 was removed with it.
 6. **USBLC6-2SC6 symbol pin names**: EasyEDA had named the pins "1"–"6". They now read I/O1, GND, I/O2, I/O2, VBUS, I/O1
    (ST datasheet, Figure 1).
+7. **ESP32-C6-WROOM-1 UART pin names**: pin 24 was `RXD0` and is now `IO17`; pin 25 was `TXD0` and is now `IO16`. Per datasheet v1.4 Table 3-1, pin 24 = U0RXD/GPIO17
+   and pin 25 = U0TXD/GPIO16. `tools/hw/check_netlist.py` maps MCU pins to GPIOs only through `IO<n>`/`GPIO<n>` names, and
+   `interface.yaml` routes AUX_UART_TX/RX to GPIO16/GPIO17. Every MCU pin carrying an interface signal is now named `IO<n>`:
+   IO2 (27), IO6 (6), IO7 (7), IO9 (15), IO12 (13), IO13 (14), IO16 (25), IO17 (24), IO18–IO23 (16–21).
+8. **`LCSC` field**: easyeda2kicad names the property `LCSC Part`. It is renamed to `LCSC` in every symbol and footprint, so that
+   the schematic BOM has a single LCSC column, shared with the stock passives that get an `LCSC` field in Task 4.
+9. **Footprint type (`attr`)**: `CONN-TH_SM06B-GHS-TB-LF-SN` (J_SEN66) was `through_hole` although all 8 pads are SMD. It is now
+   `smd`, so it appears in the SMD placement/CPL export. The others were audited:
+   - all footprints with only SMD pads are `smd`, as are SKRTLAE010 (SMD plus non-plated holes) and the WROOM-1 (SMD plus EPAD thermal vias);
+   - the USB-C (12 SMD pads plus 4 plated shell legs) is **deliberately kept `smd`**. JLC places C2765186 on the SMT line (its part page
+     data: `assemblyMode = smtWeld`, PCBA type "Economic and Standard"), and an `smd` type keeps it in the CPL export.
+     KiCad may raise a footprint-type mismatch warning for it, and for the WROOM-1's via pads. That warning is expected.
 
 ## Pad maps checked by hand
 
@@ -124,7 +140,8 @@ Each check compares the footprint's pad numbers and positions (from the `.kicad_
 | JST SM04B-SRSS-TB | Same check; pad 1 at x = −1.50; 1.0 mm pitch, A = 3.0 mm | JST *SH connector* catalogue p. 2 (shrouded header, side entry) | **OK** |
 | JST SM03B-SRSS-TB | Same check; pad 1 at x = −1.00; A = 2.0 mm | JST *SH connector* catalogue p. 2 | **OK** |
 | SKRTLAE010 (extra) | Pins 1 and 3 are common, 2 is the switched contact; 4 and 5 are mounting tabs; pad span 3.2 mm, holes 4.25 mm apart | Alps *SKRTLAE010* basic information, land dimensions and circuit diagram | **OK**. In the schematic, BUTTON goes to pin 2 and GND to pins 1 and 3; pins 4 and 5 are mechanical. Keep copper tracks out of the hatched area between the holes. |
-| AO3400A, B5819W (extra) | SOT-23: 1 G, 2 S, 3 D; SOD-123 pad 1 = cathode with the marker | standard pinouts, EasyEDA symbol | **OK** |
+| AO3400A | Symbol 1 G, 2 S, 3 D. Footprint: pads 1 and 2 on one side, pad 3 alone opposite, pin-1 mark at pad 1. Datasheet SOT23 top view: D alone on one side, G and S on the other, pin-1 dot at G, so G = 1, S = 2, D = 3 | Alpha & Omega *AO3400A* datasheet Rev 3 (Dec 2011), p. 1 SOT23 top/bottom view | **OK** |
+| B5819W SL | Symbol pin 1 `-` = cathode (triangle apex and bar), pin 2 `+` = anode. Footprint pad 1 at −x, with the silkscreen cathode bar on the pad-1 side. Datasheet: SOD-123, "The marking bar indicates the cathode" | Jiangsu Changjiang (JCET) *B5817W–B5819W* SOD-123 datasheet, p. 1 | **OK** |
 
 ### FPC orientation (J_EPD, ruling R27)
 
