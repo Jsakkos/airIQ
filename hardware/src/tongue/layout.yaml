@@ -2,15 +2,17 @@
 # Coordinates are mm from the board's top-left corner, X right, Y down (KiCad's own axes);
 # KiCad's grid origin is set to that corner. Rotations are degrees counter-clockwise.
 #
-# Arrangement (22 x 13 mm, global limit 22 x 14):
-# - left end: the SHT45 (U1, centre 4.5, 4.5) on an island cut free by a 1.0 mm milled slot on
-#   three sides (top, left, bottom); the island joins the board only through a 2.4 mm neck on its
+# Arrangement (22 x 13 mm, global limit 22 x 14). The FRONT edge is the long top edge (-Y): it
+# faces the device front, behind the intake lip (ruling R34). The cable leaves the opposite long
+# edge (+Y), back toward the main board.
+# - left end, near the front edge: the SHT45 (U1, centre 4.5, 4.5) on an island cut free by a
+#   1.0 mm milled slot on three sides (top, left, bottom); the island joins the board only through a 2.4 mm neck on its
 #   right, which carries the sensor's four 0.2 mm traces. No other copper within 1.5 mm of the
 #   sensor: the rule area SHT45_ISOLATION (in the board file) bans vias and pours over the island,
 #   the slot and the neck, and the custom rule below bans other parts' pads there.
-# - right end: the VEML7700 (U2, side-view package) with its window facing out of the right edge
-#   (+X), the edge opposite the SHT45. Its window face is 0.25 mm inside the edge.
-# - bottom edge: the Qwiic socket J1 (JST SH side entry), cable entering from below (+Y).
+# - right end, on the front edge: the VEML7700 (U2, side-view package), its window facing out of
+#   the front edge (-Y), the same way as the SHT45 side. Its window face is 0.25 mm inside the edge.
+# - back (bottom) edge: the Qwiic socket J1 (JST SH side entry), cable entering from +Y.
 # - below the island: the M2 mounting hole H1, away from the copper.
 # Routing, the B.Cu ground pour and the rule area live in the board file (hardware/README.md,
 # regeneration contract) and survive rebuilds.
@@ -56,7 +58,7 @@ custom_rules: |
 placement:
   U1: [4.5, 4.5, 0]          # SHT45: pads 3/4 (VDD/VSS) face the neck, 1/2 (SDA/SCL) loop round
   C1: [10.0, 4.5, 90]        # SHT45 100 nF, just past the neck (5.5 mm from the sensor)
-  U2: [19.9, 4.9, 270]       # VEML7700: footprint -Y (window) turned to +X, face at x = 21.75
-  C2: [17.8, 5.05, 90]       # VEML7700 100 nF, on its VDD line
+  U2: [18.35, 2.1, 0]        # VEML7700: footprint -Y (window) = front edge, face at y = 0.25
+  C2: [18.35, 4.0, 180]      # VEML7700 100 nF, under its VDD (right) and GND (left) pads
   J1: [15.0, 9.85, 0]        # Qwiic socket: mating face toward +Y, fitting nails 0.31 mm in
   H1: [4.5, 10.4, 270]       # M2 hole, 2.2 mm (turned so its reference text clears the slot)

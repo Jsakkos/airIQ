@@ -42,11 +42,23 @@ def test_mechanical_record_matches_the_layout():
     assert MECH["sht45"]["center"] == PLACE["U1"][:2]
     assert MECH["sht45"]["slot"] == board["cutouts"][0]
     x, y, rot = PLACE["U2"]
-    assert rot == 270 and MECH["veml7700"]["faces"] == "+X"     # footprint -Y (window) -> +X
-    assert MECH["veml7700"]["window_center"][:2] == [round(x + VEML_FRONT, 3), y]
-    assert MECH["veml7700"]["window_center"][0] <= board["width"]
+    assert rot == 0 and MECH["veml7700"]["faces"] == "-Y"       # footprint -Y (window) kept as -Y
+    assert MECH["veml7700"]["window_center"][:2] == [x, round(y - VEML_FRONT, 3)]
+    assert 0 <= MECH["veml7700"]["window_center"][1] <= 0.5     # window face just behind the edge
     assert PLACE["J1"][2] == 0 and MECH["qwiic"]["cable_entry"] == "+Y"   # mating face +Y
     assert MECH["qwiic"]["center_x"] == PLACE["J1"][0]
+
+
+def test_arrangement_follows_the_front_edge():
+    """Ruling R34: the front edge is the long edge opposite the cable entry (-Y, the top edge).
+    The VEML7700 looks out of it at the end opposite the SHT45, and the SHT45 sits near it."""
+    w, h = MECH["outline"]
+    assert w > h and MECH["front_edge"] == "-Y" and MECH["qwiic"]["cable_entry"] == "+Y"
+    assert MECH["veml7700"]["faces"] == MECH["front_edge"]
+    sht_x, sht_y = MECH["sht45"]["center"]
+    veml_x = MECH["veml7700"]["window_center"][0]
+    assert sht_x < w / 2 < veml_x                               # opposite ends
+    assert sht_y < h / 2                                        # front half, behind the intake lip
 
 
 @pytest.mark.parametrize("direction", [(-1, 0), (0, -1), (0, 1)], ids=["left", "top", "bottom"])

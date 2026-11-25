@@ -11,7 +11,7 @@ paper: A4
 notes:
   - {text: "Qwiic socket J_QWIIC_TONGUE\n(pin order: hardware/interface.yaml)\nNo I2C pull-ups here: the 4.7 k\npull-ups are on the main board", at: [40.64, 63.5], size: 1.8}
   - {text: "SHT45-AD1B, I2C 0x44\nOn the slotted island: milled slot on 3 sides,\nno copper within 1.5 mm except its own pads and traces", at: [114.3, 63.5], size: 1.8}
-  - {text: "VEML7700-TR (side view), I2C 0x10\nWindow faces out of the board edge\nopposite the SHT45", at: [114.3, 111.76], size: 1.8}
+  - {text: "VEML7700-TR (side view), I2C 0x10\nWindow faces out of the front edge,\nat the end opposite the SHT45", at: [114.3, 111.76], size: 1.8}
   - {text: "M2 mounting hole", at: [40.64, 132.08], size: 1.8}
   - {text: "ERC power flags (supply arrives through J1)", at: [40.64, 160.02], size: 1.8}
 

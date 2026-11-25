@@ -1276,7 +1276,7 @@
 		)
 		(uuid "9455f10a-82c0-5ae3-99f5-cdfc01704d71")
 	)
-	(text "VEML7700-TR (side view), I2C 0x10\nWindow faces out of the board edge\nopposite the SHT45"
+	(text "VEML7700-TR (side view), I2C 0x10\nWindow faces out of the front edge,\nat the end opposite the SHT45"
 		(exclude_from_sim no)
 		(at 114.3 111.76 0)
 		(effects

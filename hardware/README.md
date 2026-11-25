@@ -90,7 +90,9 @@ uv run python tools/hw/check_bom.py build/tongue-bom.csv hardware/bom/parts.csv
 ```
 
 Tongue layout (`hardware/src/tongue/layout.yaml`; mechanical data for the enclosure in
-`hardware/interface.yaml`, `mechanical.tongue`): the SHT45 sits on an island cut free by a 1.0 mm milled
+`hardware/interface.yaml`, `mechanical.tongue`): the long top edge (−Y) is the front edge, behind the
+intake lip. The SHT45 sits near it at the left end, the VEML7700 looks out of it at the right end, and the
+Qwiic cable leaves the opposite long edge. The SHT45 sits on an island cut free by a 1.0 mm milled
 slot on three sides, joined to the board only by a 2.4 mm neck that carries its four 0.2 mm traces. The
 board-owned rule area `SHT45_ISOLATION` bans vias and pours over the island, slot and neck; a custom DRC
 rule bans other parts' pads there; `tests/hardware/test_tongue.py` checks that every track within 1.5 mm

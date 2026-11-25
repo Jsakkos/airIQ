@@ -56,6 +56,7 @@ mechanical:
   # Qwiic edge), +Z up from the top (component) surface. All parts are on top; the bottom is flat
   # (ground pour under the body only, no parts).
   tongue:
+    front_edge: -Y                 # the long top edge faces the device front, behind the intake lip
     outline: [22.0, 13.0]          # W x H rectangle, square corners
     thickness: 1.6
     max_part_height: 3.0           # VEML7700 (J1 is 2.95); bottom side 0
@@ -64,20 +65,20 @@ mechanical:
       diameter: 2.2                # non-plated, M2
       clear_diameter: 5.0          # flat, copper- and part-free circle round it (screw head, boss)
     sht45:                         # reference T/RH sensor, keep it in the intake air
-      center: [4.5, 4.5]
+      center: [4.5, 4.5]           # left end, 4.5 mm behind the front edge
       body: [1.5, 1.5, 0.55]       # L x W x H, sensing opening on top (+Z)
       island: [[2.5, 2.5], [7.5, 6.5]]   # board island it sits on; joins the board only via the neck
       neck: [[7.5, 3.3], [8.5, 5.7]]
       slot_width: 1.0              # milled slot round the island on 3 sides (top, left, bottom)
       slot: [[1.5, 1.5], [8.5, 1.5], [8.5, 3.3], [7.5, 3.3], [7.5, 2.5], [2.5, 2.5], [2.5, 6.5],
              [7.5, 6.5], [7.5, 5.7], [8.5, 5.7], [8.5, 7.5], [1.5, 7.5]]   # cutout polygon
-    veml7700:                      # ambient light, side-view package: its window looks along +X
-      faces: +X                    # out of the right edge, the edge opposite the SHT45
-      window_center: [21.75, 4.9, 1.95]  # sensitive-area centre on the window face (Z above board)
-      body: [[19.4, 1.5], [21.75, 8.3]]  # 2.35 x 6.8 footprint, 3.0 high; window face 0.25 inside the edge
+    veml7700:                      # ambient light, side-view package, at the end opposite the SHT45
+      faces: -Y                    # its window looks out of the front edge
+      window_center: [18.35, 0.25, 1.95]  # sensitive-area centre on the window face (Z above board)
+      body: [[14.95, 0.25], [21.75, 2.6]]  # 6.8 x 2.35 footprint, 3.0 high; window face 0.25 inside the edge
       half_sensitivity_angle: 55   # degrees (Vishay app note 84323): size the front window from this
     qwiic:                         # J1, JST SH 4-pin side entry (SM04B-SRSS-TB), J_QWIIC_TONGUE
-      cable_entry: +Y              # the plug enters from the bottom edge, cable leaves along +Y
+      cable_entry: +Y              # back long edge (opposite the front); the cable leaves toward the main board
       mating_face_y: 12.36         # 0.64 inside the bottom edge
       center_x: 15.0               # pin 1 (GND) at x 13.5, pin 4 (SCL) at x 16.5
       body: [[12.0, 8.1], [18.0, 12.36]]  # 2.95 high
