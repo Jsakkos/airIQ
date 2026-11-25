@@ -225,3 +225,31 @@ def test_frc_script_and_ids():
     assert load_yaml(PKG / "board.yaml")["i2c"]["id"] == "i2c_bus"
     sen = next(s for s in load_yaml(PKG / "sensors.yaml")["sensor"] if s["platform"] == "sen6x")
     assert sen["id"] == "sen"
+
+
+def display(entity_id, model="model-airq.yaml"):
+    return next(d for d in _entities(model, "display") if d.get("id") == entity_id)
+
+
+def test_display_manual_update():
+    assert display("epd")["update_interval"] == "never"
+
+
+def test_display_only_in_airq():
+    assert any("display" in d for d in load_merged(PKG / "model-airq.yaml") if d)
+    assert not any("display" in d for d in load_merged(PKG / "model-mini.yaml") if d)
+
+
+def test_display_model_and_refresh_cadence():
+    d = display("epd")
+    assert d["platform"] == "epaper_spi"
+    assert d["model"] == "${epd_model}"
+    assert d["full_update_every"] == 6
+    assert d["rotation"] in (90, 270)
+    board = load_yaml(PKG / "board.yaml")
+    assert board["substitutions"]["epd_model"] == "waveshare-2.9in-v2"
+
+
+def test_display_globals():
+    ids = {g["id"] for g in _entities("model-airq.yaml", "globals")}
+    assert {"epd_last_ms", "epd_ever", "epd_partials", "epd_shown_co2", "epd_shown_pm"} <= ids

@@ -5,7 +5,7 @@ substitutions:
   sen6x_model: SEN66
   led_count: "4"
   light_cap: "0.5"
-  epd_model: none
+  epd_model: waveshare-2.9in-v2
   # Rooms that rarely get fresh air should set co2_asc: "false" in their unit file and use forced recalibration outdoors (implemented in a later task).
   co2_asc: "true"
 
