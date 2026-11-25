@@ -16,6 +16,11 @@ sensor:
     pressure:
       id: room_p
       name: ${friendly_name} Pressure
+      # bmp581 reports Pa; SEN66 compensation and HA expect hPa.
+      unit_of_measurement: hPa
+      accuracy_decimals: 1
+      filters:
+        - multiply: 0.01
     update_interval: 30s
 
   - platform: veml7700

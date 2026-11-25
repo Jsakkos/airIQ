@@ -148,6 +148,16 @@ def test_index_keys(sensors):
     assert sen6x["co2"]["ambient_pressure_compensation_source"] == "room_p"
 
 
+def test_pressure_in_hpa_for_sen6x(sensors):
+    sen6x = next(s for s in sensors["sensor"] if s["platform"] == "sen6x")
+    src = sen6x["co2"]["ambient_pressure_compensation_source"]
+    bmp = next(s for s in sensors["sensor"] if s["platform"] == "bmp581_i2c")
+    p = bmp["pressure"]
+    assert p["id"] == src
+    assert p["unit_of_measurement"] == "hPa"
+    assert {"multiply": 0.01} in p["filters"]
+
+
 def test_lux_smoothed(sensors):
     veml = next(s for s in sensors["sensor"] if s["platform"] == "veml7700")
     filters = veml["ambient_light"]["filters"]
