@@ -1,0 +1,69 @@
+# airQ: one light showing the WORSE of the CO2 and PM2.5 bands.
+# ESPHome substitutions cannot do arithmetic, so the segment bounds are
+# explicit (default 4 LEDs); override led_first/led_last with led_count.
+substitutions:
+  led_first: "0"
+  led_last: "3"
+
+light:
+  - platform: partition
+    id: worst_light
+    name: ${friendly_name} Light
+    internal: true
+    default_transition_length: 1s
+    segments:
+      - id: led_strip
+        from: ${led_first}
+        to: ${led_last}
+
+interval:
+  - interval: 2s
+    then:
+      - lambda: |-
+          id(co2_band_g) = (int) airq::co2_band_hyst(id(co2).state, (airq::Band) id(co2_band_g));
+          id(pm_band_g) = (int) airq::pm25_band_hyst(id(pm_2_5).state, (airq::Band) id(pm_band_g));
+          if (id(light_override_until_ms) != 0 && (int32_t) (millis() - id(light_override_until_ms)) < 0) return;
+          const bool off = id(night_mode).state || !id(status_light).state;
+          const airq::Band band = airq::worse((airq::Band) id(co2_band_g), (airq::Band) id(pm_band_g));
+          const airq::Rgb c = airq::band_color(band);
+          const float br = airq::light_brightness(id(room_lux).state, ${light_cap});
+          const bool on = !off && band != airq::Band::Unknown;
+          float *last = id(light_last);
+          if (!on) {
+            if (last[0] != 0.0f) {
+              last[0] = 0.0f;
+              id(worst_light).turn_off().set_transition_length(1000).perform();
+            }
+            return;
+          }
+          if (last[0] == 1.0f && last[1] == c.r && last[2] == c.g && last[3] == c.b &&
+              std::fabs(last[4] - br) < 0.02f)
+            return;
+          last[0] = 1.0f; last[1] = c.r; last[2] = c.g; last[3] = c.b; last[4] = br;
+          id(worst_light).turn_on().set_rgb(c.r, c.g, c.b).set_brightness(br).set_transition_length(1000).perform();
+
+script:
+  # Confirmation blink: white x3 on success, red x3 on failure.
+  - id: light_blink
+    mode: single
+    parameters:
+      ok: bool
+    then:
+      - lambda: id(light_override_until_ms) = millis() + 3500;
+      - repeat:
+          count: 3
+          then:
+            - lambda: |-
+                const float br = airq::light_brightness(id(room_lux).state, ${light_cap});
+                auto call = id(worst_light).turn_on();
+                if (ok) call.set_rgb(1.0f, 1.0f, 1.0f); else call.set_rgb(1.0f, 0.0f, 0.0f);
+                call.set_brightness(br).set_transition_length(0).perform();
+            - delay: 300ms
+            - light.turn_off:
+                id: worst_light
+                transition_length: 0s
+            - delay: 300ms
+      # Hand the lights back to the interval: force a re-apply.
+      - lambda: |-
+          id(light_last)[0] = -1.0f;
+          id(light_override_until_ms) = 0;

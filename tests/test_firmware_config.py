@@ -178,3 +178,50 @@ def test_model_bundles_include_base():
     for name in ("airq-example.yaml", "airq-mini-example.yaml"):
         docs = load_merged(ESPHOME_DIR / name)
         assert any("esp32" in d for d in docs if d)
+
+
+# ---- Task 4: status light and button ----
+
+def _entities(model, domain):
+    out = []
+    for doc in load_merged(PKG / model):
+        if doc and domain in doc:
+            out.extend(doc[domain])
+    return out
+
+
+def switch(entity_id, model="model-airq.yaml"):
+    return next(s for s in _entities(model, "switch") if s.get("id") == entity_id)
+
+
+def light_ids(model):
+    return {l.get("id") for l in _entities(model, "light")}
+
+
+def test_light_state_restores():
+    for model in ("model-airq.yaml", "model-mini.yaml"):
+        assert switch("status_light", model)["restore_mode"] == "RESTORE_DEFAULT_ON"
+        assert switch("night_mode", model)["restore_mode"] == "RESTORE_DEFAULT_OFF"
+
+
+def test_mini_has_two_halves():
+    assert {"co2_light", "pm_light"} <= light_ids("model-mini.yaml")
+
+
+def test_airq_single_light():
+    assert "co2_light" not in light_ids("model-airq.yaml")
+    assert "worst_light" in light_ids("model-airq.yaml")
+
+
+def test_lights_are_internal():
+    for model in ("model-airq.yaml", "model-mini.yaml"):
+        assert all(l.get("internal") is True for l in _entities(model, "light"))
+
+
+def test_frc_script_and_ids():
+    docs = load_merged(PKG / "model-airq.yaml")
+    assert any(s.get("id") == "co2_frc" and s.get("mode") == "single"
+               for d in docs if d for s in d.get("script", []))
+    assert load_yaml(PKG / "board.yaml")["i2c"]["id"] == "i2c_bus"
+    sen = next(s for s in load_yaml(PKG / "sensors.yaml")["sensor"] if s["platform"] == "sen6x")
+    assert sen["id"] == "sen"

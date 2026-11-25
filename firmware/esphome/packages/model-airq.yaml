@@ -1,4 +1,4 @@
-# airQ (with e-ink screen). Later tasks add light, button and display packages.
+# airQ (with e-ink screen). Later tasks add the display package.
 substitutions:
   epd_model: gdey029t94
 
@@ -6,3 +6,6 @@ packages:
   pins: !include pins.yaml
   board: !include board.yaml
   sensors: !include sensors.yaml
+  light_common: !include light-common.yaml
+  light: !include light-worst.yaml
+  button: !include button.yaml

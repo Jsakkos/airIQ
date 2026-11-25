@@ -36,6 +36,7 @@ sensor:
             send_every: 1
 
   - platform: sen6x
+    id: sen
     type: ${sen6x_model}
     address: ${addr_sen6x}
     update_interval: 10s

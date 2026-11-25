@@ -86,6 +86,28 @@ int main() {
   CHECK(classify_press(14999) == Press::ForceCo2Calibration);
   CHECK(classify_press(15000) == Press::SafeModeReboot);
 
+  // Sensirion CRC-8 / SEN6x forced CO2 recalibration
+  {
+    const uint8_t beef[2] = {0xBE, 0xEF};
+    CHECK(sensirion_crc8(beef, 2) == 0x92);
+    auto cmd = sen6x_frc_command(420);
+    CHECK(cmd[0] == 0x67); CHECK(cmd[1] == 0x07); CHECK(cmd[2] == 0x01); CHECK(cmd[3] == 0xA4);
+    CHECK(cmd[4] == sensirion_crc8(cmd.data() + 2, 2));
+    int corr = 12345;
+    const uint8_t good_w[2] = {0x80, 0x0A};  // 0x800A -> +10 ppm
+    uint8_t good[3] = {0x80, 0x0A, sensirion_crc8(good_w, 2)};
+    CHECK(sen6x_frc_correction(good, &corr)); CHECK(corr == 10);
+    const uint8_t neg_w[2] = {0x7F, 0xF6};  // -10 ppm
+    uint8_t neg[3] = {0x7F, 0xF6, sensirion_crc8(neg_w, 2)};
+    CHECK(sen6x_frc_correction(neg, &corr)); CHECK(corr == -10);
+    uint8_t bad[3] = {0x80, 0x0A, (uint8_t) (good[2] ^ 0xFF)};
+    corr = 777;
+    CHECK(!sen6x_frc_correction(bad, &corr)); CHECK(corr == 777);
+    const uint8_t ff_w[2] = {0xFF, 0xFF};
+    uint8_t ff[3] = {0xFF, 0xFF, sensirion_crc8(ff_w, 2)};
+    CHECK(!sen6x_frc_correction(ff, &corr)); CHECK(corr == 777);
+  }
+
   // text
   CHECK(co2_text(612.4f) == "612");  CHECK(co2_text(NAN) == "--");  CHECK(co2_text(40000) == "40000");
   CHECK(co2_text(-1) == "--");

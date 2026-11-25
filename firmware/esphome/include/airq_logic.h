@@ -3,7 +3,9 @@
 // and #included from ESPHome lambdas.
 #pragma once
 
+#include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
@@ -100,6 +102,36 @@ inline Press classify_press(uint32_t held_ms) {
   if (held_ms < 5000) return Press::None;
   if (held_ms < 15000) return Press::ForceCo2Calibration;
   return Press::SafeModeReboot;
+}
+
+// Sensirion CRC-8 (poly 0x31, init 0xFF) over len bytes of a 16-bit word stream.
+inline uint8_t sensirion_crc8(const uint8_t* data, size_t len) {
+  uint8_t crc = 0xFF;
+  for (size_t i = 0; i < len; i++) {
+    crc ^= data[i];
+    for (int b = 0; b < 8; b++) crc = (crc & 0x80) ? (uint8_t) ((crc << 1) ^ 0x31) : (uint8_t) (crc << 1);
+  }
+  return crc;
+}
+
+// SEN66 "perform forced CO2 recalibration" (command 0x6707): command word plus
+// the target ppm as a CRC-protected word. Source: Sensirion/embedded-i2c-sen66,
+// sen66_i2c.h (SEN66_PERFORM_FORCED_CO2_RECALIBRATION_CMD_ID = 0x6707) and
+// sen66_i2c.c (write cmd + target, wait 500 ms, read one word + CRC).
+inline std::array<uint8_t, 5> sen6x_frc_command(uint16_t target_ppm) {
+  const uint8_t hi = (uint8_t) (target_ppm >> 8), lo = (uint8_t) (target_ppm & 0xFF);
+  const uint8_t w[2] = {hi, lo};
+  return {0x67, 0x07, hi, lo, sensirion_crc8(w, 2)};
+}
+
+// Parse the 3-byte FRC response (word + CRC). False on CRC mismatch or 0xFFFF
+// (calibration failed); else correction = word - 0x8000 (ppm).
+inline bool sen6x_frc_correction(const uint8_t resp[3], int* correction_ppm) {
+  if (sensirion_crc8(resp, 2) != resp[2]) return false;
+  const uint16_t word = (uint16_t) ((resp[0] << 8) | resp[1]);
+  if (word == 0xFFFF) return false;
+  *correction_ppm = (int) word - 0x8000;
+  return true;
 }
 
 inline std::string co2_text(float ppm) {

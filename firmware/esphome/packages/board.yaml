@@ -55,6 +55,7 @@ button:
     name: ${friendly_name} Safe mode
 
 i2c:
+  id: i2c_bus
   sda: ${pin_i2c_sda}
   scl: ${pin_i2c_scl}
   frequency: 100kHz
