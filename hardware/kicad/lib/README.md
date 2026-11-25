@@ -120,6 +120,18 @@ Its stock is only 308 (enough for 10 boards plus attrition).
      data: `assemblyMode = smtWeld`, PCBA type "Economic and Standard"), and an `smd` type keeps it in the CPL export.
      KiCad may raise a footprint-type mismatch warning for it, and for the WROOM-1's via pads. That warning is expected.
 
+10. **Pin electrical types of the power sub-circuit symbols** (Task 2): easyeda2kicad writes every pin as
+    `unspecified` (and the USBLC6's as `input`), so ERC could not check them and reported the USBLC6 I/O pins
+    as undriven. They now follow KiCad 10's stock symbols for the same parts:
+    - `TYPE-C16PIN2MD` as `Connector:USB_C_Receptacle_USB2.0_16P`: GND, VBUS and shell (13, 14) `passive`;
+      CC, D+/D−, SBU `bidirectional`;
+    - `USBLC6-2SC6` as `Power_Protection:USBLC6-2P6`: all six pins `passive`;
+    - `TPS562201DDCR` as `Regulator_Switching:TPS562200` (same pinout): GND and VIN `power_in`, SW `output`,
+      VFB and EN `input`, VBST `passive`;
+    - `WPN4020H3R3MT`: both pins `passive`.
+
+    The other symbols still have `unspecified` pins; Task 4 sets them the same way as it draws each part.
+
 ## Pad maps checked by hand
 
 Each check compares the footprint's pad numbers and positions (from the `.kicad_mod`) and the symbol's pin names with the manufacturer's document.

@@ -1,11 +1,19 @@
-"""Stdlib-only S-expression reader for KiCad files (.kicad_pcb, netlists).
+"""Stdlib-only S-expression reader and writer for KiCad files (.kicad_pcb, .kicad_sch, netlists).
 
 `parse` returns nested lists of ``str``: ``(a (b "c d"))`` -> ``["a", ["b", "c d"]]``.
-Quoted strings and bare atoms both become plain ``str`` (the distinction is not needed here).
+Quoted strings come back as ``QStr``, a ``str`` subclass, so readers can ignore the distinction
+(``QStr("c d") == "c d"``) while `dumps` can write the tree back with the same quoting: KiCad reads
+keywords only when bare (``(type solid)``) and names only when quoted when they contain spaces.
 """
 import re
 
 _WS = " \t\r\n"
+
+
+class QStr(str):
+    """A string atom written in double quotes (``"F.Cu"``), as opposed to a bare keyword or number."""
+
+    __slots__ = ()
 
 
 def parse(text: str) -> list:
@@ -47,7 +55,7 @@ def parse(text: str) -> list:
                     else:
                         buf.append(c)
                         i += 1
-                atom = "".join(buf)
+                atom = QStr("".join(buf))
             else:
                 j = i
                 while j < n and text[j] not in _WS and text[j] not in '()"':
@@ -63,6 +71,43 @@ def parse(text: str) -> list:
     if result is None:
         raise ValueError("empty input")
     return result
+
+
+_ESCAPES = {"\\": "\\\\", '"': '\\"', "\n": "\\n", "\t": "\\t", "\r": "\\r"}
+
+
+def _write_atom(a) -> str:
+    if isinstance(a, QStr):
+        return '"' + "".join(_ESCAPES.get(c, c) for c in a) + '"'
+    s = str(a)
+    if not s or any(c in s for c in _WS + '()"'):
+        raise ValueError(f"bare atom {s!r} needs quoting: build it as QStr")
+    return s
+
+
+def dumps(node, level: int = 0) -> str:
+    """Write a tree from `parse` (or built from lists, str and QStr) as KiCad-style text.
+
+    A list whose items are all atoms stays on one line; otherwise each child list starts a new
+    line indented by one tab. KiCad accepts any layout, so this only aims at readable diffs.
+    """
+    if not isinstance(node, list):
+        return _write_atom(node)
+    pad = "\t" * (level + 1)
+    out = "(" + " ".join(_write_atom(a) for a in _leading_atoms(node))
+    rest = node[len(_leading_atoms(node)):]
+    for item in rest:
+        out += "\n" + pad + dumps(item, level + 1)
+    if any(isinstance(item, list) for item in rest):
+        out += "\n" + "\t" * level
+    return out + ")"
+
+
+def _leading_atoms(node: list) -> list:
+    n = 0
+    while n < len(node) and not isinstance(node[n], list):
+        n += 1
+    return node[:n]
 
 
 def children(node: list, name: str) -> list[list]:

@@ -1,0 +1,26 @@
+# airQ v3 main board: project settings for the generator (tools/hw/build.py main).
+# The KiCad files in hardware/kicad/main/ are generated from this folder: edit here, then rebuild.
+# Format: hardware/README.md, "Design source".
+
+project: airq-main                 # KiCad project name: <output>/airq-main.kicad_pro
+title: airQ v3 main board
+company: airQ open hardware (CC BY-SA 4.0)
+rev: 3.0-dev
+output: ../../kicad/main           # KiCad project folder, relative to this file
+
+# Schematic sheets, in page order; each one is <name>.yaml in this folder.
+sheets: [power]
+
+# Nets drawn with a KiCad power symbol instead of a label.
+power_symbols:
+  GND: power:GND
+  +5V: power:+5V                   # USB VBUS
+  +3V3: power:+3V3
+
+# Project libraries (paths relative to this file). Other library names (Device, power,
+# Resistor_SMD, ...) are KiCad 10's stock libraries.
+libraries:
+  symbols:
+    airq: ../../kicad/lib/airq.kicad_sym
+  footprints:
+    airq: ../../kicad/lib/airq.pretty

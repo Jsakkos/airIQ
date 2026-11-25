@@ -488,85 +488,85 @@
         (stroke (width 0) (type default))
         (fill (type background))
       )
-      (pin unspecified line
+      (pin passive line
         (at -6.35 13.97 0)
         (length 2.54)
         (name "GND" (effects (font (size 1.27 1.27))))
         (number "A1B12" (effects (font (size 1.27 1.27))))
       )
-      (pin unspecified line
+      (pin passive line
         (at -6.35 11.43 0)
         (length 2.54)
         (name "VBUS" (effects (font (size 1.27 1.27))))
         (number "A4B9" (effects (font (size 1.27 1.27))))
       )
-      (pin unspecified line
+      (pin bidirectional line
         (at -6.35 8.89 0)
         (length 2.54)
         (name "SBU2" (effects (font (size 1.27 1.27))))
         (number "B8" (effects (font (size 1.27 1.27))))
       )
-      (pin unspecified line
+      (pin bidirectional line
         (at -6.35 6.35 0)
         (length 2.54)
         (name "CC1" (effects (font (size 1.27 1.27))))
         (number "A5" (effects (font (size 1.27 1.27))))
       )
-      (pin unspecified line
+      (pin bidirectional line
         (at -6.35 3.81 0)
         (length 2.54)
         (name "Dn2" (effects (font (size 1.27 1.27))))
         (number "B7" (effects (font (size 1.27 1.27))))
       )
-      (pin unspecified line
+      (pin bidirectional line
         (at -6.35 1.27 0)
         (length 2.54)
         (name "Dp1" (effects (font (size 1.27 1.27))))
         (number "A6" (effects (font (size 1.27 1.27))))
       )
-      (pin unspecified line
+      (pin bidirectional line
         (at -6.35 -1.27 0)
         (length 2.54)
         (name "Dn1" (effects (font (size 1.27 1.27))))
         (number "A7" (effects (font (size 1.27 1.27))))
       )
-      (pin unspecified line
+      (pin bidirectional line
         (at -6.35 -3.81 0)
         (length 2.54)
         (name "Dp2" (effects (font (size 1.27 1.27))))
         (number "B6" (effects (font (size 1.27 1.27))))
       )
-      (pin unspecified line
+      (pin bidirectional line
         (at -6.35 -6.35 0)
         (length 2.54)
         (name "SBU1" (effects (font (size 1.27 1.27))))
         (number "A8" (effects (font (size 1.27 1.27))))
       )
-      (pin unspecified line
+      (pin bidirectional line
         (at -6.35 -8.89 0)
         (length 2.54)
         (name "CC2" (effects (font (size 1.27 1.27))))
         (number "B5" (effects (font (size 1.27 1.27))))
       )
-      (pin unspecified line
+      (pin passive line
         (at -6.35 -11.43 0)
         (length 2.54)
         (name "VBUS" (effects (font (size 1.27 1.27))))
         (number "B4A9" (effects (font (size 1.27 1.27))))
       )
-      (pin unspecified line
+      (pin passive line
         (at -6.35 -13.97 0)
         (length 2.54)
         (name "GND" (effects (font (size 1.27 1.27))))
         (number "B1A12" (effects (font (size 1.27 1.27))))
       )
-      (pin unspecified line
+      (pin passive line
         (at 11.43 -13.97 180)
         (length 2.54)
         (name "EH" (effects (font (size 1.27 1.27))))
         (number "14" (effects (font (size 1.27 1.27))))
       )
-      (pin unspecified line
+      (pin passive line
         (at 11.43 13.97 180)
         (length 2.54)
         (name "EH" (effects (font (size 1.27 1.27))))
@@ -796,37 +796,37 @@
         (stroke (width 0) (type default))
         (fill (type none))
       )
-      (pin input line
+      (pin passive line
         (at -16.51 7.62 0)
         (length 5.08)
         (name "I/O1" (effects (font (size 1.27 1.27))))
         (number "1" (effects (font (size 1.27 1.27))))
       )
-      (pin input line
+      (pin passive line
         (at -16.51 -0.00 0)
         (length 5.08)
         (name "GND" (effects (font (size 1.27 1.27))))
         (number "2" (effects (font (size 1.27 1.27))))
       )
-      (pin input line
+      (pin passive line
         (at -16.51 -7.62 0)
         (length 5.08)
         (name "I/O2" (effects (font (size 1.27 1.27))))
         (number "3" (effects (font (size 1.27 1.27))))
       )
-      (pin input line
+      (pin passive line
         (at 16.51 -7.62 180)
         (length 5.08)
         (name "I/O2" (effects (font (size 1.27 1.27))))
         (number "4" (effects (font (size 1.27 1.27))))
       )
-      (pin input line
+      (pin passive line
         (at 16.51 -0.00 180)
         (length 5.08)
         (name "VBUS" (effects (font (size 1.27 1.27))))
         (number "5" (effects (font (size 1.27 1.27))))
       )
-      (pin input line
+      (pin passive line
         (at 16.51 7.62 180)
         (length 5.08)
         (name "I/O1" (effects (font (size 1.27 1.27))))
@@ -920,37 +920,37 @@
         (stroke (width 0) (type default))
         (fill (type none))
       )
-      (pin unspecified line
+      (pin power_in line
         (at -12.70 2.54 0)
         (length 2.54)
         (name "GND" (effects (font (size 1.27 1.27))))
         (number "1" (effects (font (size 1.27 1.27))))
       )
-      (pin unspecified line
+      (pin output line
         (at -12.70 -0.00 0)
         (length 2.54)
         (name "SW" (effects (font (size 1.27 1.27))))
         (number "2" (effects (font (size 1.27 1.27))))
       )
-      (pin unspecified line
+      (pin power_in line
         (at -12.70 -2.54 0)
         (length 2.54)
         (name "VIN" (effects (font (size 1.27 1.27))))
         (number "3" (effects (font (size 1.27 1.27))))
       )
-      (pin unspecified line
+      (pin input line
         (at 12.70 -2.54 180)
         (length 2.54)
         (name "VFB" (effects (font (size 1.27 1.27))))
         (number "4" (effects (font (size 1.27 1.27))))
       )
-      (pin unspecified line
+      (pin input line
         (at 12.70 -0.00 180)
         (length 2.54)
         (name "EN" (effects (font (size 1.27 1.27))))
         (number "5" (effects (font (size 1.27 1.27))))
       )
-      (pin unspecified line
+      (pin passive line
         (at 12.70 2.54 180)
         (length 2.54)
         (name "VBST" (effects (font (size 1.27 1.27))))
@@ -1047,13 +1047,13 @@
         (stroke (width 0) (type default))
         (fill (type none))
       )
-      (pin unspecified line
+      (pin passive line
         (at 5.08 -0.00 180)
         (length 1.27)
         (name "2" (effects (font (size 1.27 1.27))))
         (number "2" (effects (font (size 1.27 1.27))))
       )
-      (pin unspecified line
+      (pin passive line
         (at -5.08 -0.00 0)
         (length 1.27)
         (name "1" (effects (font (size 1.27 1.27))))

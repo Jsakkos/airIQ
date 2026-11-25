@@ -6,3 +6,14 @@ firmware/esphome/secrets.yaml
 firmware/esphome/.esphome/
 build/
 __pycache__/
+
+# KiCad per-user state and backups (the KiCad projects are generated, see hardware/README.md)
+*.kicad_prl
+*-backups/
+fp-info-cache
+\#auto_saved_files\#
+~*.lck
+_autosave-*
+# reports kicad-cli writes into the working folder when run without -o
+*-erc.rpt
+*-drc.rpt

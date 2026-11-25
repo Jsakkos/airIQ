@@ -1,0 +1,8 @@
+(version 1)
+# USB-C C2765186: the vendor land pattern (SHOU HAN TYPE-C 16PIN 2MD(073) drawing, the same as
+# JLC/EasyEDA's footprint for this part) puts the A1B12/B1A12/A4B9/B4A9 pads 0.18 mm from the
+# non-plated locating-peg holes. Allow that inside this footprint only. Confirm with JLC's
+# NPTH-to-copper capability at the Task 5 review.
+(rule "USB-C locating pegs, vendor land pattern"
+  (constraint hole_clearance (min 0.15mm))
+  (condition "A.memberOfFootprint('airq:USB-C-SMD_TYPE-C-16PIN-2MD-073') && B.memberOfFootprint('airq:USB-C-SMD_TYPE-C-16PIN-2MD-073')"))

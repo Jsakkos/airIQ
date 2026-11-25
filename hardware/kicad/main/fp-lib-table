@@ -1,0 +1,6 @@
+(fp_lib_table
+	(version 7)
+	(lib (name "Capacitor_SMD") (type "KiCad") (uri "${KICAD10_FOOTPRINT_DIR}/Capacitor_SMD.pretty") (options "") (descr "KiCad stock library"))
+	(lib (name "Resistor_SMD") (type "KiCad") (uri "${KICAD10_FOOTPRINT_DIR}/Resistor_SMD.pretty") (options "") (descr "KiCad stock library"))
+	(lib (name "airq") (type "KiCad") (uri "${KIPRJMOD}/../lib/airq.pretty") (options "") (descr "airQ project library"))
+)

@@ -1,0 +1,63 @@
+# airQ v3 main board layout source: outline, design rules, net classes, footprint placement.
+# Coordinates are mm from the board's top-left corner, X right, Y down (KiCad's own axes);
+# KiCad's grid origin is set to that corner. Rotations are degrees counter-clockwise.
+# Task 2 spike: only the power sub-circuit is placed, along the rear (top) edge; Task 5 owns
+# the real placement and routing.
+
+board:
+  width: 60.0
+  height: 30.0
+  origin: [100.0, 100.0]     # page position of the top-left corner
+  thickness: 1.6
+
+# Board design rules (KiCad "Constraints"): JLCPCB 2-layer, conservative values.
+rules:
+  min_clearance: 0.15
+  min_track_width: 0.15
+  min_via_diameter: 0.6
+  min_through_hole_diameter: 0.3
+  min_via_annular_width: 0.15
+  min_copper_edge_clearance: 0.3
+  min_hole_to_hole: 0.25
+
+netclasses:
+  Default: {clearance: 0.15, track_width: 0.2, via_diameter: 0.6, via_drill: 0.3}
+  Power:
+    clearance: 0.15
+    track_width: 0.4
+    via_diameter: 0.6
+    via_drill: 0.3
+    nets: ["+5V", "+3V3", "GND", "*BUCK_SW"]
+
+# DRC rule severities that differ from KiCad's defaults (the generator also makes the schematic
+# parity checks errors). Each needs a reason.
+drc_severities: {}
+
+# KiCad custom DRC rules, written to airq-main.kicad_dru. Each needs a reason.
+custom_rules: |
+  # USB-C C2765186: the vendor land pattern (SHOU HAN TYPE-C 16PIN 2MD(073) drawing, the same as
+  # JLC/EasyEDA's footprint for this part) puts the A1B12/B1A12/A4B9/B4A9 pads 0.18 mm from the
+  # non-plated locating-peg holes. Allow that inside this footprint only. Confirm with JLC's
+  # NPTH-to-copper capability at the Task 5 review.
+  (rule "USB-C locating pegs, vendor land pattern"
+    (constraint hole_clearance (min 0.15mm))
+    (condition "A.memberOfFootprint('airq:USB-C-SMD_TYPE-C-16PIN-2MD-073') && B.memberOfFootprint('airq:USB-C-SMD_TYPE-C-16PIN-2MD-073')"))
+
+# REF: [x, y, rotation]
+placement:
+  J1: [10.0, 5.0, 180]       # USB-C: mouth over the rear edge, front silk line on the edge
+  R1: [5.0, 10.0, 0]
+  R2: [15.0, 10.0, 0]
+  U1: [21.0, 6.0, 0]         # USBLC6, next to the connector
+  C7: [21.0, 10.0, 0]
+  U2: [34.0, 6.0, 0]         # TPS562201
+  C1: [27.5, 4.0, 90]
+  C2: [27.5, 9.0, 90]
+  C3: [30.5, 9.0, 90]
+  C4: [34.0, 2.5, 0]
+  R5: [34.0, 10.0, 0]
+  L1: [42.0, 6.0, 0]
+  C5: [49.0, 4.0, 90]
+  C6: [49.0, 9.0, 90]
+  R3: [38.0, 12.0, 0]
+  R4: [42.0, 12.0, 0]
