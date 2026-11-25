@@ -1,0 +1,74 @@
+(kicad_pcb
+	(version 20250907)
+	(generator "pcbnew")
+	(general
+		(thickness 1.6)
+	)
+	(layers
+		(0 "F.Cu" signal)
+		(2 "B.Cu" signal)
+		(25 "Edge.Cuts" user)
+	)
+	(gr_line
+		(start 0 0)
+		(end 61 0)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(layer "Edge.Cuts")
+	)
+	(gr_line
+		(start 61 0)
+		(end 61 30)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(layer "Edge.Cuts")
+	)
+	(gr_line
+		(start 61 30)
+		(end 0 30)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(layer "Edge.Cuts")
+	)
+	(gr_line
+		(start 0 30)
+		(end 0 0)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(layer "Edge.Cuts")
+	)
+	(footprint "R_0402"
+		(layer "F.Cu")
+		(at 10 10)
+		(property "Reference" "R1"
+			(at 0 0 0)
+			(layer "F.SilkS")
+		)
+		(fp_rect
+			(start -0.5 -0.25)
+			(end 0.5 0.25)
+			(layer "F.Fab")
+		)
+	)
+	(footprint "R_0402"
+		(layer "F.Cu")
+		(at 20 10)
+		(property "Reference" "R2"
+			(at 0 0 0)
+			(layer "F.SilkS")
+		)
+		(fp_rect
+			(start -0.5 -0.25)
+			(end 0.5 0.25)
+			(layer "F.Fab")
+		)
+	)
+)
