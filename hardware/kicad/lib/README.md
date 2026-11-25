@@ -130,7 +130,37 @@ Its stock is only 308 (enough for 10 boards plus attrition).
       VFB and EN `input`, VBST `passive`;
     - `WPN4020H3R3MT`: both pins `passive`.
 
+    - `SHT45-AD1B-R2` (Task 6) as `Sensor_Humidity:SHT4x`: SDA `bidirectional`, SCL `input`, VDD and
+      VSS `power_in`;
+    - `VEML7700-TR` (Task 6), the same way: SDA `bidirectional`, SCL `input`, VDD and GND `power_in`;
+    - `SM04B-SRSS-TB` (Task 6): all six pins `passive`, like KiCad's stock connectors.
+
     The other symbols still have `unspecified` pins; Task 4 sets them the same way as it draws each part.
+
+11. **Courtyards of the sense-tongue parts** (Task 6, before their first placement): EasyEDA drew them round
+    the body only (the SHT45's was a triangle). They are now closed rectangles covering body and pads plus
+    0.25 mm: `DFN-4_L1.5-W1.5-P0.8-TL-EP` ±1.15 × ±1.00, `LED-SMD_4P-L6.8-W2.4_VEML7700-TR` x ±3.65,
+    y −2.10…+1.15, `CONN-SMD_4P-P1.00_SM04B-SRSS-TB-LF-SN` x ±3.65, y −2.97…+3.09 mm.
+12. **3D model placement** (Task 6; the enclosure is built from the board STEP, so this matters). Measured
+    from the STEP vertices against the pads:
+    - `CONN-SMD_SR1.00-WS-4P.step` (SM04B) sat 1.5 mm to +x (the left fitting nail stood outside the body)
+      and 0.385 mm to −y (rearward) of its pads. Model offset now (−1.500, −0.385, 0) (KiCad's offset Y
+      points up the screen): the contact tails sit on the contact pads, and the body then matches KiCad's
+      stock `JST_SH_SM04B-SRSS-TB_1x04-1MP_P1.00mm_Horizontal` model to within 0.04 mm (body front, the
+      mating face, at footprint y +2.51; 2.9 mm high).
+    - `LED-SMD_4P-L6.8-W2.4_VEML7700-TR.step` was centred on z = 0 (half of its 3.0 mm height below the
+      board) and 0.45 mm to +y of the silkscreen body outline. Model offset now (0, +0.450, +1.491): the
+      body sits on the board, fills the silk outline (y −1.85…+0.50), and its lead feet are centred on the pads.
+13. **VEML7700 window direction, checked against the vector drawing** (Task 6): Vishay doc. 84286 Rev. 1.8
+    p. 10 is drawn in first-angle projection (its projection symbol shows the end view of the cone's small
+    end to the right). In the side view, placed right of the front view, the J-leads and their 1 mm feet
+    are on the left edge, which is the back of the part. In the top view, placed below the front view, the
+    lead tops sit in a recess along the top edge, which is also the back. So the leads are on the back and
+    the sensitive face is the front, the side opposite the leads. In the footprint the pads stick out
+    behind the body at +y, so the window faces footprint **−y**, as the "Pad maps" table says. The
+    sensitive-area centre is 1.95 mm above the seating plane and centred along the 6.8 mm length
+    (application note 84323, Fig. 19); the half-sensitivity angle is about ±55°. Seen from the window,
+    pin 1 is on the left, as in the datasheet photo.
 
 ## Pad maps checked by hand
 
@@ -190,8 +220,8 @@ ESP32-C6 Module's Antenna (Antenna feed point on the right)", units mm:
 - **FPC contact side and fold**: verified from the series drawing for the unfolded, display-up insertion only. Confirm the enclosure's FPC
   routing in the Task 5 owner review; a 180° fold mirrors the pin order.
 - **Side-emitting LED and side-looking VEML7700 directions** were derived from 2-D drawings: SK6812SIDE-A light toward footprint +y,
-  VEML7700 window toward footprint −y. Confirm in the KiCad 3D viewer, and against a physical part if one is at hand,
-  before the board is ordered.
+  VEML7700 window toward footprint −y (re-checked against the vector drawing in Task 6, fix 13). The EasyEDA 3D bodies have no
+  visible lens, so the 3D viewer cannot show the window. Check against a physical part if one is at hand before the board is ordered.
 - **SKRTLAE010 actuator direction**: not checked against the drawing. Confirm in 3D at placement.
 - The WROOM-1 3D body is a stand-in (the S3-WROOM-1 body with the same outline). Good enough for the enclosure STEP, not for a photo-real render.
 - Licence: the EasyEDA-derived symbols, footprints and models come from the LCSC/EasyEDA library through easyeda2kicad.

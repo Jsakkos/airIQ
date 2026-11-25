@@ -1,0 +1,62 @@
+# airQ v3 sense tongue layout source: outline, milled slot, design rules, footprint placement.
+# Coordinates are mm from the board's top-left corner, X right, Y down (KiCad's own axes);
+# KiCad's grid origin is set to that corner. Rotations are degrees counter-clockwise.
+#
+# Arrangement (22 x 13 mm, global limit 22 x 14):
+# - left end: the SHT45 (U1, centre 4.5, 4.5) on an island cut free by a 1.0 mm milled slot on
+#   three sides (top, left, bottom); the island joins the board only through a 2.4 mm neck on its
+#   right, which carries the sensor's four 0.2 mm traces. No other copper within 1.5 mm of the
+#   sensor: the rule area SHT45_ISOLATION (in the board file) bans vias and pours over the island,
+#   the slot and the neck, and the custom rule below bans other parts' pads there.
+# - right end: the VEML7700 (U2, side-view package) with its window facing out of the right edge
+#   (+X), the edge opposite the SHT45. Its window face is 0.25 mm inside the edge.
+# - bottom edge: the Qwiic socket J1 (JST SH side entry), cable entering from below (+Y).
+# - below the island: the M2 mounting hole H1, away from the copper.
+# Routing, the B.Cu ground pour and the rule area live in the board file (hardware/README.md,
+# regeneration contract) and survive rebuilds.
+
+board:
+  width: 22.0
+  height: 13.0
+  origin: [100.0, 100.0]     # page position of the top-left corner
+  thickness: 1.6
+  cutouts:
+    # Milled slot around the SHT45, 1.0 mm wide (JLC mills internal slots with a >= 0.8 mm bit;
+    # the inside corners get the bit's radius). One polygon: top arm, left arm, bottom arm, and a
+    # 1.0 mm hook at each arm's right end that narrows the island's neck to 2.4 mm (y 3.3..5.7).
+    - [[1.5, 1.5], [8.5, 1.5], [8.5, 3.3], [7.5, 3.3], [7.5, 2.5], [2.5, 2.5], [2.5, 6.5],
+       [7.5, 6.5], [7.5, 5.7], [8.5, 5.7], [8.5, 7.5], [1.5, 7.5]]
+
+# Board design rules (KiCad "Constraints"): JLCPCB 2-layer, the main board's values.
+rules:
+  min_clearance: 0.15
+  min_track_width: 0.15
+  min_via_diameter: 0.6
+  min_through_hole_diameter: 0.3
+  min_via_annular_width: 0.15
+  min_copper_edge_clearance: 0.3
+  min_hole_to_hole: 0.25
+
+netclasses:
+  Default: {clearance: 0.15, track_width: 0.2, via_diameter: 0.6, via_drill: 0.3}
+
+# DRC rule severities that differ from KiCad's defaults. Each needs a reason.
+drc_severities: {}
+
+# KiCad custom DRC rules, written to airq-tongue.kicad_dru. Each needs a reason.
+custom_rules: |
+  # Spec 6.2 / global constraint "Sense tongue": no copper within 1.5 mm of the SHT45 except its
+  # own pads and traces. The rule area SHT45_ISOLATION (board file) covers the island, the slot
+  # and the neck; it bans vias and pours there. This rule bans every other part's pads there.
+  (rule "SHT45 isolation: only the SHT45's own pads"
+    (constraint disallow pad)
+    (condition "A.intersectsArea('SHT45_ISOLATION') && !A.memberOfFootprint('U1')"))
+
+# REF: [x, y, rotation]
+placement:
+  U1: [4.5, 4.5, 0]          # SHT45: pads 3/4 (VDD/VSS) face the neck, 1/2 (SDA/SCL) loop round
+  C1: [10.0, 4.5, 90]        # SHT45 100 nF, just past the neck (5.5 mm from the sensor)
+  U2: [19.9, 4.9, 270]       # VEML7700: footprint -Y (window) turned to +X, face at x = 21.75
+  C2: [17.8, 5.05, 90]       # VEML7700 100 nF, on its VDD line
+  J1: [15.0, 9.85, 0]        # Qwiic socket: mating face toward +Y, fitting nails 0.31 mm in
+  H1: [4.5, 10.4, 270]       # M2 hole, 2.2 mm (turned so its reference text clears the slot)

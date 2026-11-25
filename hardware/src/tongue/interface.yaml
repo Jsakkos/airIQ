@@ -1,0 +1,10 @@
+# Interface subset for the sense tongue, for tools/hw/check_netlist.py:
+#
+#   uv run --with pyyaml python tools/hw/check_netlist.py build/tongue.net hardware/src/tongue/interface.yaml
+#
+# The tongue has no MCU, no USB and no pull-ups, so only the connector rule group applies.
+# The single source of truth is hardware/interface.yaml: this entry is a copy of its
+# connectors.J_QWIIC_TONGUE, and tests/test_interface.py fails if the two ever differ.
+checks: [connectors]
+connectors:
+  J_QWIIC_TONGUE: [GND, +3V3, I2C_SDA, I2C_SCL]

@@ -1,6 +1,6 @@
 """Build a board's KiCad 10 project from its design source, then check and export it.
 
-    uv run --with pyyaml python tools/hw/build.py main [--routed]
+    uv run --with pyyaml python tools/hw/build.py {main,tongue} [--routed]
 
 Steps (outputs other than the KiCad project go to build/):
  1. read hardware/src/<board>/ (design.py);
@@ -38,7 +38,7 @@ from jlc import BOM_ARGS, cpl_from_pos
 from kicad_lib import Libraries
 
 REPO = Path(__file__).resolve().parents[2]
-BOARDS = {"main": REPO / "hardware/src/main"}
+BOARDS = {"main": REPO / "hardware/src/main", "tongue": REPO / "hardware/src/tongue"}
 UNROUTED = "unconnected_items"
 
 

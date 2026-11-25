@@ -61,29 +61,32 @@ def test_dnp_and_fields_reach_the_netlist(make_design, libs, tmp_path):
     assert r1.dnp and r1.fields["Role"] == "J_X" and r1.path.count("/") == 2
 
 
-def _tracked() -> list[str]:
-    """Names of the committed (git-tracked) files in hardware/kicad/main."""
-    out = subprocess.run(["git", "ls-files", "hardware/kicad/main"], cwd=REPO,
+BOARDS = ("main", "tongue")      # tools/hw/build.py boards: hardware/src/<board> -> hardware/kicad/<board>
+
+
+def _tracked(board: str) -> list[str]:
+    """Names of the committed (git-tracked) files in hardware/kicad/<board>."""
+    out = subprocess.run(["git", "ls-files", f"hardware/kicad/{board}"], cwd=REPO,
                          capture_output=True, text=True)
     if out.returncode != 0:
         pytest.skip("git is not available")
     return sorted(Path(line).name for line in out.stdout.splitlines())
 
 
-def _scratch_repo(root: Path) -> Path:
-    """The main-board source, the airq library and the committed KiCad project, in `root`.
+def _scratch_repo(root: Path, board: str = "main") -> Path:
+    """A board's source, the airq library and its committed KiCad project, in `root`.
 
     Starting from the committed project (not from nothing) is what a rebuild does in the
     repository: the board keeps its routing, the .kicad_pro its KiCad settings.
     """
-    shutil.copytree(REPO / "hardware/src/main", root / "hardware/src/main")
+    shutil.copytree(REPO / f"hardware/src/{board}", root / f"hardware/src/{board}")
     lib = root / "hardware/kicad/lib"
     lib.mkdir(parents=True)
     shutil.copy(REPO / "hardware/kicad/lib/airq.kicad_sym", lib)
     shutil.copytree(REPO / "hardware/kicad/lib/airq.pretty", lib / "airq.pretty")
-    (root / "hardware/kicad/main").mkdir()
-    for name in _tracked():
-        shutil.copy(REPO / "hardware/kicad/main" / name, root / "hardware/kicad/main" / name)
+    (root / f"hardware/kicad/{board}").mkdir()
+    for name in _tracked(board):
+        shutil.copy(REPO / f"hardware/kicad/{board}" / name, root / f"hardware/kicad/{board}" / name)
     return root
 
 
@@ -91,48 +94,70 @@ def _text(path: Path) -> bytes:
     return path.read_bytes().replace(b"\r\n", b"\n")
 
 
-@pytest.fixture(scope="module")
-def main_build(tmp_path_factory):
-    """A rebuild of the committed main-board project in a scratch copy of the repository."""
+@pytest.fixture(scope="module", params=BOARDS)
+def board_build(request, tmp_path_factory):
+    """(board, scratch root, build result): a rebuild of a committed project in a scratch copy
+    of the repository."""
     from build import build
-    root = _scratch_repo(tmp_path_factory.mktemp("repo"))
-    return root, build(root / "hardware/src/main", root / "build", "main")
+    board = request.param
+    root = _scratch_repo(tmp_path_factory.mktemp(board), board)
+    return board, root, build(root / f"hardware/src/{board}", root / "build", board)
 
 
-def test_main_board_is_clean_apart_from_routing(main_build):
-    _, res = main_build
-    assert res.errors(routed=False) == 0, (res.erc, res.drc)
+def test_board_is_clean(board_build):
+    """ERC and DRC clean. The main board is not routed yet (Task 5); the tongue is fully routed."""
+    board, _, res = board_build
+    routed = board == "tongue"
+    assert res.errors(routed=routed) == 0, (res.erc, res.drc)
     assert not [k for (sev, k) in res.erc if sev == "error"]
-    assert {k for (sev, k) in res.drc if sev == "error"} <= {"unconnected_items"}
+    if not routed:
+        assert {k for (sev, k) in res.drc if sev == "error"} <= {"unconnected_items"}
     assert res.unplaced == [] and res.hand_edges == []
 
 
-def test_rebuilding_the_committed_project_changes_nothing(main_build):
+def test_rebuilding_the_committed_project_changes_nothing(board_build):
     """The stale-output guard: the committed files are exactly what a rebuild leaves behind.
 
     Fails when the source changed without a rebuild, after a KiCad GUI save that a rebuild
     normalises, or when a generated file is not committed (or an obsolete one still is).
     """
-    root, res = main_build
+    board, root, res = board_build
     written = sorted(p.name for p in res.written)
-    assert written == _tracked(), "commit exactly the files tools/hw/build.py main writes"
-    stale = [n for n in written
-             if _text(root / "hardware/kicad/main" / n) != _text(REPO / "hardware/kicad/main" / n)]
-    assert not stale, f"run tools/hw/build.py main and commit: {stale}"
+    assert written == _tracked(board), f"commit exactly the files tools/hw/build.py {board} writes"
+    stale = [n for n in written if _text(root / f"hardware/kicad/{board}" / n)
+             != _text(REPO / f"hardware/kicad/{board}" / n)]
+    assert not stale, f"run tools/hw/build.py {board} and commit: {stale}"
 
 
-def test_jlc_bom_cpl_and_dsn(main_build):
-    root, _ = main_build
-    bom = list(csv.DictReader((root / "build/main-bom.csv").open(encoding="utf-8")))
+def test_jlc_bom_cpl_and_dsn(board_build):
+    board, root, _ = board_build
+    bom = list(csv.DictReader((root / f"build/{board}-bom.csv").open(encoding="utf-8")))
     assert list(bom[0]) == ["Comment", "Designator", "Footprint", "LCSC"]
     assert all(r["LCSC"].startswith("C") for r in bom)
     bom_refs = sorted(ref for r in bom for ref in r["Designator"].split(","))
-    cpl = list(csv.DictReader((root / "build/main-cpl.csv").open(encoding="utf-8")))
+    cpl = list(csv.DictReader((root / f"build/{board}-cpl.csv").open(encoding="utf-8")))
     assert list(cpl[0]) == ["Designator", "Mid X", "Mid Y", "Layer", "Rotation"]
     assert sorted(r["Designator"] for r in cpl) == bom_refs
     assert all(r["Layer"] == "Top" for r in cpl)
-    dsn = (root / "build/main.dsn").read_text(encoding="utf-8")
+    dsn = (root / f"build/{board}.dsn").read_text(encoding="utf-8")
     assert "(placement" in dsn and "(network" in dsn
+
+
+def test_tongue_gates(board_build):
+    """The plan's Task 6 gates on a fresh rebuild: netlist vs the tongue's interface subset,
+    outline <= 22 x 14 mm with every part on F.Cu, and the BOM against the parts table (the
+    M2 hole is not a BOM or CPL line)."""
+    from check_board import check_board
+    from check_bom import check_bom
+    from check_netlist import check_netlist
+    board, root, res = board_build
+    if board != "tongue":
+        pytest.skip("tongue only")
+    assert check_netlist(root / "build/tongue.net", REPO / "hardware/src/tongue/interface.yaml") == []
+    assert check_board(res.pcb, 22.0, 14.0) == []
+    assert check_bom(root / "build/tongue-bom.csv", REPO / "hardware/bom/parts.csv") == []
+    bom = (root / "build/tongue-bom.csv").read_text(encoding="utf-8")
+    assert "H1" not in bom and "H1" not in (root / "build/tongue-cpl.csv").read_text(encoding="utf-8")
 
 
 ROUTED = """

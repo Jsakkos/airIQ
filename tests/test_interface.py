@@ -89,5 +89,14 @@ def test_sen66_connector_pins(iface):
     assert pins == ["+3V3", "GND", "I2C_SDA", "I2C_SCL", "NC", "NC"]
 
 
+def test_tongue_interface_subset_matches(iface):
+    # check_netlist runs the sense tongue against this subset (connector rules only); its copy of
+    # J_QWIIC_TONGUE must never drift from this file, the single source of truth.
+    sub = yaml.safe_load((IFACE_PATH.parent / "src" / "tongue" / "interface.yaml")
+                         .read_text(encoding="utf-8"))
+    assert sub["checks"] == ["connectors"]
+    assert sub["connectors"] == {"J_QWIIC_TONGUE": iface["connectors"]["J_QWIIC_TONGUE"]}
+
+
 def test_no_todo_in_interface_yaml():
     assert "TODO" not in IFACE_PATH.read_text(encoding="utf-8")

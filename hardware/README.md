@@ -8,7 +8,8 @@
 | `bom/parts.csv` | LCSC parts table: JLC Economic status, stock, boards |
 | `interface.yaml` | GPIOs, I²C addresses and connector pinouts shared with the firmware |
 
-Boards: `main` (the main board). The sense tongue (`tongue`) follows the same scheme.
+Boards: `main` (the main board) and `tongue` (the sense tongue: SHT45 and VEML7700 on a 22 × 13 mm
+board cabled to the main board's `J_QWIIC_TONGUE`, see below). Both follow the same scheme.
 
 ## Toolchain
 
@@ -76,6 +77,25 @@ uv run --with pytest --with pyyaml pytest tests
 
 To look at the result without the GUI: `kicad-cli sch export pdf -o build/main-sch.pdf …kicad_sch` and
 `kicad-cli pcb render --rotate "-45,0,30" -o build/main.png …kicad_pcb`.
+
+The sense tongue builds the same way (`build.py tongue --routed`: it is routed) and has its own gates:
+it has no MCU, USB or pull-ups, so `check_netlist` runs against its interface subset
+`hardware/src/tongue/interface.yaml` (`checks: [connectors]`, a copy of `J_QWIIC_TONGUE` that
+`tests/test_interface.py` keeps equal to `hardware/interface.yaml`), and the size limit is 22 × 14 mm:
+
+```
+uv run --with pyyaml python tools/hw/check_netlist.py build/tongue.net hardware/src/tongue/interface.yaml
+uv run python tools/hw/check_board.py hardware/kicad/tongue/airq-tongue.kicad_pcb --max-w 22 --max-h 14
+uv run python tools/hw/check_bom.py build/tongue-bom.csv hardware/bom/parts.csv
+```
+
+Tongue layout (`hardware/src/tongue/layout.yaml`; mechanical data for the enclosure in
+`hardware/interface.yaml`, `mechanical.tongue`): the SHT45 sits on an island cut free by a 1.0 mm milled
+slot on three sides, joined to the board only by a 2.4 mm neck that carries its four 0.2 mm traces. The
+board-owned rule area `SHT45_ISOLATION` bans vias and pours over the island, slot and neck; a custom DRC
+rule bans other parts' pads there; `tests/hardware/test_tongue.py` checks that every track within 1.5 mm
+of the sensor is one of its own. The routing, the B.Cu ground pour (body only) and the rule area were
+written into the board file once, like routing done in KiCad, and are kept by every rebuild.
 
 ### How the pipeline works
 
