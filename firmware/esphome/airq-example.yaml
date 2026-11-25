@@ -5,3 +5,4 @@ substitutions:
 
 packages:
   model: !include packages/model-airq.yaml
+  # hcho: !include packages/hcho.yaml  # optional SFA40 formaldehyde sensor (airQ only; fits the spare I2C address)

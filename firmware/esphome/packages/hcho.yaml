@@ -1,0 +1,10 @@
+# Optional formaldehyde (HCHO) sensor, Sensirion SFA40. airQ only (never in the mini).
+# Address 0x5D is the sfa40 component default (esphome 2026.11.1 i2c_device_schema(0x5D)).
+sensor:
+  - platform: sfa40
+    id: hcho
+    i2c_id: i2c_bus
+    address: ${addr_sfa40}
+    update_interval: 60s
+    formaldehyde:
+      name: "Formaldehyde"

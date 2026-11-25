@@ -166,4 +166,8 @@ inline Refresh decide_refresh(uint32_t now_ms, uint32_t last_ms, bool ever_refre
   return partials_since_full >= 5 ? Refresh::Full : Refresh::Partial;
 }
 
+// Forced CO2 recalibration is only valid after the sensor has been measuring for
+// at least 3 minutes (SCD4x-class requirement, R19).
+inline bool frc_allowed(uint32_t uptime_ms) { return uptime_ms >= 180000u; }
+
 }  // namespace airq

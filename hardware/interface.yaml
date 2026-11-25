@@ -21,7 +21,7 @@ i2c_addresses:
   sht45: 0x44
   bmp585: 0x46
   veml7700: 0x10
-  sfa40: 0x5D  # TODO verify against SFA40 datasheet (ESPHome default; same as SFA30)
+  sfa40: 0x5D  # verified: ESPHome sfa40 component default (i2c_device_schema(0x5D)), esphome 2026.11.1
 
 # Net name on each pin, in pin order. NC = not connected.
 connectors:

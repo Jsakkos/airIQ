@@ -133,6 +133,9 @@ int main() {
   CHECK(decide_refresh(100000, 4294900000u, true, true, 0) == Refresh::None);  // millis() wrap: 167 296 ms elapsed
   CHECK(decide_refresh(200000, 4294900000u, true, true, 0) == Refresh::Partial);  // wrap, 267 296 ms elapsed
 
+  // forced recalibration needs >= 3 min of measurement
+  CHECK(!frc_allowed(0)); CHECK(!frc_allowed(179999)); CHECK(frc_allowed(180000));
+
   if (g_failures != 0) {
     std::printf("%d of %d checks FAILED\n", g_failures, g_checks);
     return 1;

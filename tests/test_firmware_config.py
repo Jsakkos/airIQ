@@ -253,3 +253,22 @@ def test_display_model_and_refresh_cadence():
 def test_display_globals():
     ids = {g["id"] for g in _entities("model-airq.yaml", "globals")}
     assert {"epd_last_ms", "epd_ever", "epd_partials", "epd_shown_co2", "epd_shown_pm"} <= ids
+
+
+def test_hcho_package():
+    pkg = PKG / "hcho.yaml"
+    assert pkg.exists()
+    sensors = load_yaml(pkg)["sensor"]
+    assert any(s.get("platform") == "sfa40" and s.get("id") == "hcho" for s in sensors)
+    # airQ-only: nothing in the mini's merged package tree is an sfa40 sensor or mentions hcho.yaml
+    assert "hcho.yaml" not in (PKG / "model-mini.yaml").read_text(encoding="utf-8")
+    for d in load_merged(PKG / "model-mini.yaml"):
+        assert not any(s.get("platform") == "sfa40" for s in (d or {}).get("sensor", []))
+    # airq-example.yaml mentions hcho.yaml only in comments
+    for line in (ESPHOME_DIR / "airq-example.yaml").read_text(encoding="utf-8").splitlines():
+        if "hcho.yaml" in line:
+            assert line.lstrip().startswith("#"), line
+
+
+def test_frc_gated_on_uptime():
+    assert "airq::frc_allowed(millis())" in (PKG / "button.yaml").read_text(encoding="utf-8")

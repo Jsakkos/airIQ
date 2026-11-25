@@ -40,6 +40,19 @@ script:
   - id: co2_frc
     mode: single
     then:
+      # Refuse unless the sensor has been measuring >= 3 min (uptime is a proxy:
+      # the sen6x starts measuring at boot). Do not touch the sensor when refused.
+      - if:
+          condition:
+            lambda: |-
+              return !airq::frc_allowed(millis());
+          then:
+            - lambda: |-
+                ESP_LOGW("airq", "FRC refused, needs >= 3 min of measurement after power-on");
+            - script.execute:
+                id: light_blink
+                ok: false
+            - script.stop: co2_frc
       # Quiesce the sen6x polling chain so it cannot collide with the raw I2C
       # transfers below, give any in-flight read chain time to finish, then stop.
       - component.suspend: sen
