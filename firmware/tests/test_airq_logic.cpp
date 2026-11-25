@@ -86,6 +86,15 @@ int main() {
   CHECK(classify_press(14999) == Press::ForceCo2Calibration);
   CHECK(classify_press(15000) == Press::SafeModeReboot);
 
+  // glance_band: never a false green on partial readings
+  CHECK(glance_band(Band::Unknown, Band::Unknown) == Band::Unknown);
+  CHECK(glance_band(Band::Unknown, Band::Green) == Band::Unknown);
+  CHECK(glance_band(Band::Green, Band::Unknown) == Band::Unknown);
+  CHECK(glance_band(Band::Unknown, Band::Orange) == Band::Orange);
+  CHECK(glance_band(Band::Yellow, Band::Unknown) == Band::Yellow);
+  CHECK(glance_band(Band::Green, Band::Green) == Band::Green);
+  CHECK(glance_band(Band::Green, Band::Red) == Band::Red);
+
   // Sensirion CRC-8 / SEN6x forced CO2 recalibration
   {
     const uint8_t beef[2] = {0xBE, 0xEF};

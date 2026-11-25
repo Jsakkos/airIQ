@@ -40,7 +40,13 @@ script:
   - id: co2_frc
     mode: single
     then:
-      - lambda: id(sen).stop_measurement();
+      # Quiesce the sen6x polling chain so it cannot collide with the raw I2C
+      # transfers below, give any in-flight read chain time to finish, then stop.
+      - component.suspend: sen
+      - delay: 2s
+      - lambda: |-
+          ESP_LOGI("airq", "FRC: stopping SEN6x measurement");
+          id(sen).stop_measurement();
       - delay: 1500ms
       - lambda: |-
           const auto cmd = airq::sen6x_frc_command(420);
@@ -56,7 +62,17 @@ script:
           id(frc_ok_g) = (err == esphome::i2c::ERROR_OK) && airq::sen6x_frc_correction(resp, &correction);
           if (id(frc_ok_g)) ESP_LOGI("airq", "FRC done, correction %d ppm", correction);
           else ESP_LOGW("airq", "FRC failed (i2c err %d)", (int) err);
+      # Restart on every path (success or failure). start_measurement() silently
+      # no-ops when busy or failed, so call it twice, 1 s apart; the second call
+      # is harmless if the first worked (it returns early while measuring_).
+      - lambda: |-
+          ESP_LOGI("airq", "FRC: restarting SEN6x measurement");
+          id(sen).start_measurement();
+      - delay: 1s
       - lambda: id(sen).start_measurement();
+      - component.resume: sen
+      - lambda: |-
+          ESP_LOGI("airq", "FRC: SEN6x resumed, result %s", id(frc_ok_g) ? "ok" : "FAILED");
       - script.execute:
           id: light_blink
           ok: !lambda return id(frc_ok_g);

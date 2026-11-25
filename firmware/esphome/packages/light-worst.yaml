@@ -24,7 +24,7 @@ interval:
           id(pm_band_g) = (int) airq::pm25_band_hyst(id(pm_2_5).state, (airq::Band) id(pm_band_g));
           if (id(light_override_until_ms) != 0 && (int32_t) (millis() - id(light_override_until_ms)) < 0) return;
           const bool off = id(night_mode).state || !id(status_light).state;
-          const airq::Band band = airq::worse((airq::Band) id(co2_band_g), (airq::Band) id(pm_band_g));
+          const airq::Band band = airq::glance_band((airq::Band) id(co2_band_g), (airq::Band) id(pm_band_g));
           const airq::Rgb c = airq::band_color(band);
           const float br = airq::light_brightness(id(room_lux).state, ${light_cap});
           const bool on = !off && band != airq::Band::Unknown;

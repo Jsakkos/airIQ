@@ -70,6 +70,14 @@ inline Band worse(Band a, Band b) {
   return a > b ? a : b;
 }
 
+// Band for the single airQ light. Like worse(), but never claims Green while
+// the other reading is missing (a known Yellow-or-worse is still truthful).
+inline Band glance_band(Band co2, Band pm) {
+  if (co2 == Band::Unknown && pm == Band::Unknown) return Band::Unknown;
+  if ((co2 == Band::Unknown || pm == Band::Unknown) && worse(co2, pm) == Band::Green) return Band::Unknown;
+  return worse(co2, pm);
+}
+
 inline Rgb band_color(Band b) {
   switch (b) {
     case Band::Green: return {0.0f, 1.0f, 0.0f};
