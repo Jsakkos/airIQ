@@ -51,8 +51,8 @@ Rejected candidates:
 - Nothing else for the build. Routing the main board (Task 5) used **Freerouting 2.5.0**, the official
   release JAR from <https://github.com/freerouting/freerouting/releases/tag/v2.5.0>
   (`freerouting-2.5.0.jar`, SHA-256 `f6f51bb02245e8e717f9359bd260cc9c5c0b1bc0acc8b7cb2cd5b8ffeb5de3c7`), run with
-  Java 25 from `build/tools/` (not committed). It is needed only to route a board again, see "Main board
-  layout" below.
+  Java 25 from `build/tools/` (not committed). It is needed only to route a board again with
+  `tools/hw/route/route_main.sh`, see "How it was routed" below.
 
 ### Build and check a board
 
@@ -121,22 +121,36 @@ KiCad's top view are left and right for someone in front of the device.
 - Pressure sensor at the rear-left and LED buffer at the front-left, away from the module and the buck; the e-ink panel's
   capacitors in a row behind the FPC, its boost circuit (L2, Q1, diodes) between the FPC and the module;
   the unfitted J_AUX_UART pads across the middle-left; H2 at the front-right, next to the button.
-- **Copper:** GND pours on both layers over the whole board (except the rule areas), about 80 stitching
-  vias. Other rule areas: no top tracks under the module (its signals leave through vias), no top tracks
-  or vias under the USB-C shell, no copper in the button's "prohibited area", no tracks or vias round
-  the screw heads. A custom rule ties J1's ground pins solidly to the pours.
+- **Copper:** GND pours on both layers over the whole board (except the rule areas), about 75 stitching
+  vias. Under the module the bottom layer is ground only (rule area `U3_NO_BOTTOM_TRACKS`: no B.Cu tracks
+  inside its on-board body; RF ground and the path for its heat): the pin-15..27 column's signals leave
+  on the top layer, west under the module in lanes east of the EPAD, out of its bottom end and through
+  vias just west of it. The top layer over the EPAD side is kept free of tracks too (`U3_EPAD_TOP`).
+  Other rule areas: no top tracks or vias under the USB-C shell, no copper in the button's "prohibited
+  area", no tracks or vias round the screw heads. Custom rules tie J1's ground pins and U3's ground pads
+  (EPAD and its thermal vias) solidly to the pours. `tests/hardware/test_main_board.py` bounds the B.Cu
+  signal track under the module (none) and checks the bottom pour's cover there (≥ 90 % of the body,
+  ≥ 95 % round the EPAD).
+- The LED data line: SN74AHCT1G125 output → 33 Ω series resistor R14 (beside the buffer) → D1 DIN.
 
-**How it was routed** (one-off, like routing in KiCad; the items live in the board file): the critical
-nets were drawn first (the buck's VIN/GND/SW loop with a short SW stub to the bootstrap cap, the FB divider
-and its sense line, USB D+/D− from both connector contacts into the ESD part's flow-through inputs and on to
-the module as a length-matched pair, module and LED decoupling, the VBUS feed, and the e-ink SPI's escape
-vias at the module and a via fan below the FPC's pins);
-Freerouting 2.5.0 then routed every other net except GND from the DSN that `build.py` writes
-(`tools/hw/kicad_dsn.py BOARD OUT.dsn`; GND moved to a net class Freerouting was told to ignore, power nets
-at 0.3 mm, a 0.35 mm keep-out band inside the outline); the session was imported with
-`tools/hw/kicad_dsn.py --import-ses BOARD IN.ses`, one-sided vias it left were removed, and the pours and
-stitching vias were added. To change the routing: edit it in KiCad (then rebuild and commit), or start
-again from an unrouted board the same way.
+**How it was routed** (like routing in KiCad: the items live in the board file, and rebuilds keep them).
+The scripts that made it are in `tools/hw/route/`; they hard-code this placement and are not part of
+the build (`build.py` never runs them). `route_main.sh` runs the whole sequence from the placed board:
+`cleanup.py unroute`, then `main_preroute.py` (rule areas and the hand-routed critical nets: the buck's
+VIN/GND/SW loop with a short SW stub to the bootstrap cap, the FB divider and its sense line, USB D+/D−
+from both connector contacts into the ESD part's flow-through inputs and on to the module as a
+length-matched pair, module and LED decoupling, the VBUS feed, the LED data path through R14, the
+module's signal lanes and vias, and the e-ink SPI, which changes layer once outside the module to
+reach the FPC's mirrored pin order), then Freerouting 2.5.0 on every other net except GND from the DSN
+that `build.py` writes (`fr_prep.py`: GND moved to a net class Freerouting is told to ignore, power nets
+at 0.3 mm, a 0.35 mm keep-out band inside the outline; a second, narrower pass for what is left), the
+session imported with `tools/hw/kicad_dsn.py --import-ses BOARD IN.ses` and cleaned (`cleanup.py`:
+one-sided vias and stubs, sub-minimum neck-downs), hand fixes on the result (`main_postfix.py`), and the
+pours and stitching vias (`main_pour.py`, `stitch.py`). Freerouting's multi-threaded optimiser makes
+re-runs differ slightly (sub-micron positions, an occasional segment), so a re-run gives an equivalent,
+not byte-identical, board. `tongue_route.py` is the sense tongue's routing, written the same way. To
+change the routing: edit it in KiCad (then rebuild and commit), or redraw the affected pre-route lines
+and run `route_main.sh` again.
 
 ### How the pipeline works
 

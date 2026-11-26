@@ -31,6 +31,7 @@ LED_FACE = 1.36           # SK6812SIDE-A light face (footprint +y)
 SW_TIP = 1.96             # SKRTLAE010 actuator tip (footprint +y)
 WROOM_TOP, WROOM_BOTTOM, WROOM_HALF_W = -15.74, 9.76, 9.0   # module body
 ANTENNA_STRIP = 6.0
+ANTENNA_KEEPOUT_EDGE = 0.5   # the antenna keep-out covers the board up to y 0.5; rule areas below start there
 
 
 def _at(ref):
@@ -226,6 +227,84 @@ def test_ground_pours_cover_both_layers(board):
         pts = _poly(child(z, "polygon"))
         assert {round(p[0], 3) for p in pts} == {0, W} and {round(p[1], 3) for p in pts} == {0, H}
         assert children(z, "filled_polygon"), f"{name} is not filled"
+
+
+# ---- the bottom layer under the module is ground ------------------------------------------------
+
+def _module_box():
+    """U3's body over the board (the antenna strip beyond the rear edge left out): x0, y0, x1, y1."""
+    (x0, y0), (x1, y1) = MECH["antenna"]["module_body"]
+    return x0, max(y0, 0.0), x1, y1
+
+
+def _length_inside(a, b, box):
+    """Length of the segment a-b inside an axis-aligned box (Liang-Barsky clipping)."""
+    (ax, ay), (bx, by) = a, b
+    x0, y0, x1, y1 = box
+    dx, dy = bx - ax, by - ay
+    t0, t1 = 0.0, 1.0
+    for p, q in ((-dx, ax - x0), (dx, x1 - ax), (-dy, ay - y0), (dy, y1 - ay)):
+        if p == 0:
+            if q < 0:
+                return 0.0
+            continue
+        t0, t1 = (max(t0, q / p), t1) if p < 0 else (t0, min(t1, q / p))
+    return max(0.0, t1 - t0) * math.hypot(dx, dy)
+
+
+def _fill_coverage(zone, layer, box, step=0.1):
+    """Share of a box covered by a zone's fill on one layer: even-odd test of the filled polygons at the
+    centres of a `step` grid."""
+    edges = []
+    for fp in children(zone, "filled_polygon"):
+        if atom(fp, "layer") == layer:
+            pts = _poly(fp)
+            edges += list(zip(pts, pts[1:] + pts[:1]))
+    x0, y0, x1, y1 = box
+    nx, ny = round((x1 - x0) / step), round((y1 - y0) / step)
+    hit = 0
+    for j in range(ny):
+        y = y0 + (j + 0.5) * step
+        xs = sorted(ax + (y - ay) * (bx - ax) / (by - ay) for (ax, ay), (bx, by) in edges if (ay > y) != (by > y))
+        for i in range(nx):
+            x = x0 + (i + 0.5) * step
+            hit += sum(1 for xc in xs if xc > x) % 2
+    return hit / (nx * ny)
+
+
+def test_no_bottom_layer_signals_under_the_module(board):
+    """The bottom layer under U3 is the module's RF ground and the path for its heat (the EPAD's thermal
+    vias): signals leave the module on the top layer. A rule area keeps B.Cu tracks out, and no signal
+    track or via is inside the module's body (owner gate: it had grown to 199 mm of B.Cu signal track)."""
+    box = _module_box()
+    zone = _zone(board, "U3_NO_BOTTOM_TRACKS")
+    layers = child(zone, "layers")                  # KiCad writes a one-layer rule area as (layer ...)
+    assert ([str(l) for l in layers[1:]] if layers else [str(atom(zone, "layer"))]) == ["B.Cu"]
+    assert atom(child(zone, "keepout"), "tracks") == "not_allowed"
+    pts = _poly(child(zone, "polygon"))
+    assert min(p[0] for p in pts) <= box[0] + 1e-6 and max(p[0] for p in pts) >= box[2] - 1e-6
+    assert min(p[1] for p in pts) <= ANTENNA_KEEPOUT_EDGE + 1e-6 and max(p[1] for p in pts) >= box[3] - 1e-6
+    inside = 0.0
+    for s in children(board, "segment"):
+        if atom(s, "layer") == "B.Cu" and atom(s, "net") != "GND":
+            a, b = child(s, "start"), child(s, "end")
+            inside += _length_inside((float(a[1]) - OX, float(a[2]) - OY), (float(b[1]) - OX, float(b[2]) - OY), box)
+    assert inside <= 1.0, f"{inside:.1f} mm of B.Cu signal track under the module"
+    for v in children(board, "via"):
+        x, y = float(child(v, "at")[1]) - OX, float(child(v, "at")[2]) - OY
+        inside_box = box[0] <= x <= box[2] and box[1] <= y <= box[3]
+        assert not inside_box or atom(v, "net") == "GND", f"signal via under the module at {x:.2f}, {y:.2f}"
+
+
+def test_bottom_ground_under_the_module_and_its_epad_is_solid(board):
+    """GND_BOTTOM fills >= 90 % of the module's on-board body and >= 95 % of the 6 x 6 mm square round its
+    EPAD (the EPAD's pads connect solid, layout.yaml custom rule), on a 0.1 mm grid."""
+    zone = _zone(board, "GND_BOTTOM")
+    assert _fill_coverage(zone, "B.Cu", _module_box()) >= 0.90
+    epad = [(x, y) for (ref, num), (_, x, y) in _pads(board).items() if ref == "U3" and 30 <= int(num) <= 37]
+    cx = (min(x for x, _ in epad) + max(x for x, _ in epad)) / 2
+    cy = (min(y for _, y in epad) + max(y for _, y in epad)) / 2
+    assert _fill_coverage(zone, "B.Cu", (cx - 3, cy - 3, cx + 3, cy + 3)) >= 0.95
 
 
 def test_usb_pair_runs_side_by_side_to_the_module(board):

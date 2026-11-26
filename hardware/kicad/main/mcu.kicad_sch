@@ -1650,7 +1650,7 @@
 		)
 		(uuid "4742f05b-61b4-5ae7-b916-6a26545f7656")
 	)
-	(text "ESP32-C6 module (Role MCU)\nPROVISIONAL (ruling R22): ESP32-C6-WROOM-1-N8; option B = ESP32-C6-MINI-1-N4\nGPIO signals: hardware/interface.yaml `signals`\nIO12 / IO13 = USB D- / D+ (native USB flashing)\nGPIO4, GPIO5, GPIO15 (straps) and IO0, IO1, IO3, IO10, IO11: not connected"
+	(text "ESP32-C6 module (Role MCU)\nESP32-C6-WROOM-1-N8 (owner-confirmed, ruling R22)\nGPIO signals: hardware/interface.yaml `signals`\nIO12 / IO13 = USB D- / D+ (native USB flashing)\nGPIO4, GPIO5, GPIO15 (straps) and IO0, IO1, IO3, IO10, IO11: not connected"
 		(exclude_from_sim no)
 		(at 73.66 50.8 0)
 		(effects
@@ -1661,7 +1661,7 @@
 		)
 		(uuid "507cf1fd-8568-5087-b2cb-267e2a6b4499")
 	)
-	(text "Pressure sensor, I2C address 0x77\nPROVISIONAL (ruling R22): MS5611-01BA03; option B = BMP585\nPS = VDD: I2C mode. CSB (pins 4, 5) = GND: address 0x77\nSDO is not used in I2C mode"
+	(text "Pressure sensor, I2C address 0x77\nMS5611-01BA03 (owner-confirmed, ruling R22)\nPS = VDD: I2C mode. CSB (pins 4, 5) = GND: address 0x77\nSDO is not used in I2C mode"
 		(exclude_from_sim no)
 		(at 154.94 124.46 0)
 		(effects

@@ -8,23 +8,23 @@
 # module carries `Role: MCU`, so the generator wires each `signals` entry of hardware/interface.yaml
 # to the module pin named IO<n>. The pins below are the module's supply, EN, straps, USB and NC.
 #
-# MCU and pressure sensor are PROVISIONAL (rulings R22, R35: option A, Economic tier). To swap to
-# option B (ESP32-C6-MINI-1-N4 + BMP585), replace the U3 and U4 entries only; see
-# hardware/kicad/lib/README.md "Provisional MCU and pressure sensor".
+# MCU and pressure sensor: ESP32-C6-WROOM-1-N8 + MS5611-01BA03, owner-confirmed (ruling R22, option A,
+# Economic tier, 2026-11-25). The Standard-tier swap-back (ESP32-C6-MINI-1-N4 + BMP585) replaces the U3
+# and U4 entries only; see hardware/kicad/lib/README.md "MCU and pressure sensor".
 
 title: "MCU, I2C bus, pressure sensor"
 paper: A4
 
 notes:
-  - {text: "ESP32-C6 module (Role MCU)\nPROVISIONAL (ruling R22): ESP32-C6-WROOM-1-N8; option B = ESP32-C6-MINI-1-N4\nGPIO signals: hardware/interface.yaml `signals`\nIO12 / IO13 = USB D- / D+ (native USB flashing)\nGPIO4, GPIO5, GPIO15 (straps) and IO0, IO1, IO3, IO10, IO11: not connected", at: [73.66, 50.8], size: 1.8}
+  - {text: "ESP32-C6 module (Role MCU)\nESP32-C6-WROOM-1-N8 (owner-confirmed, ruling R22)\nGPIO signals: hardware/interface.yaml `signals`\nIO12 / IO13 = USB D- / D+ (native USB flashing)\nGPIO4, GPIO5, GPIO15 (straps) and IO0, IO1, IO3, IO10, IO11: not connected", at: [73.66, 50.8], size: 1.8}
   - {text: "Module 3V3: 10 uF (R15) + 100 nF", at: [17.78, 63.5], size: 1.8}
   - {text: "EN: 10 k / 1 uF reset RC", at: [17.78, 99.06], size: 1.8}
   - {text: "GPIO8 strap: 10 k pull-up\n(ROM download needs it high)\nGPIO9 = BUTTON: pull-up on\nthe leds_button sheet", at: [17.78, 142.24], size: 1.8}
   - {text: "I2C bus: 4.7 k pull-ups to +3V3 (main board only)\nShared by SEN66, sense tongue, Qwiic aux, pressure sensor", at: [154.94, 63.5], size: 1.8}
-  - {text: "Pressure sensor, I2C address 0x77\nPROVISIONAL (ruling R22): MS5611-01BA03; option B = BMP585\nPS = VDD: I2C mode. CSB (pins 4, 5) = GND: address 0x77\nSDO is not used in I2C mode", at: [154.94, 124.46], size: 1.8}
+  - {text: "Pressure sensor, I2C address 0x77\nMS5611-01BA03 (owner-confirmed, ruling R22)\nPS = VDD: I2C mode. CSB (pins 4, 5) = GND: address 0x77\nSDO is not used in I2C mode", at: [154.94, 124.46], size: 1.8}
 
 parts:
-  # -- MCU module (PROVISIONAL option A). Signals come from interface.yaml through `Role: MCU`.
+  # -- MCU module (owner-confirmed, R22). Signals come from interface.yaml through `Role: MCU`.
   U3:
     symbol: airq:ESP32-C6-WROOM-1-N8
     at: [101.6, 104.14]
@@ -42,8 +42,8 @@ parts:
       IO3: NC
       IO4: NC           # MTMS strap
       IO5: NC           # MTDI strap
-      IO10: NC          # WROOM-1 only (not on the MINI-1)
-      IO11: NC          # WROOM-1 only (not on the MINI-1)
+      IO10: NC          # unused
+      IO11: NC          # unused; IO10/IO11 are absent on the MINI-1 swap-back
       IO15: NC          # strap: must not be driven
       NC: NC            # module pin 22
   C8:                   # module 3V3 bulk, >= 10 uF (ruling R15)
@@ -98,7 +98,7 @@ parts:
     lcsc: C25900
     pins: [+3V3, I2C_SCL]
 
-  # -- Pressure sensor (PROVISIONAL option A): TE MS5611-01BA03 in I2C mode
+  # -- Pressure sensor (owner-confirmed, R22): TE MS5611-01BA03 in I2C mode
   U4:
     symbol: airq:MS561101BA03-50
     at: [190.5, 143.51]

@@ -5,3 +5,8 @@
 (rule "J1 ground: solid to the pours"
   (constraint zone_connection solid)
   (condition "A.Type == 'Pad' && A.memberOfFootprint('J1') && A.NetName == 'GND'"))
+# ESP32-C6-WROOM-1 U3: its EPAD and the thermal vias in it carry the module's heat into both ground
+# pours; connect them (and its GND pins) solid, not through thermal-relief spokes.
+(rule "U3 ground: solid to the pours"
+  (constraint zone_connection solid)
+  (condition "A.Type == 'Pad' && A.memberOfFootprint('U3') && A.NetName == 'GND'"))

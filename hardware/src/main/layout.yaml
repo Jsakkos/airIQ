@@ -51,6 +51,11 @@ custom_rules: |
   (rule "J1 ground: solid to the pours"
     (constraint zone_connection solid)
     (condition "A.Type == 'Pad' && A.memberOfFootprint('J1') && A.NetName == 'GND'"))
+  # ESP32-C6-WROOM-1 U3: its EPAD and the thermal vias in it carry the module's heat into both ground
+  # pours; connect them (and its GND pins) solid, not through thermal-relief spokes.
+  (rule "U3 ground: solid to the pours"
+    (constraint zone_connection solid)
+    (condition "A.Type == 'Pad' && A.memberOfFootprint('U3') && A.NetName == 'GND'"))
 
 # REF: [x, y, rotation], or {at: [x, y, rotation], ref: [dx, dy] | [dx, dy, angle] | hide}
 placement:
@@ -91,6 +96,7 @@ placement:
   J6: {at: [8.0, 17.45, 90], ref: [10.5, -2.15]}
   # -- front edge: LED buffer, LEDs, FPC, LED socket, button
   U5: {at: [11.5, 23.2, 180], ref: [0, 0, 90]}
+  R14: {at: [10.6, 25.9, 270], ref: hide}   # 33 R series, between U5's output and D1 DIN
   C13: {at: [14.55, 22.25, 0], ref: hide}
   R10: {at: [8.4, 22.0, 90], ref: hide}
   C18: {at: [9.05, 27.9, 90], ref: hide}
@@ -105,7 +111,7 @@ placement:
   J7: {at: [28.8, 26.12, 0], ref: [0, 2.0]}
   J5: [50.85, 26.7, 0]
   SW1: {at: [57.0, 28.28, 0], ref: [0, -2.68]}
-  R11: {at: [54.0, 21.5, 90], ref: hide}
+  R11: {at: [53.85, 23.1, 0], ref: hide}    # on the BUTTON line, below the module's signal lanes
   H2: {at: [57.4, 22.8, 0], ref: hide}
   # -- e-ink panel supply caps behind the FPC, boost circuit
   C28: {at: [18.4, 21.9, 90], ref: hide}

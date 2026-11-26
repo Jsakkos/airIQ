@@ -9,9 +9,9 @@ title: "LEDs (5 V, buffered) and button"
 paper: A4
 
 notes:
-  - {text: "LED data level shifter: SN74AHCT1G125 at 5 V (TTL input, VIH 2 V)\nLED_DATA (GPIO2, 3.3 V) -> LED_DATA_5V. OE tied low: always enabled.\n10 k pull-down: buffer input defined while GPIO2 floats (reset, boot)", at: [17.78, 63.5], size: 1.8}
+  - {text: "LED data level shifter: SN74AHCT1G125 at 5 V (TTL input, VIH 2 V)\nLED_DATA (GPIO2, 3.3 V) -> LED_DATA_5V. OE tied low: always enabled.\n10 k pull-down: buffer input defined while GPIO2 floats (reset, boot)\n33 R in series at the buffer output (R14): damps the edge into D1 DIN", at: [17.78, 63.5], size: 1.8}
   - {text: "Button: side-actuated SKRTLAE010, BUTTON (GPIO9, BOOT strap) to GND\n10 k pull-up: GPIO9 reads high at boot unless the button is held\nPins 1, 3 = common (GND), 2 = switched; 4, 5 = mounting tabs", at: [162.56, 63.5], size: 1.8}
-  - {text: "Status LEDs: 4 x SK6812SIDE-A (WS2812 protocol, GRB), one chain on +5V, 2 per mini half\nD1 -> D2 -> D3 -> D4; DOUT of D4 = LED_DOUT_5V -> J_LED_EXT pin 2 (off-board segment)", at: [17.78, 124.46], size: 1.8}
+  - {text: "Status LEDs: 4 x SK6812SIDE-A (WS2812 protocol, GRB), one chain on +5V, 2 per mini half\nLED_DIN_1 -> D1 -> D2 -> D3 -> D4; DOUT of D4 = LED_DOUT_5V -> J_LED_EXT pin 2 (off-board segment)", at: [17.78, 124.46], size: 1.8}
   - {text: "100 nF at each LED; 10 uF +5V bulk for the LEDs and J_LED_EXT", at: [17.78, 157.48], size: 1.8}
 
 parts:
@@ -40,13 +40,20 @@ parts:
     footprint: Resistor_SMD:R_0402_1005Metric
     lcsc: C25744
     pins: [LED_DATA, GND]
+  R14:                  # LED data series resistor, right at U5's output (owner gate)
+    symbol: Device:R
+    at: [90.17, 95.25]
+    value: 33R
+    footprint: Resistor_SMD:R_0402_1005Metric
+    lcsc: C25105
+    pins: [LED_DATA_5V, LED_DIN_1]
 
   # -- Status LEDs, one chain (light leaves toward footprint +y: front edge, see lib README)
   D1:
     symbol: airq:SK6812SIDE-A_C5378721
     at: [45.72, 139.7]
     stub: {DOUT: 7.62}    # DOUT label clear of the GND symbol on the pin above
-    pins: {DIN: LED_DATA_5V, VDD: +5V, DOUT: LED_CHAIN_1, GND: GND}
+    pins: {DIN: LED_DIN_1, VDD: +5V, DOUT: LED_CHAIN_1, GND: GND}
   D2:
     symbol: airq:SK6812SIDE-A_C5378721
     at: [101.6, 139.7]

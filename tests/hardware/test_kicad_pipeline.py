@@ -180,12 +180,15 @@ def test_main_gates(board_build):
     assert aux not in {r["Designator"] for r in cpl}
 
 
+# The pour overlaps the committed board's own GND_BOTTOM, so it has a priority of its own: of two
+# overlapping same-net pours with equal priority, KiCad 10 leaves one unfilled once the board has a
+# custom zone_connection rule (layout.yaml: U3's ground pads solid).
 ROUTED = """
   (segment (start 105 125) (end 115 125) (width 0.4) (layer "B.Cu") (net "GND")
     (uuid "0d1f5b1e-0000-4000-8000-000000000001"))
   (via (at 115 125) (size 0.6) (drill 0.3) (layers "F.Cu" "B.Cu") (net "GND")
     (uuid "0d1f5b1e-0000-4000-8000-000000000002"))
-  (zone (net "GND") (layer "B.Cu") (uuid "0d1f5b1e-0000-4000-8000-000000000003") (hatch edge 0.5)
+  (zone (net "GND") (layer "B.Cu") (uuid "0d1f5b1e-0000-4000-8000-000000000003") (priority 1) (hatch edge 0.5)
     (connect_pads (clearance 0.2)) (min_thickness 0.2)
     (fill yes (thermal_gap 0.3) (thermal_bridge_width 0.3))
     (polygon (pts (xy 100 100) (xy 160 100) (xy 160 130) (xy 100 130))))
