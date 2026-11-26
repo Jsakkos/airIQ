@@ -17,6 +17,7 @@ Contents:
 - [Printing the coupons](#printing-the-coupons)
 - [Coupon results](#coupon-results)
 - [Layout studies](#layout-studies)
+- [airQ enclosure](#airq-enclosure)
 - [Sources](#sources)
 - [To confirm](#to-confirm)
 
@@ -32,6 +33,10 @@ print and assembly guide (Task 5). The print-test coupons (Task 2) are below.
 | `src/encbuild.py` | The design registry (`DESIGNS`) and the build: script, `solidcraft-cli run`, save, checks |
 | `src/ref_*.py` | One generator per reference part (`ref_pcb.py` wraps the board STEP files) |
 | `src/coupons.py` | The print-test coupons' generator |
+| `src/enclosure_common.py` | Shared construction for both enclosures (shell, base plate, zone wall, cradle, gaskets, standoffs, tongue mount) |
+| `src/airq.py` | The airQ enclosure's generator: `airq.sc` |
+| `src/airq_check.py` | The airQ check design (every reference placed), interference and distances |
+| `airq.sc` | The airQ enclosure design (committed) |
 | `src/layout_study.py` | The layout studies' section arithmetic for both models (pure Python; `tests/enclosure/test_layout_study.py`) |
 | `coupons.sc` | The coupons design, built from `src/coupons.py` (committed) |
 | `export/` | Printable exports (`coupons.3mf`, `coupons.step`), written by `build.py` (committed) |
@@ -326,7 +331,10 @@ These are the layout studies (ruling R14) that every feature of the two enclosur
 - **Models.** Each model is a `Model` preset, `AIRQ` or `MINI`. A variant is written
   `dataclasses.replace(MINI, lip=15.5)`.
 
-**Status (2026-11-26): the owner must decide both envelopes.** Nothing is modelled until then.
+**Status (2026-11-26): the owner must decide both envelopes.** Ruling R22 (controller, 2026-11-26)
+has chosen the lower-lip layout for both models: the airQ at 95 × 55 × 51 with a 15 mm lip, and the
+mini with a 15.5 mm lip. It is the owner's to reverse. The other options below stay documented for
+the owner. The airQ is built on R22's layout ("airQ enclosure" below).
 - **airQ.** The main board, the SEN66 and the panel do not fit 95 × 55 × 48 mm (±1) when the
   whole front is sloped. The only poses within a few millimetres break the air and heat rules.
   The options are below.
@@ -558,6 +566,88 @@ depth (airQ 55, mini 50) with a horizontal board.
 - **1.6 mm walls.** They save less than 0.6 mm.
 - **25° airQ front.** It saves about 4 mm of depth. But the shorter face needs H 51.4 (+3.4) to
   hold the slots, the LED line and the panel.
+
+## airQ enclosure
+
+`airq.sc`, built from `src/airq.py` with the shared construction in `src/enclosure_common.py`
+(Task 4 reuses it with the mini's values). Task 3a builds the body and the internals; Task 3b
+adds the face features.
+
+**Layout (R22).** The envelope is 95 × 55 × 51 with a 15 mm vertical lower lip. The study's lip
+row needed 95 × 55 × 50.1. Rounding the lip to 15 still fits D 55, which needs 54.62. The face
+needs 1 mm more than the study gave, for the zone wall's ledge between the intake slots and the
+LED slot, so H is 51.
+- The board lies horizontal above the standing SEN66, with the zone wall between.
+- The SEN66's port face faces the front, with its inlet end on the user's left. The square inlet
+  is then high and the round inlet low.
+- The intake plenum is in front of the inlets and under the zone wall's ledge, across the lip.
+- The outlet blows into its ring and runs in a layer in front of the module. It then turns back
+  along the module's right end into the rear plenum behind the outlet grille.
+- The SFA40's sealed pocket is at the rear left, with its own grille in the rear wall.
+- The tongue lies behind the lip in the intake air.
+
+**Print split.** Printed face down, the rear wall would be a 60° overhang. So:
+- `shell` (the lip, the face, the top and both sides) prints face down on textured PEI.
+- `base_plate` is one L-shaped part: the floor, the rear wall and the two board standoffs. It
+  prints floor down, so its posts and grilles are vertical.
+- The insert bosses are in the shell (R10b). They are inclined in print: confirm them at the
+  first shell print (Task 2 M7). The rear left has no boss: the HCHO pocket and the SEN66's
+  cable bay fill that corner, and the base plate's rear wall holds the shell's rear.
+
+**Bodies** (volume in mm³; size and minimum corner in mm):
+
+| Body | Volume | Size | Min corner | What, material |
+|---|---|---|---|---|
+| `shell` | 21365 | 95.00 × 55.00 × 51.00 | −47.5, 0, 0 | lip, face, top and sides; three M2 insert bosses; the panel pocket. Shell material |
+| `base_plate` | 18013 | 91.00 × 53.00 × 49.00 | −45.5, 2.0, 0 | floor and rear wall (an L), screw counterbores, standoffs H1 (the USB-C support) and H2, the HCHO grille |
+| `zone_wall` | 9348 | 91.00 × 51.00 × 16.90 | −45.5, 2.0, 13.8 | ledge behind the lip, slanted part behind the panel, horizontal part over the SEN66 |
+| `sen66_foam` | 1176 | 55.20 × 21.30 × 1.00 | −45.5, 20.0, 2.0 | the 1 mm foam under the SEN66 |
+| `sen66_cradle` | 236 | 36.85 × 1.60 × 4.00 | −45.5, 41.45, 2.0 | rear rail (stops short of the H1 standoff) |
+| `sen66_end_stop` | 148 | 1.60 × 23.05 × 4.00 | 9.85, 20.0, 2.0 | right-end stop |
+| `gasket_out` | 212 | 24.00 × 2.00 × 24.00 | −15.1, 18.0, 3.8 | outlet ring on the port face. TPU 95A |
+| `gasket_in` | 179 | 26.70 × 3.20 × 2.80 | −45.5, 16.8, 26.1 | seal along the SEN66's top front edge, under the zone wall. TPU 95A |
+| `tongue_mount` | 1085 | 22.00 × 7.00 × 9.60 | −41.0, 8.2, 2.0 | pedestal and locating pin for the tongue |
+| `hcho_pocket` | 1787 | 32.10 × 6.60 × 26.90 | −45.5, 46.4, 2.0 | SFA40 pocket walls |
+| `outlet_duct` | 2308 | 64.30 × 7.80 × 26.90 | −18.8, 12.2, 2.0 | outlet layer's front and left walls |
+| `baffle` | 1537 | 26.65 × 6.90 × 26.90 | −13.4, 41.3, 2.0 | wall in front of the outlet grille, and the cable bay's side |
+
+**Parameters Task 3b and Task 4 use.** The plan's names are `W`, `D`, `H`, `tilt_deg`, `wall`,
+`grille_min_z`, `slot_w`, `clr_align`, `clr_remove`, `clr_snap`, plus `lip`. The plan's `floor`
+is named `floor_t`, because SolidCraft reserves `floor` (a function). The positions 3b needs:
+- panel: `panel_x0`, `panel_s0`, `bezel`, `window_xc`;
+- LED slot and light guide: `led_f0`, `led_h_slot`, `led_len`, `led_z`, `guide_t`;
+- adapter: `adapter_x`, `adapter_s`, `adapter_t`;
+- FFC: `ffc_len` (100 mm: about 45 of route plus a service loop of about 50, so the shell can lie
+  beside the base while the FFC is plugged in), into `j7_x0` … `j7_x1`;
+- dot and flexure on SW1's push axis: `sw_x`, `sw_z`, `dot_f`, `dot_d`;
+- light-sensor window: `lsw_x`, `lsw_z`, `lsw_d`;
+- intake slots: `slot_row1_z`, `slot_row2_z`;
+- USB-C: `usb_x`, `usb_z`, `usb_well` (6.6), `usb_chamfer`.
+
+The board's front edge `board_y0` is the study's binding constraint written as an expression: the
+LED faces' corner with the panel and the light guide in front of it.
+
+**Check design.** `uv run --with pyyaml python enclosure/src/airq_check.py --run` places all six
+references in `.build/airq-check.sc` (`ref_main` only there, R8), runs the interference check and
+prints the distances. `tests/enclosure/test_airq.py` repeats it.
+
+### Check table
+
+Task 3a filled the rows its features answer. Task 3b completes the table.
+
+| Check | Rule | Value | How measured | Result |
+|---|---|---|---|---|
+| Envelope | 95 × 55 × 48 ±1, R22: 95 × 55 × ≈50 | 95.00 × 55.00 × 51.00 | `measure`, union of the bodies (`test_build_and_bounding_box`) | pass (R22; H 51 recorded) |
+| Interference with the references | 0 overlapping volume (R9) | 0 pairs; 357 bodies checked, 0 unchecked | `inspect.interference` on the check design; each reference's own internal overlaps excluded | pass |
+| Rebuild over the parameter range | no errors | wall 1.6 and 2.4, `clr_*` ±0.1: no feature errors, 12 bodies each, volume back to 57392.3 | `parameters.change` + `document.inspect` walk (`test_rebuilds_over_wall_and_clearances`) | pass |
+| Antenna to SEN66 | ≥ 15 (R12) | 17.8 | box distance from the placements (`airq_check.distances`) | pass |
+| Antenna to the USB plug and cable | ≥ 15 (R12) | 18.6 | as above, 12.5 × 7 overmold | pass |
+| Antenna to the inserts and screws | ≥ 15 (R12) | 23.8 (shell bosses), 21.8 (standoff screws) | as above | pass |
+| Tongue to U3 / U2 | ≥ 20 | 50.5 / 42.5 | as above | pass |
+| Support boss near the USB-C | within 8 mm | H1 standoff: 7.7 to J1's centre, 3.2 to its shell | as above (interface.yaml H1, J1) | pass |
+| HCHO grille | open area ≥ 2 × the SFA40 opening (54.7); lower edge ≥ 10 | 67.2 mm²; lower edge z 11.0 | slot sizes | pass |
+| Antenna end to the rear wall | inside the case | 0.58 mm (default wall). At wall 2.4 the inner face reaches the strip: D needs +0.1 there | arithmetic | pass at the default, note at wall 2.4 |
+| Intake and outlet grilles, LED/guide wall, MS5611 line of sight, light-sensor window, USB-C opening | plan, R13 | – | Task 3b | pending (3b) |
 
 ## Sources
 
