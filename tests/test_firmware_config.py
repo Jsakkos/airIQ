@@ -124,6 +124,8 @@ def test_low_heat_cpu(board):
 def test_esp_idf_c6(board):
     assert board["esp32"]["variant"] == "esp32c6"
     assert board["esp32"]["framework"]["type"] == "esp-idf"
+    # ESP32-C6-WROOM-1-N8 on the main board (hardware/bom/parts.csv): 8 MB, not ESPHome's 4 MB default.
+    assert board["esp32"]["flash_size"] == "8MB"
 
 
 def test_logger_off_uart0(board):

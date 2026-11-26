@@ -35,8 +35,11 @@ esphome:
     - include/airq_logic.h
 
 esp32:
-  board: esp32-c6-devkitm-1
+  # The board carries an ESP32-C6-WROOM-1-N8 (8 MB flash), the module of Espressif's
+  # ESP32-C6-DevKitC-1; ESPHome's default flash size is 4 MB, so set it.
+  board: esp32-c6-devkitc-1
   variant: esp32c6
+  flash_size: 8MB
   cpu_frequency: 80MHz
   framework:
     type: esp-idf
