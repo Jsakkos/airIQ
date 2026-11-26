@@ -155,7 +155,9 @@ class Script:
         return name
 
     def values(self) -> dict[str, float]:
-        return {n: p.value for n, p in self.params.items()}
+        """Values for local evaluation: lengths in mm, angles (unit "deg") in radians, so that
+        sin/cos/tan of an angle parameter evaluate as SolidCraft evaluates them."""
+        return {n: math.radians(p.value) if p.unit == "deg" else p.value for n, p in self.params.items()}
 
     def v(self, expr: str | float) -> float:
         """Numeric value of an expression over the parameters (for picks and expectations)."""
@@ -221,6 +223,20 @@ class Script:
         if body:
             params["body"] = body
         return self._feature("solid.fillet", name, params)
+
+    def chamfer(self, name: str, edges: list[list[float]], distance, body: str | None = None) -> int:
+        """solid.chamfer (equal distance). Edge picks are plain numbers, as for fillet."""
+        self._check_exprs(distance)
+        params = {"edges": [[round(c, 6) for c in e] for e in edges], "distance": distance}
+        if body:
+            params["body"] = body
+        return self._feature("solid.chamfer", name, params)
+
+    def shell(self, name: str, faces: list[list[float]], thickness) -> int:
+        """solid.shell: hollow a body to `thickness` inward, removing the picked faces."""
+        self._check_exprs(thickness)
+        return self._feature("solid.shell", name, {"faces": [[round(c, 6) for c in f] for f in faces],
+                                                    "thickness": thickness})
 
     def extrude(self, name: str, sketch: str, distance, body: str | None = None,
                 operation: str = "new", targets: list[str] | None = None, **extra) -> int:
@@ -332,6 +348,8 @@ class Sketch:
     def _point(self, pt) -> list:
         x, y = pt
         self.s._check_exprs(x, y)
+        if x == 0 and y == 0:
+            return [0, 0]                   # snaps to the sketch origin, so it is fixed
         if not (names_in(x) or names_in(y)):
             raise ValueError(f"point {pt!r} names no parameter, so it would not be fixed")
         return [x, y]
