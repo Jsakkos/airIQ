@@ -22,16 +22,15 @@ sensor:
         - timeout: 120s
     update_interval: 10s
 
-  - platform: bmp581_i2c
-    address: ${addr_bmp585}
+  - platform: ms5611
+    address: ${addr_ms5611}
     pressure:
       id: room_p
       name: Pressure
-      # bmp581 reports Pa; SEN66 compensation and HA expect hPa.
+      # ms5611 already reports hPa (what the SEN66 compensation and HA expect).
       unit_of_measurement: hPa
       accuracy_decimals: 1
       filters:
-        - multiply: 0.01
         - timeout: 120s
     update_interval: 30s
 
@@ -57,7 +56,7 @@ sensor:
       id: co2
       name: CO2
       automatic_self_calibration: ${co2_asc}
-      # Compensate CO2 for ambient pressure from the BMP585.
+      # Compensate CO2 for ambient pressure from the MS5611.
       ambient_pressure_compensation_source: room_p
       filters:
         - timeout: 120s

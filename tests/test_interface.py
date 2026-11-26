@@ -6,11 +6,11 @@ import yaml
 
 IFACE_PATH = Path(__file__).resolve().parent.parent / "hardware" / "interface.yaml"
 
-# GPIOs exposed by the ESP32-C6-MINI-1 module (GPIO10/11 are not broken out).
-# Source: ESP32-C6-MINI-1 & MINI-1U Datasheet v1.5, section 3 "Pin Definitions",
-# Table 3-1 Pin Description:
-# https://documentation.espressif.com/esp32-c6-mini-1_mini-1u_datasheet_en.pdf
-MODULE_GPIOS = {f"GPIO{n}" for n in [*range(0, 10), *range(12, 24)]}
+# GPIOs exposed by the ESP32-C6-WROOM-1 module (GPIO14 is not broken out).
+# Source: ESP32-C6-WROOM-1 & WROOM-1U Datasheet, section "Pin Definitions",
+# Table "Pin Definitions" (IO0-IO13, IO15-IO23; IO16/IO17 are TXD0/RXD0):
+# https://documentation.espressif.com/esp32-c6-wroom-1_wroom-1u_datasheet_en.pdf
+MODULE_GPIOS = {f"GPIO{n}" for n in [*range(0, 14), *range(15, 24)]}
 
 
 @pytest.fixture(scope="module")

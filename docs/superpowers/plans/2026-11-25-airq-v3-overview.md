@@ -62,3 +62,11 @@ The spec covers three subsystems. Each can be built and tested on its own, so ea
 - **Stale-reading guard.** Every sensor output has a 120 s `timeout` filter (publishes NaN), because the sen6x driver never publishes NaN on I²C failure and a loose cable would otherwise freeze the light and display on the last value (possibly green).
 - **Fallback access point has a password** (`ap_password` secret), since the captive portal exposes an unauthenticated firmware upload.
 - **FRC implementation.** ESPHome's `sen6x` has no FRC action, so the button script suspends the component and sends the raw SEN66 command 0x6707 over the shared I²C bus; it is refused unless uptime is at least 180 s (3 min of measurement, R19).
+
+## Decisions made while executing Plan 2
+
+- **R22, WROOM-1-N8 and MS5611 (owner-confirmed 2026-11-25).** JLCPCB marks the spec-pinned ESP32-C6-MINI-1-N4 and BMP585 "Standard Only", so the board uses the ESP32-C6-WROOM-1-N8 (LCSC C5366877, same ESP32-C6, PCB antenna, 8 MB flash) and the TE MS5611-01BA03 (LCSC C15639) to stay on the Economic tier. Impact: the module is 25.5 x 18 mm (larger than the MINI-1) and the MS5611 adds about $2.5 per unit. The MS5611 sits at I2C 0x77 (CSB tied to GND); `interface.yaml`, `pins.yaml` and the firmware `ms5611` platform follow it (it reports hPa directly, so no scaling filter).
+- **SK6812SIDE-A LEDs.** Genuine WS2812B side-view parts are Standard Only; the SK6812SIDE-A is WS2812-protocol compatible, so the firmware uses `chipset: SK6812`.
+- **Tongue front edge.** The sense tongue's front edge is the long edge opposite the cable (R34); the VEML7700 faces it.
+- **J_EPD pin 4/5 correction.** Pins 4 and 5 of the e-ink FPC connector were corrected in the board design and `interface.yaml`.
+- **J_SEN66 pins 5/6 are NC.** The SEN66 pins 5 and 6 are not connected on the board.

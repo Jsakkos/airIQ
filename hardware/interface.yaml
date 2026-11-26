@@ -1,6 +1,6 @@
 # airQ v3 interface contract: single source of truth for GPIOs, I2C addresses
 # and connector pinouts. Consumed by the firmware and the PCB checkers.
-# GPIOs verified against ESP32-C6-MINI-1 datasheet v1.5, Table 3-1.
+# GPIOs verified against the ESP32-C6-WROOM-1 datasheet, Table "Pin Definitions".
 
 signals:
   I2C_SDA: GPIO6
@@ -19,7 +19,7 @@ signals:
 i2c_addresses:
   sen6x: 0x6B
   sht45: 0x44
-  bmp585: 0x46
+  ms5611: 0x77  # TE MS5611-01BA03, CSB low -> 0x77 (the board ties CSB to GND)
   veml7700: 0x10
   sfa40: 0x5D  # verified: ESPHome sfa40 component default (i2c_device_schema(0x5D)), esphome 2026.11.1
 
@@ -162,6 +162,6 @@ mechanical:
       pin1: [8.0, 17.45]           # pins 1..6 along +X to x 20.7
 
 # GPIOs the design must not use.
-# GPIO12/13 are USB D-/D+. GPIO10/11 are not exposed by the ESP32-C6-MINI-1 module,
-# so they cannot appear in `signals` anyway.
+# GPIO12/13 are USB D-/D+. GPIO14 is not exposed by the ESP32-C6-WROOM-1 module,
+# so it cannot appear in `signals` anyway.
 reserved: [GPIO12, GPIO13]

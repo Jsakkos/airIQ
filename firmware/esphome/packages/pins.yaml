@@ -15,6 +15,6 @@ substitutions:
   pin_aux_uart_rx: GPIO17
   addr_sen6x: "0x6B"
   addr_sht45: "0x44"
-  addr_bmp585: "0x46"
+  addr_ms5611: "0x77"
   addr_veml7700: "0x10"
   addr_sfa40: "0x5D"

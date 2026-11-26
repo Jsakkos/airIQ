@@ -27,13 +27,13 @@ missing-model warnings.
 
 EasyEDA footprints keep JLC's placement orientation, which keeps the CPL rotations simple (Task 7).
 
-## Provisional MCU and pressure sensor (ruling R22)
+## MCU and pressure sensor (ruling R22, owner-confirmed)
 
 The spec pins the ESP32-C6-MINI-1-N4 (C5736265) and the BMP585 (C18184976). JLC lists both as **"Standard Only"**
-for PCBA, so they would move the main-board order off the Economic tier. Ruling R22 is **PROVISIONAL**: the
-owner was asked to choose. Meanwhile the table uses two Economic-eligible substitutes:
+for PCBA, so they would move the main-board order off the Economic tier. Ruling R22: on 2026-11-25 the
+owner confirmed option A, so the board uses two Economic-eligible substitutes:
 
-| Role | Provisional (Economic) | Swap-back (Standard tier) |
+| Role | Confirmed (Economic) | Swap-back (Standard tier) |
 |---|---|---|
 | MCU | ESP32-C6-WROOM-1-N8, C5366877: symbol `airq:ESP32-C6-WROOM-1-N8`, footprint `airq:WIRELM-SMD_ESP32-C6-WROOM-1` | ESP32-C6-MINI-1-N4, C5736265: stock `RF_Module:ESP32-C6-MINI-1` symbol and footprint (ruling R11; it carries Espressif's keep-out and a STEP model) |
 | Pressure | MS5611-01BA03, C15639: `airq:MS561101BA03-50` / `airq:SENSORS-SMD_MS5611-01BA03` | BMP585, C18184976: `airq:BMP585_C18184976` / `airq:LGA-9_L3.3-W3.3-P1.10-TL`. Kept in this library but not hand-checked; check its pad map if R22 reverts |
@@ -53,8 +53,8 @@ To swap back (each part is one entry in the source: `U3` and `U4` in `hardware/s
   Set its pin types and hand-check its pad map first (table below). Add a 100 nF for VDDIO.
 - Then replace the two parts.csv lines.
 Both substitutes expose the same interface nets: every GPIO in `interface.yaml` exists on the WROOM-1 (datasheet v1.4,
-Table 3-1). The MS5611 answers at I²C 0x77 (CSB low) or 0x76 (CSB high), not the BMP585's 0x46. Changing that address
-in `interface.yaml` and in the firmware is a separate, later task.
+Table 3-1). The MS5611 answers at I²C 0x77 (CSB low) or 0x76 (CSB high), not the BMP585's 0x46. The contract and firmware now use
+0x77 (`interface.yaml`, `pins.yaml`); the board ties CSB to GND.
 
 ## Parts in this library
 
@@ -288,7 +288,7 @@ ESP32-C6 Module's Antenna (Antenna feed point on the right)", units mm:
 
 ## Open for owner review
 
-- **R22 is provisional**: WROOM-1-N8 + MS5611 (Economic) vs MINI-1-N4 + BMP585 (Standard tier). See above.
+- **R22 is confirmed** (owner, 2026-11-25): WROOM-1-N8 + MS5611 (Economic); MINI-1-N4 + BMP585 (Standard tier) remains documented as the swap-back. See above.
 - **FPC contact side and fold**: verified from the series drawing for the unfolded, display-up insertion only. Confirm the enclosure's FPC
   routing in the Task 5 owner review; a 180° fold mirrors the pin order.
 - **Side-emitting LED and side-looking VEML7700 directions** were derived from 2-D drawings: SK6812SIDE-A light toward footprint +y,
