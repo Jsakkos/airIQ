@@ -25,12 +25,13 @@ STEP_WRAPPERS = ("airq-main", "airq-tongue")
 PARTS = [n for n in encbuild.DESIGNS if n not in STEP_WRAPPERS]
 
 FEATURE_COMMANDS = {"solid.box", "solid.cylinder", "solid.extrude", "solid.revolve", "solid.fillet",
-                    "solid.combine", "sketch.create", "file.insert_step"}
+                    "solid.chamfer", "solid.shell", "solid.combine", "sketch.create", "file.insert_step"}
 # fields that carry a size or a position: each must be a parameter expression (or 0)
 SIZE_FIELDS = {"solid.box": ("corner", "length", "width", "height"),
                "solid.cylinder": ("base", "diameter", "height"),
                "solid.extrude": ("distance",), "solid.revolve": ("angle", "axis"),
-               "solid.fillet": ("radius",), "sketch.create": ("offset",),
+               "solid.fillet": ("radius",), "solid.chamfer": ("distance",), "solid.shell": ("thickness",),
+               "sketch.create": ("offset",),
                "sketch.line": ("points",), "sketch.circle.center": ("center", "diameter")}
 
 
@@ -69,10 +70,10 @@ def test_component_names_are_the_plan_interfaces():
     ref_fpc_adapter; Task 2 adds the coupons design. insert_design names the component after
     the design."""
     assert {encbuild.module(n).DESIGN for n in encbuild.DESIGNS} == {
-        "ref_sen66", "ref_epd", "ref_sfa40", "ref_main", "ref_tongue", "ref_fpc_adapter", "coupons"}
+        "ref_sen66", "ref_epd", "ref_sfa40", "ref_main", "ref_tongue", "ref_fpc_adapter", "coupons", "airq"}
     for name, s in SCRIPTS.items():
         assert s.commands[0] == {"command": "file.new", "params": {"name": encbuild.module(name).DESIGN}}
-        assert encbuild.module(name).OUTPUT.startswith("reference/") == (name != "coupons")
+        assert encbuild.module(name).OUTPUT.startswith("reference/") == (name not in ("coupons", "airq"))
 
 
 @pytest.mark.parametrize("name", list(encbuild.DESIGNS))
@@ -113,6 +114,8 @@ def test_every_body_is_named(name):
         "coupons": ["coupon_clr_pegs", "coupon_clr_holes", "coupon_grille", "coupon_insert",
                     "coupon_flexure", "coupon_lg_body", "coupon_lg_bar_lit", "coupon_lg_bar_dark",
                     "coupon_lg_bar_dark_2"],
+        "airq": ["shell", "base_plate", "zone_wall", "sen66_foam", "sen66_cradle", "sen66_end_stop",
+                 "gasket_out", "gasket_in", "tongue_mount", "hcho_pocket", "outlet_duct", "baffle"],
     }[name]
     assert SCRIPTS[name].bodies == expected
 

@@ -65,8 +65,8 @@ def build() -> Script:
     p("window_xc", "panel_x0 + panel_l - 2.70 - 67.50 / 2", "view-area centre x (ref_epd va_far, va_w): the LED line centres on it")
 
     # --- SEN66, zone wall, board ------------------------------------------------------------
-    C.add_sen66(s, m, "-inner_x + clr_remove", 20.0)
-    s.params["sen_y0"].comment += "; 1.8 behind the study's 18.2 so the high square inlet keeps a 3.4 mm path under the zone wall"
+    C.add_sen66(s, m, "-inner_x + clr_remove", 20.0,
+                "; 1.8 behind the study's 18.2 so the high square inlet keeps a 3.4 mm path under the zone wall")
     p("outlet_d", 20.5, "SEN66 outlet diameter (ref_sen66)")
     p("outlet_x", "sen_x0 + 42.4", "outlet centre x (ref_sen66 outlet_x, inlet end left)")
     p("outlet_z", "sen_top - 12.8", "outlet centre z (ref_sen66 outlet_y, module y down)")
@@ -126,7 +126,7 @@ def build() -> Script:
 
 def _slant_z(y: str) -> str:
     """Height where the zone wall's slanted back face is at depth y."""
-    return f"lip + ({y} * cos_t - zw_tf - zone_t) / sin_t"
+    return f"lip + (({y}) * cos_t - zw_tf - zone_t) / sin_t"
 
 
 def baffle(s: Script) -> None:

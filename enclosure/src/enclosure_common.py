@@ -44,10 +44,10 @@ def add_envelope(s: Script, m: L.Model) -> None:
     p("sin_t", "sin(tilt_deg)", "derived", unit="")
     p("y_top", "(H - lip) * sin_t / cos_t", "derived: y of the slope's top edge")
     p("inner_x", "W / 2 - wall", "derived: half the interior width")
-    p("edge_chamfer", 0.8, "crisp chamfer on the crease and the top edges (Paper look)")
+    p("edge_chamfer", 0.8, "crisp chamfer on the crease and the top front edge (Paper look)")
 
 
-def add_sen66(s: Script, m: L.Model, sen_x0: str, sen_y0: float) -> None:
+def add_sen66(s: Script, m: L.Model, sen_x0: str, sen_y0: float, sen_y0_note: str = "") -> None:
     """The standing SEN66 (R17): long axis along x, port face vertical, facing the front."""
     r = L._refs()
     p = s.param
@@ -56,9 +56,9 @@ def add_sen66(s: Script, m: L.Model, sen_x0: str, sen_y0: float) -> None:
     p("sen_up", r["sen_w"], "SEN66 height as it stands, its 25.6 width (ref_sen66, R17)")
     p("foam", m.foam, "plan: the SEN66 sits on 1 mm foam")
     p("sen_x0", sen_x0, "SEN66 inlet end (left), against the left wall")
-    p("sen_y0", sen_y0, f"SEN66 port face (front); {LS} places it behind the tongue and inlet gasket")
+    p("sen_y0", sen_y0, f"SEN66 port face (front); {LS} places it behind the tongue and inlet gasket{sen_y0_note}")
     p("sen_top", "floor_t + foam + sen_up", "derived: SEN66 top")
-    p("gasket_t", m.sen_front, f"inlet gasket and outlet ring depth in front of the port face ({LS} sen_front)")
+    p("gasket_t", 2.0, f"outlet ring depth in front of the port face (within {LS} sen_front 3.0; its top clears the zone wall)")
 
 
 def add_zone_and_board(s: Script, m: L.Model, front_t_need: str, board_x0: str) -> None:
@@ -112,8 +112,9 @@ def shell(s: Script, bosses: list[tuple[str, str]]) -> None:
         sk.polyline([(0, 0), ("D", 0), ("D", "H"), ("y_top", "H"), (0, "lip")])
     s.extrude("Envelope", "Envelope profile", "W", body="shell")
     v = s.v
-    s.chamfer("Edge chamfers", [[0, 0, v("lip")], [0, v("y_top"), v("H")], [0, v("D"), v("H")]],
-              "edge_chamfer", body="shell")
+    # the crease and the top front edge; the top rear edge borders the rear face the shell
+    # removes, so it is not chamfered before the shell (its inward offset would meet the rear wall)
+    s.chamfer("Edge chamfers", [[0, 0, v("lip")], [0, v("y_top"), v("H")]], "edge_chamfer", body="shell")
     s.shell("Shell walls", [[0, v("D") / 2, 0], [0, v("D"), v("H") / 2]], "wall")
     for i, (bx, by) in enumerate(bosses, 1):
         s.cylinder(f"Insert boss {i}", [bx, by, "floor_t"], "boss_d", "boss_h", operation="join", targets=["shell"])
@@ -151,8 +152,9 @@ def base_plate(s: Script, screw_xy: list[tuple[str, str]]) -> None:
     s.box("Rear wall", ["-inner_x + clr_remove", "D - wall", 0],
           ["2 * (inner_x - clr_remove)", "wall", "H - wall - clr_remove"], operation="join", targets=["base_plate"])
     for i, (x, y) in enumerate(screw_xy, 1):
-        s.cylinder(f"Screw hole {i}", [x, y, -0.5], "screw_d", "floor_t + 1", operation="cut", targets=["base_plate"])
-        s.cylinder(f"Screw head {i}", [x, y, -0.5], "head_d", "head_depth + 0.5", operation="cut", targets=["base_plate"])
+        s.cylinder(f"Screw hole {i}", [x, y, "-head_depth"], "screw_d", "floor_t + 2 * head_depth", operation="cut",
+                   targets=["base_plate"])
+        s.cylinder(f"Screw head {i}", [x, y, "-head_depth"], "head_d", "2 * head_depth", operation="cut", targets=["base_plate"])
 
 
 def standoffs(s: Script) -> None:
