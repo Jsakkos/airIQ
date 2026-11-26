@@ -198,7 +198,7 @@ def test_air_paths_by_their_parameters():
 def test_tongue_leaves_the_intake_rows_open():
     """M4: the tongue is set back from the lip; the slots in front of it feed a channel whose
     side exits pass at least their open area."""
-    exits = 2 * V("tongue_gap") * (V("ledge_z0") - V("tongue_z0"))
+    exits = 2 * V("tongue_gap") * (V("ledge_z0") - V("lid_z0") - V("lid_t"))
     span = V("tongue_x1") - max(V("tongue_x1") - V("tongue_w"), V("lsw_gap_x1"))
     in_front = 2 * V("slot_w") * (span - V("slot_bar"))
     assert exits >= in_front
@@ -287,6 +287,32 @@ def test_grommets_squeeze_and_are_held():
     pairs = {frozenset(p) for p in airq_check.TOUCHES}
     for g in GROMMETS:
         assert any(g in p for p in pairs), g
+
+
+def test_gravity_parts_are_held():
+    """Review N5: nothing that seals rests by gravity alone.
+    - The zone wall sits on the standoffs' spigots and carries pads up to the board: the board's
+      M2 screws clamp it (no gap between its pads and the board's underside).
+    - The HCHO lid and the SFA40 are clamped to the base by two M2 screws from under the floor,
+      through the SFA40's front-left and rear-right holes, into the lid's posts (pilots in them).
+    - The tongue is located by its pocket in the lid and held under the zone wall's pad over its
+      VEML7700, clr_align above it."""
+    pad = _feature("Zone wall pad H1")
+    assert V(pad["base"][2]) + V(pad["height"]) == pytest.approx(V("board_z0"))
+    assert V(_feature("Standoff H1")["height"]) == pytest.approx(V("zw_z0 - floor_t + 0.5"))   # up to the zone wall only
+    assert V("spigot_h") > 0 and V("screw_d") > V("pilot_d")
+    for dx, dy in airq.SFA_SCREWS:
+        i = airq.SFA_HOLES.index((dx, dy)) + 1
+        assert f"SFA40 screw hole {i}" in S.features and f"SFA40 hold-down {i} pilot" in S.features
+        assert f"SFA40 pin {i}" not in S.features
+    assert V("floor_t") - V("head_depth") >= 1.6
+    assert V("lid_pilot_depth") <= V("lid_z0") - V("floor_t") - V("sfa_bt") + V("lid_t") - 0.5      # blind in the post and lid
+    hold = _feature("Tongue hold-down")
+    gap = V(hold["corner"][2]) - (V("tongue_z0") + V("tongue_t") + V("tongue_parts_h"))
+    assert gap == pytest.approx(V("clr_align"))
+    assert V(hold["corner"][1]) + V(hold["width"]) <= V(airq.C.yb("ledge_z0"))        # under the ledge
+    assert 0 < V("tongue_recess") < V("lid_t")
+    assert "Tongue pin" not in S.features                                          # the lid's top is flat: prints top down
 
 
 def test_screw_heads_leave_a_floor():

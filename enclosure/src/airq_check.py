@@ -221,8 +221,8 @@ def air_probes(s) -> list[dict]:
         _box("air_hcho_layer", "sfa_x0 + 17.0", "sfa_y0", "floor_t + sfa_cap", "sfa_x0 + 17.5", "sfa_y0 + sfa_w", "lid_z0"),
         _box("air_hcho_window", "hx1", "cy0 + 0.8", "floor_t", "cx0", "cy1 - 0.8", "lid_z0 - shelf_w"),
         _box("air_hcho_chimney", "cx0", "cy0", "grille_min_z - 0.5", "tub_x", "cy1", "grille_min_z"),
-        _box("air_tongue_left", f"{tl} - 0.5", "wall", "tongue_z0", tl, "tongue_y0", "ledge_z0"),
-        _box("air_tongue_right", "tongue_x1", "wall", "tongue_z0", "tongue_x1 + 0.5", "tongue_y0", "ledge_z0"),
+        _box("air_tongue_left", f"{tl} - 0.5", "wall", "lid_z0 + lid_t", tl, "tongue_y0", "ledge_z0"),
+        _box("air_tongue_right", "tongue_x1", "wall", "lid_z0 + lid_t", "tongue_x1 + 0.5", "tongue_y0", "ledge_z0"),
     ]
 
 

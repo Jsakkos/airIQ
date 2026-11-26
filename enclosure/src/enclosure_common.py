@@ -118,6 +118,8 @@ def add_standoffs(s: Script) -> None:
     p("pilot_depth", 6.0, "pilot hole depth")
     p("collar_w", 1.5, "standoff collar under the zone wall: the zone wall's hole rests on it (a lap)")
     p("collar_h", 1.2, "standoff collar height")
+    p("spigot_d", 3.0, "standoff spigot into the zone wall's underside: locates it (N5)")
+    p("spigot_h", 1.0, "standoff spigot height above the zone wall's underside")
     p("h1_x", f"board_x0 + {h1x}", "H1 x (interface.yaml; 8 mm from the USB-C: the support boss)")
     p("h1_y", f"board_y0 + board_d - {h1y}", "H1 y (interface.yaml, layout Y from the rear edge)")
     p("h2_x", f"board_x0 + {h2x}", "H2 x (interface.yaml)")
@@ -234,15 +236,18 @@ def rails(s: Script) -> None:
 
 
 def standoffs(s: Script) -> None:
-    """Board standoffs: posts on the floor up through the zone wall to the board's bottom, at H1
-    (the USB-C support boss, interface.yaml: 8 mm from the USB-C) and H2, each with a collar the
-    zone wall's hole rests on (a lap, no slit round the post). Joined to base_plate: they print
-    vertical with it. H1 also merges with the plenum plate (airq), which braces it to 2 mm under
-    the board (M7). The pilot holes are cut at the end (`standoff_pilots`)."""
+    """Board standoffs: posts on the floor up to the zone wall's underside, at H1 (the USB-C
+    support boss, interface.yaml: 8 mm from the USB-C) and H2, each with a collar and a spigot. The
+    zone wall sits on them (a lap round the spigot) and carries a pad up to the board, so the
+    board's M2 screws, through the zone wall into the posts' pilots, clamp the zone wall (N5).
+    Joined to base_plate: they print vertical with it. H1 also merges with the plenum plate (airq),
+    which braces it up to the zone wall (M7). The pilot holes are cut at the end."""
     for name, (x, y) in (("H1", ("h1_x", "h1_y")), ("H2", ("h2_x", "h2_y"))):
-        s.cylinder(f"Standoff {name}", [x, y, "floor_t - 0.5"], "standoff_d", "board_z0 - floor_t + 0.5",
+        s.cylinder(f"Standoff {name}", [x, y, "floor_t - 0.5"], "standoff_d", "zw_z0 - floor_t + 0.5",
                    operation="join", targets=["base_plate"])
         s.cylinder(f"Standoff {name} collar", [x, y, "zw_z0 - collar_h"], "standoff_d + 2 * collar_w", "collar_h",
+                   operation="join", targets=["base_plate"])
+        s.cylinder(f"Standoff {name} spigot", [x, y, "zw_z0 - 0.5"], "spigot_d", "spigot_h + 0.5",
                    operation="join", targets=["base_plate"])
 
 
@@ -284,15 +289,19 @@ def zone_wall(s: Script) -> None:
       FFC and the adapter, which stay in the electronics zone;
     - a horizontal part over the SEN66 and the outlet plenum, back to the rear wall.
     It rests on the base's tub (rails, boss pockets, plenum plate, rear-wall rib, standoff
-    collars): laps all round. The standoffs pass through it; the front bosses pass its notches
-    when the shell is lowered (I1)."""
+    collars): laps all round. It sits on the standoffs' spigots and the board's screws clamp it
+    there (N5); the front bosses pass its notches when the shell is lowered (I1)."""
     with s.sketch("Zone wall profile", "YZ", offset="-inner_x + clr_remove") as sk:
         sk.polyline([("wall + seal_t", "ledge_z0"), (yb("ledge_z0"), "ledge_z0"), (yb("zw_z0"), "zw_z0"),
                      ("D - wall - clr_remove", "zw_z0"), ("D - wall - clr_remove", "zw_z1"), (yf("zw_z1"), "zw_z1"),
                      (yf("ledge_z1"), "ledge_z1"), ("wall + seal_t", "ledge_z1")])
     s.extrude("Zone wall", "Zone wall profile", "2 * (inner_x - clr_remove)", body="zone_wall")
-    for name, (x, y) in (("H1", ("h1_x", "h1_y")), ("H2", ("h2_x", "h2_y"))):
-        s.cylinder(f"Zone wall hole {name}", [x, y, "zw_z0 - 1"], "standoff_d + 2 * clr_align", "zone_t + 2",
+    for name, (x, y) in (("H1", ("h1_x", "h1_y")), ("H2", ("h2_x", "h2_y"))):     # N5: the board's screws clamp it here
+        s.cylinder(f"Zone wall pad {name}", [x, y, "zw_z1 - 0.5"], "standoff_d", "board_z0 - zw_z1 + 0.5",
+                   operation="join", targets=["zone_wall"])
+        s.cylinder(f"Zone wall spigot seat {name}", [x, y, "zw_z0 - 1"], "spigot_d + 2 * clr_align", "spigot_h + clr_align + 1",
+                   operation="cut", targets=["zone_wall"])
+        s.cylinder(f"Zone wall screw hole {name}", [x, y, "zw_z0"], "screw_d", "board_z0 - zw_z0 + 1",
                    operation="cut", targets=["zone_wall"])
     for i, sx in enumerate(("-boss_x", "boss_x"), 1):     # the shell's floor bosses pass here on the way down
         s.box(f"Zone wall boss notch {i}", [f"{sx} - boss_d / 2 - clr_remove", "-wall", "ledge_z0 - 1"],

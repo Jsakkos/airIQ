@@ -172,7 +172,8 @@ def build() -> Script:
     p("tongue_gap", 4.6, "air between the lip and the tongue's front edge: the slots in front of it stay open (M4)")
     p("tongue_x1", "hx1 - 5.0", "tongue's right end (it lies turned 180 deg): room right of it for the air in front of it")
     p("tongue_y0", "wall + tongue_gap", "tongue's front edge (VEML7700 window toward the lip)")
-    p("tongue_z0", "lid_z0 + lid_t", "tongue's bottom, on the HCHO lid")
+    p("tongue_recess", 0.4, "the tongue's seat: a pocket this deep in the lid's top (clr_align round the board) locates it (N5)")
+    p("tongue_z0", "lid_z0 + lid_t - tongue_recess", "tongue's bottom, in its pocket in the HCHO lid")
 
     # --- face positions on SW1, the LEDs, J7, USB-C, the tongue, the adapter (Task 3b) -------
     btn, usb, fpc = main["button"], main["usb_c"], main["fpc"]
@@ -230,6 +231,7 @@ def build() -> Script:
     cable_params(s)
     C.zone_wall(s)
     zone_drawer(s)
+    tongue_capture(s)
     C.zone_seal(s)
     s.box("SEN66 foam", ["sen_x0", "sen_y0", "floor_t"], ["sen_l", "sen_d", "foam"], body="sen66_foam")
     gaskets(s)
@@ -284,6 +286,10 @@ def wiper_profile(c: str = "0") -> list[tuple[str, str]]:
             (f"wiper_x1 - wiper_lean - wiper_w - {c}", tip), (f"wiper_x1 - wiper_w - {c}", "plate_y0")]
 
 
+SFA_HOLES = ((0, 0), (1, 0), (0, 1), (1, 1))        # the SFA40's holes: (0, 0) front left ... (1, 1) rear right
+SFA_SCREWS = ((0, 0), (1, 1))                       # N5: M2 screws from under the floor into the lid's posts
+
+
 def hcho_pocket(s: Script) -> None:
     """The SFA40's sealed pocket at the front right, part of base_plate (R26: off the rear wall,
     which the outlet grille needs whole). The SFA40 lies flat on pins through its holes, opening
@@ -311,7 +317,9 @@ def hcho_pocket(s: Script) -> None:
           operation="join", targets=["base_plate"])
     s.box("HCHO chimney rear wall", ["cx0 - 0.5", "cy1", "floor_t - 0.5"], ["tub_x - cx0 + 1", "iwall", "zw_z0 - floor_t + 0.5"],
           operation="join", targets=["base_plate"])
-    for i, (dx, dy) in enumerate(((0, 0), (1, 0), (0, 1), (1, 1)), 1):
+    for i, (dx, dy) in enumerate(SFA_HOLES, 1):
+        if (dx, dy) in SFA_SCREWS:
+            continue                       # these two holes take the lid's screws from under the floor (N5)
         x = f"sfa_x0 + sfa_hole_in + {dx} * (sfa_w - 2 * sfa_hole_in)"
         y = f"sfa_y0 + sfa_hole_in + {dy} * (sfa_w - 2 * sfa_hole_in)"
         s.cylinder(f"SFA40 pin {i}", [x, y, "floor_t - 0.5"], "sfa_hole_d - 2 * clr_align", "sfa_bt + 0.5",
@@ -321,6 +329,15 @@ def hcho_pocket(s: Script) -> None:
 def base_cuts(s: Script) -> None:
     """Cuts in base_plate after every join: the gaskets' seats and the outlet bore, the window from
     the HCHO pocket into its chimney, and the HCHO grille."""
+    for i, (dx, dy) in enumerate(SFA_HOLES, 1):
+        if (dx, dy) not in SFA_SCREWS:
+            continue
+        x = f"sfa_x0 + sfa_hole_in + {dx} * (sfa_w - 2 * sfa_hole_in)"
+        y = f"sfa_y0 + sfa_hole_in + {dy} * (sfa_w - 2 * sfa_hole_in)"
+        s.cylinder(f"SFA40 screw hole {i}", [x, y, "-head_depth"], "screw_d", "floor_t + 2 * head_depth", operation="cut",
+                   targets=["base_plate"])
+        s.cylinder(f"SFA40 screw head {i}", [x, y, "-head_depth"], "head_d", "2 * head_depth", operation="cut",
+                   targets=["base_plate"])
     s.cylinder("Outlet ring seat", ["outlet_x", "plate_y0 - 0.5", "outlet_z"], "ring_od + 2 * clr_align", "seat_d + 0.5",
                axis="Y", operation="cut", targets=["base_plate"])
     s.cylinder("Outlet bore", ["outlet_x", "plate_y0 - 1", "outlet_z"], "ring_bore", "iwall + 2", axis="Y",
@@ -378,6 +395,21 @@ def hcho_window(s: Script) -> None:
 def zt(y: str, t: str) -> str:
     """z of the point at depth y with depth t behind the slope's outer surface (an expression)."""
     return f"lip + (({y}) * cos_t - ({t})) / sin_t"
+
+
+def tongue_capture(s: Script) -> None:
+    """N5: the tongue is located by its pocket in the lid and held down by a pad under the zone
+    wall's ledge over its VEML7700's top, clr_align above it (the zone wall is clamped by the
+    board's screws). The pad shades the sensor from above too."""
+    (vx0, vy0), (vx1, vy1) = B.TONGUE["veml7700"]["body"]
+    p = s.param
+    p("veml_bx0", vx0, "VEML7700 body x from (tongue frame, interface.yaml)")
+    p("veml_bx1", vx1, "VEML7700 body x to (interface.yaml)")
+    p("veml_by0", vy0, "VEML7700 body y from (interface.yaml)")
+    p("veml_by1", vy1, "VEML7700 body y to (interface.yaml)")
+    s.box("Tongue hold-down", ["tongue_x1 - veml_bx1 + 0.5", "tongue_y0 + veml_by0 + 0.35", "tongue_z0 + tongue_t + tongue_parts_h + clr_align"],
+          ["veml_bx1 - veml_bx0 - 1.0", "veml_by1 - veml_by0 - 0.7", "ledge_z0 + 0.5 - (tongue_z0 + tongue_t + tongue_parts_h + clr_align)"],
+          operation="join", targets=["zone_wall"])
 
 
 def cable_params(s: Script) -> None:
@@ -444,21 +476,29 @@ def gaskets(s: Script) -> None:
 
 
 def hcho_lid(s: Script) -> None:
-    """`hcho_lid`: closes the HCHO pocket and carries the tongue (the tongue mount): it rests on
-    the pocket's walls, the lip rib and the shelf; posts press the SFA40 onto its pins (I2
-    retention); the tongue's pin goes through the tongue's M2 hole."""
+    """`hcho_lid`: closes the HCHO pocket and seats the tongue (the plan's tongue mount: a pocket
+    in its top). It rests on the pocket's walls, the lip rib and the shelves; four posts on its
+    underside press the SFA40 down; two M2 screws from under the floor, through the SFA40's front
+    left and rear right holes, go into two of the posts and clamp the board and the lid to the
+    base (N5). Its top is flat but for the pocket and the cable hole, so it prints top face down,
+    posts up (N6)."""
+    p = s.param
+    p("lid_pilot_depth", 3.5, "M2 self-tapping pilot depth in the lid's screw posts")
     with s.sketch("HCHO lid outline", "XY", offset="lid_z0") as sk:
         sk.polyline([("sen_x1 + clr_align", "wall + clr_remove"), ("bp_x0 - clr_remove", "wall + clr_remove"),
                      ("bp_x0 - clr_remove", "bp_y1 + clr_remove"), ("hx1 - clr_remove", "bp_y1 + clr_remove"),
                      ("hx1 - clr_remove", "hy1 + iwall"), ("sen_x1 + clr_align", "hy1 + iwall")])
     s.extrude("HCHO lid", "HCHO lid outline", "lid_t", body="hcho_lid")
-    for i, (dx, dy) in enumerate(((0, 0), (1, 0), (0, 1), (1, 1)), 1):
+    for i, (dx, dy) in enumerate(SFA_HOLES, 1):
         x = f"sfa_x0 + sfa_hole_in + {dx} * (sfa_w - 2 * sfa_hole_in)"
         y = f"sfa_y0 + sfa_hole_in + {dy} * (sfa_w - 2 * sfa_hole_in)"
         s.cylinder(f"SFA40 hold-down {i}", [x, y, "floor_t + sfa_bt"], "sfa_hole_d + 1.4", "lid_z0 - floor_t - sfa_bt + 0.5",
                    operation="join", targets=["hcho_lid"])
-    s.cylinder("Tongue pin", ["tongue_x1 - tongue_hole_x", "tongue_y0 + tongue_hole_y", "lid_z0 + lid_t - 0.5"],
-               "tongue_hole_d - 2 * clr_align", "tongue_t + 1.5", operation="join", targets=["hcho_lid"])
+        if (dx, dy) in SFA_SCREWS:
+            s.cylinder(f"SFA40 hold-down {i} pilot", [x, y, "floor_t + sfa_bt - 0.5"], "pilot_d", "lid_pilot_depth + 0.5",
+                       operation="cut", targets=["hcho_lid"])
+    s.box("Tongue seat", ["tongue_x1 - tongue_w - clr_align", "tongue_y0 - clr_align", "lid_z0 + lid_t - tongue_recess"],
+          ["tongue_w + 2 * clr_align", "tongue_dp + 2 * clr_align", "tongue_recess + 0.5"], operation="cut", targets=["hcho_lid"])
     # I2: the hole passes the Qwiic plug of the SFA40's cable to the tongue (the lid goes on over it)
     s.param("lid_hole_l", "qw_plug_w + 2 * clr_remove", "lid cable hole along x: passes the Qwiic plug's width")
     s.param("lid_hole_w", "qw_plug_t + 2 * clr_remove", "lid cable hole along y: passes the Qwiic plug's thickness")
