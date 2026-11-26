@@ -21,11 +21,13 @@ along x).
 
 Bodies:
 - printed: shell; base_plate (floor, lip, rear wall, side rails, boss pockets, standoffs with
-  collars, the outlet plenum's plate and rib, the SEN66 cradle, the HCHO pocket's walls, chimney
-  and grille, the SFA40's pins); zone_wall; hcho_lid (closes the HCHO pocket; the tongue lies on
-  it, on its locating pin: the tongue mount);
-- TPU 95A: gasket_out, gasket_in, zone_seal, grommet_zone, grommet_j4, grommet_tongue;
-- foam: sen66_foam.
+  collars and spigots, the outlet plenum's plate and rib, the SEN66 cradle, the HCHO pocket's
+  walls, chimney and grille, the SFA40's pins and screw holes); zone_wall (clamped by the board's
+  screws); hcho_lid (closes the HCHO pocket, screwed from below through the SFA40; the tongue sits
+  in a pocket in its top: the tongue mount);
+- TPU 95A: gasket_out (the SEN66's rear stop), gasket_in (a wiper), zone_seal, and the split
+  grommets grommet_zone_a/_b, grommet_j4_a/_b, grommet_tongue_a/_b;
+- foam: sen66_foam, sen66_pad (presses the SEN66 onto gasket_out; fix round 2, review I3(b)).
 
 Every position Task 3b needs is a named parameter here, even where 3a does not cut the feature.
 """
