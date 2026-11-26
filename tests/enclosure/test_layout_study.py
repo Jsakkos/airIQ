@@ -199,3 +199,23 @@ def test_what_the_questions_buy(m, depth):
         tilt = a["tilt 25 deg"]
         assert 3.5 < plan["horizontal_D"] - tilt["horizontal_D"] < 4.5       # 25 deg: about 4 mm
         assert tilt["face_H"] > 51.0                                         # but a taller face
+
+
+# --- fix round 1 (R25, R26) ----------------------------------------------------------------
+
+def test_ports_forward_front_layer_cannot_carry_the_outlet():
+    """R25: with the ports facing the front (3a before fix round 1), an outlet duct along the
+    module's front has at most the sensor zone in front of it: under 330.1 even with the strip
+    under the ledge, and the module cannot move back (H1 stands behind it)."""
+    m = replace(AIRQ, lip=15.0, H=51.0)
+    assert 200 < L.front_layer(m, 20.0) < 230
+    assert L.front_layer(m, 20.0, under_ledge=True) < L.PORT_OUTLET
+    assert L.front_layer(m, 25.0) > L.PORT_OUTLET          # it would take the module 5 mm further back
+
+
+def test_hcho_alternatives_by_slot_count():
+    """R26: grille areas count whole 1.2 mm slots (a 3.0 pitch is 40 %, 2.4 is 50 %)."""
+    rows = L.hcho_alternatives(replace(AIRQ, lip=15.0, H=51.0))
+    built = rows[0]
+    assert built["open_40"] == pytest.approx(18 * 1.2 * 18.9) and built["open_40"] < L.OUTLET_MIN
+    assert all(not r["meets"] for r in rows[:-1]) and rows[-1]["meets"]

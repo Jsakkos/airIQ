@@ -1,16 +1,26 @@
-"""The airQ check design: enclosure/airq.sc with every reference part placed (Task 3a Step 3).
+"""The airQ check design: enclosure/airq.sc with every reference part placed (Task 3a).
 
 `check_script()` returns a command script for `solidcraft-cli run --in enclosure/airq.sc`. It:
 - inserts the six references at their places in the layout. ref_main goes only here (R8: it
   adds 5.5 MB);
+- sets gasket_squeeze to 0, so the TPU gaskets' faces touch what they seal (R9);
+- adds the check bodies, all placed by the design's parameters:
+  - `ko_*` keep-outs: the plugs (the SEN66's JST-GH, the Qwiic plugs at the SFA40, the tongue
+    and J4, J2's) and the cables' routes through the grommets (review I2: routing room);
+  - `air_*` probes: one free section per internal air path (R25). A probe that touches but does
+    not overlap anything proves its section is free air; the section is the probe's size;
+  - `sweep_*` and `shell_up_*`: the shell's insertion path along -z (review I1): the swept
+    columns of its bosses, and copies of the shell raised in steps;
 - runs the interference check (R9: touching is fine, shared volume is not);
-- measures the bodies;
+- measures the bodies (the probes' sections);
+- sets gasket_squeeze to a small value and checks that each gasket now overlaps what it seals:
+  its faces touched at 0 (zero gap, zero overlap);
 - saves enclosure/.build/airq-check.sc.
 
 The placement matrices are rigid and proper (det +1). Their translations are parameter
 expressions, so the references follow the design's parameters. `distances()` gives the
-distances that the placements answer, from the generator's values. Run it all with
-`uv run --with pyyaml python enclosure/src/airq_check.py`, or through
+distances the placements answer, from the generator's values and the boards' sources. Run it all
+with `uv run --with pyyaml python enclosure/src/airq_check.py --run`, or through
 tests/enclosure/test_airq.py.
 """
 from __future__ import annotations
@@ -22,11 +32,18 @@ import sys
 from pathlib import Path
 
 import airq
+import board_sources as B
 import encbuild
-from sclib import ENCLOSURE, mechanical
+import ref_sfa40
+from sclib import ENCLOSURE
 
 REF = ENCLOSURE / "reference"
 CHECK_SC = encbuild.BUILD_DIR / "airq-check.sc"
+REFS = ("ref_sen66", "ref_epd", "ref_fpc_adapter", "ref_sfa40", "ref_tongue", "ref_main")
+SHELL_BORNE = ("ref_epd", "ref_fpc_adapter")     # the panel and the adapter are in the shell and come down with it
+SWEEP_DZ = (1, 2, 4, 8, 16, 32)                  # the shell's raised copies (mm along +z)
+TOUCH_SQUEEZE = 0.05                             # the gaskets overlap their seats by this much when they touch at 0
+TOUCHES = (("gasket_out", "sen66_body"), ("gasket_in", "sen66_body"), ("zone_seal", "base_plate"))
 
 
 def _rows(rot, t):
@@ -42,15 +59,16 @@ def placements(s=None) -> list[dict]:
     epd_y, epd_z = slope("panel_s0", "bezel + panel_t")
     ad_y, ad_z = slope("adapter_s", "adapter_t")
     return [
-        # SEN66: module x -> +x (inlet end left), module z (port face -> connector) -> +y, module y -> -z
-        {"path": REF / "sen66.sc", "matrix": _rows([[1, 0, 0], [0, 0, 1], [0, -1, 0]], ["sen_x0", "sen_y0", "sen_top"])},
+        # SEN66, ports to the rear: module x -> -x (inlet end right), module z (port face -> connector) -> -y,
+        # module y -> -z (square inlet high)
+        {"path": REF / "sen66.sc", "matrix": _rows([[-1, 0, 0], [0, 0, -1], [0, -1, 0]], ["sen_x1", "sen_y1", "sen_top"])},
         # panel: x -> +x (tail end left), y -> up the slope, z -> the slope's outward normal; tail folded
         {"path": REF / "epd-2.9.sc", "configuration": "folded",
          "matrix": _rows([[1, 0, 0], [0, sn, -c], [0, c, sn]], ["panel_x0", epd_y, epd_z])},
         # adapter: its y (signal path) -> +x, its z (ZIFs) -> toward the panel, x -> down the slope
         {"path": REF / "fpc-adapter.sc", "matrix": _rows([[0, 1, 0], [-sn, 0, -c], [-c, 0, sn]], ["adapter_x", ad_y, ad_z])},
-        # SFA40: standing, its opening (+z) facing the rear wall, its board's y -> -z
-        {"path": REF / "sfa40-breakout.sc", "matrix": _rows([[1, 0, 0], [0, 0, 1], [0, -1, 0]], ["sfa_x0", "sfa_y0", "sfa_z0"])},
+        # SFA40: flat on the floor, opening up; its x (J2 -> J1) -> +y, its y -> -x
+        {"path": REF / "sfa40-breakout.sc", "matrix": _rows([[0, -1, 0], [1, 0, 0], [0, 0, 1]], ["sfa_x0", "sfa_y0", "floor_t"])},
         # tongue: turned 180 deg about z, its front edge (VEML7700) toward the lip
         {"path": REF / "airq-tongue.sc", "matrix": _rows([[-1, 0, 0], [0, -1, 0], [0, 0, 1]], ["tongue_x1", "tongue_y0", "tongue_z0"])},
         # main board: STEP frame as it lies (front edge at STEP y -30)
@@ -58,28 +76,186 @@ def placements(s=None) -> list[dict]:
     ]
 
 
-def check_script(save: Path = CHECK_SC, budget_s: float = 600) -> dict:
+# --- check bodies (all from the design's parameters) -----------------------------------------
+# board-side positions read from interface.yaml (R27), as expressions over the design's names
+J2 = B.MAIN["j_sen66"]["body"]
+J4 = B.MAIN["j_qwiic_aux"]["body"]
+TQ = B.TONGUE["qwiic"]
+TQH = B.connector_h("qwiic", board="tongue")
+_SFA = ref_sfa40.build().v
+SFA_QW = (f"sfa_x0 + {_SFA('qwiic_y')} - {_SFA('qwiic_w')} / 2", f"sfa_x0 + {_SFA('qwiic_y')} + {_SFA('qwiic_w')} / 2")   # its Qwiic plugs' x span (ref_sfa40)
+
+
+def _box(name, x0, y0, z0, x1, y1, z1):
+    return {"command": "solid.box", "params": {"name": name, "body_name": name, "corner": [x0, y0, z0],
+                                               "length": f"({x1}) - ({x0})", "width": f"({y1}) - ({y0})",
+                                               "height": f"({z1}) - ({z0})", "operation": "new"}}
+
+
+def _cyl(name, base, d, h, axis="Z"):
+    return {"command": "solid.cylinder", "params": {"name": name, "body_name": name, "base": base, "diameter": d,
+                                                    "height": h, "axis": axis, "operation": "new"}}
+
+
+def keepouts(s) -> list[dict]:
+    """The plugs and the cables' routes (I2). The SEN66's connector position and mating direction
+    and the plugs' sizes are to confirm: the keep-outs are envelopes, 5 mm plugs out of the
+    connector faces with the cable's bend in front."""
+    t = lambda tt, z: f"({tt} + ({z} - lip) * sin_t) / cos_t"     # noqa: E731  y at depth tt behind the slope, height z
+    mid = "sen_top - sen_up / 2"
+    b = []
+    # SEN66 plug on its connector face (front), the cable's bend down, the run left, the riser
+    b.append(_box("ko_sen66_plug", "plug_x0", "sen_y0 - 6.0", f"{mid} - 2.5", "plug_x1", "sen_y0", f"{mid} + 2.5"))
+    b.append(_box("ko_sen66_bend", "plug_x0", "sen_y0 - 6.94", "floor_t", "plug_x1", "sen_y0 - 6.0", f"{mid} + 0.7"))
+    b.append(_box("ko_sen66_bend_low", "plug_x0", "pt_y0 + 0.1", "floor_t", "plug_x1", "sen_y0 - 6.94", "ledge_z0 + 0.2"))
+    b.append(_box("ko_cable_run", "pt_x0", "pt_y0 + 0.1", "floor_t", "plug_x0", "pt_y0 + 2.6", "floor_t + 3.0"))
+    b.append(_box("ko_cable_riser", "pt_x0", "pt_y0 + 0.1", "floor_t + 3.0", "pt_x1", "pt_y0 + 2.6", "pt_z0"))
+    # through the zone wall's grommet, up the strip behind the folded tail, over the zone wall to J2 and J4
+    b.append(_cyl("ko_cable_gh", ["pt_x0 + 1.7", "pt_y0 + 1.6", "pt_z0"], "cable_gh_d", "pt_z1 - pt_z0"))
+    b.append(_cyl("ko_cable_qwiic", ["pt_x1 - 1.5", "pt_y1 - 1.3", "pt_z0"], "cable_qw_d", "pt_z1 - pt_z0"))
+    b.append({"command": "sketch.create", "params": {"name": "ko_strip_profile", "plane": "YZ", "offset": "pt_x0"}})
+    b.append({"command": "sketch.line", "params": {"closed": True, "points": [
+        [t("4.2", "pt_z1"), "pt_z1"], [t("6.9", "pt_z1"), "pt_z1"], [t("6.9", "zw_z1 + 0.5"), "zw_z1 + 0.5"],
+        ["board_y0 + board_d - " + str(J4[0][1]), "zw_z1 + 0.5"], ["board_y0 + board_d - " + str(J4[0][1]), "zw_z1 + 2.6"],
+        [t("4.2", "zw_z1 + 2.6"), "zw_z1 + 2.6"]]}})
+    b += [{"command": "sketch.solve", "params": {}}, {"command": "sketch.finish", "params": {}}]
+    b.append({"command": "solid.extrude", "params": {"name": "ko_strip", "body_name": "ko_strip", "sketch": "ko_strip_profile",
+                                                     "distance": "pt_x1 - pt_x0", "operation": "new"}})
+    bx = "board_x0"
+    fy = "board_y0 + board_d"
+    b.append(_box("ko_route", "pt_x1", t("6.9", "zw_z1 + 2.6") + " + 0.2", "zw_z1 + 0.5",
+                  f"{bx} + {J2[0][0]} - 5.0", f"{fy} - {J4[0][1]}", "zw_z1 + 2.6"))
+    b.append(_box("ko_j2_plug", f"{bx} + {J2[0][0]} - 5.0", f"{fy} - {J2[1][1]}", "board_z0 + board_t",
+                  f"{bx} + {J2[0][0]}", f"{fy} - {J2[0][1]}", f"board_z0 + board_t + {B.connector_h('j_sen66')}"))
+    b.append(_box("ko_j4_plug", f"{bx} + {J4[0][0]} - 5.0", f"{fy} - {J4[1][1]}", "board_z0 + board_t",
+                  f"{bx} + {J4[0][0]}", f"{fy} - {J4[0][1]}", f"board_z0 + board_t + {B.connector_h('j_qwiic_aux')}"))
+    # SFA40: J2 (front) plug and its cable to grommet_j4, then left in front of the SEN66 to the riser
+    b.append(_box("ko_sfa_front", SFA_QW[0], "wall + shelf_w + 0.1", "floor_t", SFA_QW[1], "sfa_y0", "lid_z0 - shelf_w - 0.1"))
+    b.append(_box("ko_sfa_turn", "sen_x1 + clr_align + iwall + 0.3", "wall + 0.8", "floor_t", SFA_QW[0], "wall + 4.4", "floor_t + 3.8"))
+    b.append(_cyl("ko_j4_grommet", ["sen_x1 + clr_align - 0.3", "wall + 2.6", "floor_t + 2.0"], "cable_qw_d", "iwall + 0.6", axis="X"))
+    b.append(_box("ko_j4_run", "-bp_x0 + 0.2", "wall + 0.8", "floor_t", "sen_x1 + clr_align - 0.3", "wall + 4.4", "floor_t + 3.8"))
+    b.append(_box("ko_j4_turn", "-bp_x0 + 0.2", "wall + 4.4", "floor_t", "pt_x1", "pt_y0 + 0.1", "floor_t + 3.0"))
+    # SFA40: J1 (rear) plug, up through grommet_tongue, to the tongue's Qwiic plug
+    b.append(_box("ko_sfa_rear", SFA_QW[0], "sfa_y0 + sfa_w", "floor_t", SFA_QW[1], "hy1", "lid_z0 - 0.3"))
+    b.append(_cyl("ko_lid_cable", ["sfa_x0 + sfa_w / 2", "hy1 - 2.1", "lid_z0 - 0.3"], "cable_qw_d", "lid_t + 0.6"))
+    tq_x = f"tongue_x1 - {TQ['center_x']}"
+    b.append(_box("ko_tongue_plug", f"{tq_x} - 3.0", f"tongue_y0 + {TQ['mating_face_y']}", "tongue_z0 + tongue_t",
+                  f"{tq_x} + 3.0", f"tongue_y0 + {TQ['mating_face_y']} + 4.5", f"tongue_z0 + tongue_t + {TQH}"))
+    b.append(_box("ko_tongue_cable", f"{tq_x} - 3.0", f"tongue_y0 + {TQ['mating_face_y']} + 4.5", "lid_z0 + lid_t + 0.3",
+                  "sfa_x0 + sfa_w / 2 + 2.5", "hy1 - 0.6", f"tongue_z0 + tongue_t + {TQH}"))
+    return b
+
+
+AIR = {   # probe -> (path, R25 minimum, the probe's face that is the section: "x", "y" or "z")
+    "air_intake_gap": ("intake: the gap behind the port face to the inlets", 77.3, "x"),
+    "air_intake_front": ("intake: the sensor zone in front of the SEN66", 77.3, "x"),
+    "air_intake_right": ("intake: over the HCHO lid, toward the gap", 77.3, "y"),
+    "air_outlet_ring": ("outlet: the ring's bore (gasket_out)", 330.1, "y"),
+    "air_outlet_right": ("outlet: the plenum right of H1", None, "x"),
+    "air_outlet_mid": ("outlet: the plenum between the ring and H1", None, "x"),
+    "air_outlet_mid_top": ("outlet: the plenum between the ring and H1, in front of the rib", None, "x"),
+    "air_outlet_h1": ("outlet: the plenum behind H1, below its trim's top", None, "x"),
+    "air_outlet_h1_top": ("outlet: the plenum behind H1, above its trim", None, "x"),
+    "air_hcho_layer": ("HCHO: over the SFA40's cap, toward the chimney", 27.4, "x"),
+    "air_hcho_window": ("HCHO: the window into the chimney", 27.4, "x"),
+    "air_hcho_chimney": ("HCHO: up the chimney to the grille", 27.4, "z"),
+    "air_tongue_left": ("intake (M4): the slots in front of the tongue, out to the left", None, "x"),
+    "air_tongue_right": ("intake (M4): the slots in front of the tongue, out to the right", None, "x"),
+}
+
+
+def air_probes(s) -> list[dict]:
+    """The free sections of the internal air paths (R25), from the parameters. Each must touch
+    and not overlap anything; its section is its face in the flow."""
+    tl = "tongue_x1 - tongue_w"
+    return [
+        _box("air_intake_gap", "inlet_x0", "sen_y1", "floor_t", "sen_x1", "plate_y0", "zw_z0"),
+        _box("air_intake_front", "plug_x1 + 1.5", "wall + 0.1", "floor_t + 3.8", "plug_x1 + 2.0",
+             "sen_y0 - clr_align - iwall", "ledge_z0"),
+        _box("air_intake_right", "hx0", "cy1 + iwall + 0.5", "tongue_z0 + tongue_t + 3.0", "h2_x - standoff_d / 2 - collar_w - 0.1", "cy1 + iwall + 1.0", "zw_z0"),
+        _cyl("air_outlet_ring", ["outlet_x", "sen_y1", "outlet_z"], "ring_bore", "plate_y1 - sen_y1", axis="Y"),
+        _box("air_outlet_right", "h1_x + standoff_d / 2 + 0.3", "plate_y1", "floor_t", "h1_x + standoff_d / 2 + 0.7",
+             "D - wall", "zw_z0 - rib_d"),
+        _box("air_outlet_mid", "outlet_x + ring_od / 2 + 0.5", "plate_y1", "floor_t", "outlet_x + ring_od / 2 + 0.9",
+             "D - wall", "zw_z0 - rib_d"),
+        _box("air_outlet_mid_top", "outlet_x + ring_od / 2 + 0.5", "plate_y1", "zw_z0 - rib_d", "outlet_x + ring_od / 2 + 0.9",
+             "D - wall - rib_d", "zw_z0"),
+        _box("air_outlet_h1", "h1_x - 0.2", "plate_y1 + 0.6", "floor_t", "h1_x + 0.2", "D - wall", "h1_trim_z"),
+        _box("air_outlet_h1_top", "h1_x - 0.2", "h1_y + standoff_d / 2", "h1_trim_z", "h1_x + 0.2", "D - wall", "zw_z0 - rib_d"),
+        _box("air_hcho_layer", "sfa_x0 + 17.0", "sfa_y0", "floor_t + sfa_cap", "sfa_x0 + 17.5", "sfa_y0 + sfa_w", "lid_z0"),
+        _box("air_hcho_window", "hx1", "cy0 + 0.8", "floor_t", "cx0", "cy1 - 0.8", "lid_z0 - shelf_w"),
+        _box("air_hcho_chimney", "cx0", "cy0", "grille_min_z - 0.5", "tub_x", "cy1", "grille_min_z"),
+        _box("air_tongue_left", f"{tl} - 0.5", "wall", "tongue_z0", tl, "tongue_y0", "ledge_z0"),
+        _box("air_tongue_right", "tongue_x1", "wall", "tongue_z0", "tongue_x1 + 0.5", "tongue_y0", "ledge_z0"),
+    ]
+
+
+def sweeps(s) -> list[dict]:
+    """The shell's way on (I1): it is lowered along -z onto the assembled base. Its bosses are the
+    parts that reach into the case, so their swept columns (from where they end up to above the
+    case) must clear everything on the base; and the whole shell is copied at raised steps."""
+    b = [_cyl(f"sweep_boss_{i}", [sx, "boss_y", "floor_t"], "boss_d", "H + 5 - floor_t") for i, sx in enumerate(("-boss_x", "boss_x"), 1)]
+    b.append(_box("sweep_rear_boss", "rear_boss_x - boss_d / 2", "D - wall - clr_remove - rear_boss_len", "rear_boss_z - boss_d / 2",
+                  "rear_boss_x + boss_d / 2", "D - wall - clr_remove", "H + 5"))
+    for dz in SWEEP_DZ:
+        b.append({"command": "solid.move", "params": {"name": f"shell_up_{dz}", "bodies": ["shell"], "translate": [0, 0, dz],
+                                                      "copy": True, "body_name": f"shell_up_{dz}"}})
+    return b
+
+
+def check_bodies(s) -> list[str]:
+    names = []
+    for c in keepouts(s) + air_probes(s) + sweeps(s):
+        n = c["params"].get("body_name")
+        if n:
+            names.append(n)
+    return names
+
+
+def exclusions(names: list[str]) -> list[list[str]]:
+    """Pairs that may overlap: each reference's own STEP bodies (pins in housings), keep-outs
+    with each other (the routes join), and the shell's sweep with the shell and what it carries."""
+    out = [[f"{n}:1", f"{n}:1"] for n in REFS]
+    ko = [n for n in names if n.startswith("ko_")]
+    out += [[a, b] for i, a in enumerate(ko) for b in ko[i + 1:]]
+    sw = [n for n in names if n.startswith(("sweep_", "shell_up_"))]
+    out += [[a, b] for i, a in enumerate(sw) for b in sw[i + 1:]]
+    out += [[a, "shell"] for a in sw]
+    out += [[a, f"{r}:1"] for a in sw for r in SHELL_BORNE]
+    return out
+
+
+def check_script(save: Path = CHECK_SC, budget_s: float = 900) -> dict:
+    s = airq.build()
     steps = []
-    for pl in placements():
+    for pl in placements(s):
         params = {"path": str(pl["path"]), "matrix": pl["matrix"]}
         if "configuration" in pl:
             params["configuration"] = pl["configuration"]
         steps.append({"command": "component.insert_design", "params": params})
-    # a reference's own bodies may overlap inside its STEP model (pins in housings): only pairs
-    # with at least one enclosure body, or between two references, count
-    own = [[f"{n}:1", f"{n}:1"] for n in ("ref_sen66", "ref_epd", "ref_fpc_adapter", "ref_sfa40", "ref_tongue", "ref_main")]
-    steps += [{"command": "inspect.interference", "params": {"budget_s": budget_s, "exclude_pairs": own}},
-              {"command": "inspect.measure", "params": {"summary": True}},
-              {"command": "file.save", "params": {"path": str(save), "cache": False}}]
-    return {"commands": steps}
+    steps.append({"command": "parameters.change", "params": {"changes": {"gasket_squeeze": "0 mm"}}})
+    extra = keepouts(s) + air_probes(s) + sweeps(s)
+    steps += extra
+    names = check_bodies(s)
+    mark = {"interference": len(steps)}
+    steps.append({"command": "inspect.interference", "params": {"budget_s": budget_s, "exclude_pairs": exclusions(names)}})
+    mark["measure"] = len(steps)
+    steps.append({"command": "inspect.measure", "params": {"summary": True}})
+    steps.append({"command": "parameters.change", "params": {"changes": {"gasket_squeeze": f"{TOUCH_SQUEEZE} mm"}}})
+    mark["touch"] = len(steps)
+    steps.append({"command": "inspect.interference", "params": {"budget_s": 120, "bodies": sorted({b for p in TOUCHES for b in p})}})
+    steps.append({"command": "parameters.change", "params": {"changes": {"gasket_squeeze": "0 mm"}}})
+    steps.append({"command": "file.save", "params": {"path": str(save), "cache": False}})
+    return {"commands": steps, "mark": mark}
 
 
 def run(cli: str | None = None) -> dict:
-    """Build the check design and return {interference, measure} (the run's results)."""
+    """Build the check design and return {inserted, interference, measure, touch} (the run's results)."""
     cli = cli or encbuild.cli_path()
     encbuild.BUILD_DIR.mkdir(parents=True, exist_ok=True)
+    sc = check_script()
     script = encbuild.BUILD_DIR / "airq-check.json"
-    script.write_text(json.dumps(check_script(), indent=1), encoding="utf-8")
+    script.write_text(json.dumps({"commands": sc["commands"]}, indent=1), encoding="utf-8")
     out = encbuild.BUILD_DIR / "airq-check.results.json"
     out.unlink(missing_ok=True)
     proc = subprocess.run([cli, "run", str(script), "--in", str(ENCLOSURE / airq.OUTPUT), "--results", "--quiet",
@@ -87,40 +263,92 @@ def run(cli: str | None = None) -> dict:
     res = json.loads(out.read_text(encoding="utf-8")) if out.exists() else None
     if proc.returncode != 0 or not isinstance(res, list):
         raise RuntimeError(f"check run failed: {res if isinstance(res, dict) else proc.stderr or proc.stdout}")
-    return {"inserted": res[:6], "interference": res[6], "measure": res[7]}
+    m = sc["mark"]
+    return {"inserted": res[:6], "interference": res[m["interference"]], "measure": res[m["measure"]],
+            "touch": res[m["touch"]]}
 
+
+def sections(measure: dict) -> dict:
+    """Each air probe's section (mm2) from its measured box: the face named in AIR (the ring's is
+    its circle, pi d^2 / 4 from its measured width)."""
+    boxes = {b["name"]: b["bbox"] for b in measure["bodies"]}
+    out = {}
+    for name, (_, _, face) in AIR.items():
+        lo, hi = boxes[name]["min"], boxes[name]["max"]
+        dx, dy, dz = (hi[i] - lo[i] for i in range(3))
+        if name == "air_outlet_ring":
+            out[name] = math.pi * dx * dx / 4
+        else:
+            out[name] = {"x": dy * dz, "y": dx * dz, "z": dx * dy}[face]
+    return out
+
+
+BRANCHES = {   # plenum branch -> (its probes, the x it is cut at)
+    "between the ring and H1": (("air_outlet_mid", "air_outlet_mid_top"), "outlet_x + ring_od / 2 + 0.5"),
+    "at H1": (("air_outlet_h1", "air_outlet_h1_top"), "h1_x - standoff_d / 2"),
+    "right of H1": (("air_outlet_right",), "h1_x + standoff_d / 2 + 0.3"),
+}
+
+
+def branch_need(s, x_expr: str, port: float = 330.1) -> float:
+    """The outlet port area a plenum branch serves: the port's area times the share of the outlet
+    grille's open area to the right of x (the grille's slots are alike, so the share is their count)."""
+    v = s.v
+    x = v(x_expr)
+    x0, pitch, n = v("out_gx0"), v("out_pitch"), int(v("out_n"))
+    right = sum(1 for i in range(n) if x0 + i * pitch >= x)
+    return port * right / n
+
+
+def branches(s, measured: dict) -> dict:
+    """{branch: (section measured, area it serves)} for the outlet plenum (R25)."""
+    return {name: (sum(measured[p] for p in probes), branch_need(s, x)) for name, (probes, x) in BRANCHES.items()}
+
+
+def touch_volumes(touch: dict) -> dict:
+    """{(a, b): overlap volume} for TOUCHES at gasket_squeeze = TOUCH_SQUEEZE."""
+    got = {frozenset((p["a"], p["b"])): p["volume_mm3"] for p in touch["interferences"]}
+    return {pair: got.get(frozenset(pair), 0.0) for pair in TOUCHES}
+
+
+# --- distances the layout answers (arithmetic from the parameters and the boards' sources) ---------
 
 def _box_gap(a, b) -> float:
     return math.sqrt(sum(max(0.0, lo2 - hi1, lo1 - hi2) ** 2 for (lo1, hi1), (lo2, hi2) in zip(a, b)))
 
 
 def distances(s=None) -> dict:
-    """The distances 3a's placements answer, from the design's values and interface.yaml."""
+    """The distances 3a's placements answer, from the design's values, interface.yaml and
+    layout.yaml (U2: its footprint's courtyard)."""
     s = s or airq.build()
     v = s.v
-    m = mechanical("main")
+    m = B.MAIN
     x0, y_front, z_top = v("board_x0"), v("board_y0"), v("board_z0") + v("board_t")
     dev = lambda X, Y: (x0 + X, y_front + v("board_d") - Y)       # noqa: E731  layout (X, Y) -> device (x, y)
     mod = m["antenna"]["module_body"]
-    ant = ((x0 + mod[0][0], x0 + mod[1][0]), tuple(sorted((dev(0, 0)[1], dev(0, mod[0][1])[1]))), (z_top, z_top + 3.1))
-    u3 = ((x0 + mod[0][0], x0 + mod[1][0]), tuple(sorted((dev(0, mod[0][1])[1], dev(0, mod[1][1])[1]))), (z_top, z_top + 3.1))
-    u2x, u2y = dev(24.6, 3.4)
-    u2 = ((u2x - 1.5, u2x + 1.5), (u2y - 1.5, u2y + 1.5), (z_top, z_top + 1.0))       # TPS562201 SOT-23-6, about 3 x 3
-    sen = ((v("sen_x0"), v("sen_x0") + v("sen_l")), (v("sen_y0"), v("sen_y0") + v("sen_d")), (v("floor_t") + v("foam"), v("sen_top")))
+    mh = B.module_h()
+    ant = ((x0 + mod[0][0], x0 + mod[1][0]), tuple(sorted((dev(0, 0)[1], dev(0, mod[0][1])[1]))), (z_top, z_top + mh))
+    u3 = ((x0 + mod[0][0], x0 + mod[1][0]), tuple(sorted((dev(0, mod[0][1])[1], dev(0, mod[1][1])[1]))), (z_top, z_top + mh))
+    (ux0, uy0), (ux1, uy1) = B.layout_part("U2")["box"]
+    u2 = ((x0 + ux0, x0 + ux1), tuple(sorted((dev(0, uy0)[1], dev(0, uy1)[1]))), (z_top, z_top + m["max_part_height"]))
+    sen = ((v("sen_x0"), v("sen_x1")), (v("sen_y0"), v("sen_y1")), (v("floor_t") + v("foam"), v("sen_top")))
     tx1, ty0, tz0 = v("tongue_x1"), v("tongue_y0"), v("tongue_z0")
-    tongue = ((tx1 - v("tongue_w"), tx1), (ty0, ty0 + v("tongue_dp")), (tz0, tz0 + v("tongue_t") + 3.0))
+    tongue = ((tx1 - v("tongue_w"), tx1), (ty0, ty0 + v("tongue_dp")), (tz0, tz0 + v("tongue_t") + v("tongue_parts_h")))
     usb_x = v("usb_x")
-    plug = ((usb_x - 6.25, usb_x + 6.25), (dev(0, 0)[1], v("D") + 20.0), (v("usb_z") - 3.5, v("usb_z") + 3.5))   # 12.5 x 7 overmold out the rear
+    plug = ((usb_x - 6.25, usb_x + 6.25), (dev(0, 0)[1], v("D") + 20.0), (v("usb_z") - 3.5, v("usb_z") + 3.5))   # 12.5 x 7 overmold out the rear (typical, to confirm)
     r = v("boss_d") / 2
-    bosses = [((x - r, x + r), (y - r, y + r), (v("floor_t") - v("head_depth"), v("floor_t") + v("boss_h")))
-              for x, y in ((-v("inner_x") + r - 0.5, v("wall") + 3.0), (v("inner_x") - r + 0.5, v("wall") + 3.0))]
-    rz = v("H") - v("wall") - r + 0.5           # the rear boss, screwed from the rear
-    bosses.append(((-v("inner_x") + r - 0.5 - r, -v("inner_x") + r - 0.5 + r), (v("D") - v("wall") - 6.2, v("D")),
-                   (rz - r, rz + r)))
-    sfa = ((v("sfa_x0"), v("sfa_x0") + 25.4), (v("sfa_y0"), v("sfa_y0") + 4.5), (v("sfa_z0"), v("sfa_z0") + 25.4))
+    bosses = [((x - r, x + r), (v("boss_y") - r, v("boss_y") + r), (v("floor_t") - v("head_depth"), v("floor_t") + v("boss_h")))
+              for x in (-v("boss_x"), v("boss_x"))]
+    rx, rz = v("rear_boss_x"), v("rear_boss_z")
+    bosses.append(((rx - r, rx + r), (v("D") - v("wall") - v("clr_remove") - v("rear_boss_len"), v("D")), (rz - r, rz + r)))
+    sfa = ((v("sfa_x0"), v("sfa_x0") + v("sfa_w")), (v("sfa_y0"), v("sfa_y0") + v("sfa_w")),
+           (v("floor_t"), v("floor_t") + v("sfa_bt") + v("sfa_parts")))
     h1 = (v("h1_x"), v("h1_y"))
-    j1 = ((usb_x - 8.94 / 2, usb_x + 8.94 / 2), tuple(sorted((dev(0, 0)[1], dev(0, 7.35)[1]))))
+    usb_len = B.usb_len()
+    j1 = ((usb_x - v("usb_sw") / 2, usb_x + v("usb_sw") / 2), tuple(sorted((dev(0, 0)[1], dev(0, usb_len)[1]))))
     h1_to_j1_edge = math.hypot(max(0.0, j1[0][0] - h1[0], h1[0] - j1[0][1]), max(0.0, j1[1][0] - h1[1], h1[1] - j1[1][1]))
+    slots = [(v(f"cy0 + 0.6 + {i} * hg_pitch"), v(f"min(zw_z0, max(ledge_z0, lip + ((cy0 + 0.6 + {i} * hg_pitch) * cos_t - zw_tf - zone_t) / sin_t)) - hg_margin"))
+             for i in range(5)]
     return {
         "antenna_to_sen66": _box_gap(ant, sen),
         "antenna_to_usb_plug": _box_gap(ant, plug),
@@ -131,24 +359,42 @@ def distances(s=None) -> dict:
         "tongue_to_u3": _box_gap(tongue, u3),
         "tongue_to_u2": _box_gap(tongue, u2),
         "h1_to_usb_c_shell": h1_to_j1_edge,
-        "h1_to_usb_c_centre": math.hypot(h1[0] - usb_x, h1[1] - dev(0, 7.35 / 2)[1]),
+        "h1_to_usb_c_centre": math.hypot(h1[0] - usb_x, h1[1] - dev(0, usb_len / 2)[1]),
+        "h1_free_above_plenum": v("board_z0") - v("zw_z0"),
         "antenna_end_to_rear_wall": (v("D") - v("wall")) - dev(0, mod[0][1])[1],
-        "hcho_grille_open_mm2": 4 * v("slot_w") * v("hcho_slot_h"),
-        "hcho_grille_lower_edge_z": v("grille_min_z") + 1.0,
+        "hcho_grille_open_mm2": sum(v("slot_w") * (top - v("grille_min_z")) for _, top in slots),
+        "hcho_grille_lower_edge_z": v("grille_min_z"),
+        "outlet_grille_open_mm2": v("out_n") * v("slot_w") * (v("out_gz1") - v("out_gz0")),
+        "outlet_grille_lower_edge_z": v("out_gz0"),
+        "intake_open_mm2": intake_open(s),
+        "intake_to_outlet_grille": v("D") - v("wall"),       # lip's outer face to the rear wall's: different faces
     }
 
 
+def intake_open(s) -> float:
+    """Open area of the two intake rows (1.2 slots, slot_bar bars) between row_x0 and row_x1 with
+    the light-sensor window's gap: each span holds slots end to end with bars between."""
+    v = s.v
+    spans = [(v("row_x0"), v("lsw_gap_x0")), (v("lsw_gap_x1"), v("row_x1"))]
+    per_row = 0.0
+    for a, b in spans:
+        n = max(1, math.floor((b - a + v("slot_bar")) / 10.0))        # slots about 8.8-10 mm long
+        per_row += (b - a) - (n - 1) * v("slot_bar")
+    return 2 * per_row * v("slot_w")
+
+
 def insertion_probe(s=None) -> list[str]:
-    """I1: the shell is lowered onto the assembled base along -z (R24). Everything of the shell
-    below the zone wall's top must pass the zone wall through a notch, and no part of the shell
-    may pass through the board's footprint below the board's top. Returns the conflicts (none
-    when it assembles). The rear boss sits above the board's parts and left of the board."""
+    """I1, arithmetic: the shell is lowered onto the assembled base along -z (R24). Each front
+    floor boss must pass the zone wall's notch and stay out of the board's footprint; the rear
+    boss stays above and left of the board. The geometric sweep is in the check design
+    (`sweeps`). Returns the conflicts (none when it assembles)."""
     s = s or airq.build()
     v = s.v
     out = []
     r = v("boss_d") / 2
     board = ((v("board_x0"), v("board_x0") + v("board_w")), (v("board_y0"), v("board_y0") + v("board_d") + v("antenna_out")))
-    for i, (x, y) in enumerate(((-v("inner_x") + r - 0.5, v("wall") + 3.0), (v("inner_x") - r + 0.5, v("wall") + 3.0)), 1):
+    for i, x in enumerate((-v("boss_x"), v("boss_x")), 1):
+        y = v("boss_y")
         notch = s.commands[[c["params"].get("name") for c in s.commands].index(f"Zone wall boss notch {i}")]["params"]
         nx0, ny0 = v(notch["corner"][0]), v(notch["corner"][1])
         nx1, ny1 = nx0 + v(notch["length"]), ny0 + v(notch["width"])
@@ -156,8 +402,8 @@ def insertion_probe(s=None) -> list[str]:
             out.append(f"floor boss {i} does not pass the zone wall's notch")
         if board[0][0] < x + r and x - r < board[0][1] and board[1][0] < y + r and y - r < board[1][1]:
             out.append(f"floor boss {i} passes through the board's footprint")
-    rx, rz = -v("inner_x") + r - 0.5, v("H") - v("wall") - r + 0.5
-    if rx + r > board[0][0] and rz - r < v("board_z0") + v("board_t") + 4.25:
+    rx, rz = v("rear_boss_x"), v("rear_boss_z")
+    if rx + r > board[0][0] and rz - r < v("board_z0") + v("board_t") + B.MAIN["max_part_height"]:
         out.append("rear boss passes the board")
     return out
 
@@ -170,8 +416,11 @@ if __name__ == "__main__":
         r = run()
         i = r["interference"]
         print("interference: count", i["count"], "checked", i["checked"], "unchecked", len(i["unchecked"]),
-              "pairs", i["pairs_candidate"], i["pairs_intersected"])
-        for pair in i["interferences"][:30]:
+              "pairs", i["pairs_candidate"], i["pairs_intersected"], "excluded", i["pairs_excluded"])
+        for pair in i["interferences"][:40]:
             print("  ", pair["a"], "|", pair["b"], round(pair["volume_mm3"], 3), [round(c, 2) for c in pair["center"]])
         for u in i["unchecked"][:10]:
             print("  unchecked", u)
+        print("sections:", {k: round(x, 1) for k, x in sections(r["measure"]).items()})
+        print("outlet branches (section, serves):", {k: (round(a, 1), round(b, 1)) for k, (a, b) in branches(airq.build(), sections(r["measure"])).items()})
+        print("touch at squeeze", TOUCH_SQUEEZE, ":", {f"{a}|{b}": round(x, 3) for (a, b), x in touch_volumes(r["touch"]).items()})

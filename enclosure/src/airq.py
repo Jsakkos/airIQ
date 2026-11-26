@@ -1,35 +1,45 @@
-"""airq: the airQ enclosure (Plan 3 Task 3a, ruling R22): body and internals.
+"""airq: the airQ enclosure (Plan 3 Task 3a, rulings R22, R24-R29): body and internals.
 
-Layout: enclosure/README.md "Layout studies", from `layout_study` with R22's front.
-- The envelope is 95 x 55 x 51.
-- A 15 mm vertical lower lip carries the intake slots, with the 30 deg screen face above it.
+Layout: enclosure/README.md "Layout studies" and "airQ enclosure".
+- The envelope is 95 x 55 x 51: a 15 mm vertical lower lip carries the intake slots, with the
+  30 deg screen face above it.
 - The board lies horizontal above the standing SEN66, with the zone wall between.
-Shared construction: `enclosure_common` (Task 4 reuses it).
+Shared construction: `enclosure_common` (Task 4 reuses it). Board positions: `board_sources` (R27).
+
+SEN66 pose (fix round 1 part B, a judgement call recorded in the README): the port face looks
+to the REAR and the inlet end is on the user's right. R17 holds (port face vertical, long axis
+along x).
+- Outlet: it blows straight back through a TPU ring (`gasket_out`, seated in the plenum plate)
+  into the outlet plenum, a box of the base behind the module, and out of the outlet grille in
+  the lower rear wall. The plate is the baffle in front of the grille.
+- Inlets: they draw from the sensor zone, which is the intake plenum. The intake slots in the
+  lower front lip feed it, and nothing else opens into it. A TPU strip (`gasket_in`) on the port
+  face between the inlets and the outlet ring separates the port groups.
+- The ports-forward pose cannot keep R25's outlet path: the sensor zone in front of the module
+  is under the zone wall's slant, at most about 300 mm2 in section against the 330.1 the outlet
+  needs, and the module cannot move back past H1.
 
 Bodies:
-- printed: shell, base_plate (the floor and the rear wall, with the board standoffs), zone_wall,
-  sen66_cradle, sen66_end_stop, outlet_duct and baffle (the outlet duct's walls), hcho_pocket (its
-  grille is in the rear wall), tongue_mount;
-- TPU: gasket_in, gasket_out;
+- printed: shell; base_plate (floor, lip, rear wall, side rails, boss pockets, standoffs with
+  collars, the outlet plenum's plate and rib, the SEN66 cradle, the HCHO pocket's walls, chimney
+  and grille, the SFA40's pins); zone_wall; hcho_lid (closes the HCHO pocket; the tongue lies on
+  it, on its locating pin: the tongue mount);
+- TPU 95A: gasket_out, gasket_in, zone_seal, grommet_zone, grommet_j4, grommet_tongue;
 - foam: sen66_foam.
 
 Every position Task 3b needs is a named parameter here, even where 3a does not cut the feature.
-These are the window, the LED slot and light guide, the adapter, the FFC route and service loop,
-the dot and flexure on SW1's axis, the light-sensor window, the grilles and the USB-C opening.
-
-The SEN66 stands with its port face forward and its inlet end on the user's left. Seen from the
-front, that puts the square inlet high and the round inlet low (a proper rotation of
-ref_sen66's frame). The intake plenum lies in front of the inlets (left) and under the zone
-wall's ledge across the lip. The outlet blows forward into the outlet ring, runs right in a
-layer in front of the module, back along its right end, and into the rear plenum behind the
-rear grille (the baffle's walls).
 """
 from __future__ import annotations
 
 from dataclasses import replace
 
+import board_sources as B
 import enclosure_common as C
 import layout_study as L
+import ref_epd
+import ref_fpc_adapter
+import ref_sen66
+import ref_sfa40
 from sclib import Script
 
 DESIGN = "airq"
@@ -46,6 +56,11 @@ def build() -> Script:
     p = s.param
     C.add_envelope(s, m)
     r = L._refs()
+    sen = ref_sen66.build().v
+    sfa = ref_sfa40.build().v
+    epd = ref_epd.build().v
+    ad = ref_fpc_adapter.build().v
+    main = B.MAIN
 
     # --- front face (Task 3b cuts these; 3a fixes them) ----------------------------------
     p("bezel", m.bezel, f"window lip in front of the panel ({C.LS})")
@@ -53,8 +68,10 @@ def build() -> Script:
     p("panel_w", r["panel_w"], "panel width, up the slope (ref_epd)")
     p("panel_t", r["panel_t"], "panel thickness (ref_epd, R16)")
     p("block_out", r["block_out"], "hatched block past the tail end (ref_epd; to confirm)")
+    p("va_far", r["va_far"], "view area to the panel's far end (ref_epd va_far)")
+    p("va_w", r["va_w"], "view area length (ref_epd va_w)")
     p("guide_t", m.guide_t, f"light guide thickness between the LED faces and the panel ({C.LS}, R20)")
-    p("slot_bar", 1.2, "bar between the two intake slot rows on the lip")
+    p("slot_bar", 1.2, "bar between the two intake slot rows on the lip, and between slots in a row")
     p("slot_row1_z", "grille_min_z", "intake slots, lower row bottom: the 10 mm line (on the lip)")
     p("slot_row2_z", "slot_row1_z + slot_w + slot_bar", "intake slots, upper row bottom (its top under the zone wall's ledge)")
     p("led_f0", 16.2, "LED slot lower edge, along the front (f): its inner edge above the ledge")
@@ -62,106 +79,318 @@ def build() -> Script:
     p("led_len", 30.0, "LED line length (plan)")
     p("panel_s0", "led_f0 + led_h_slot + 1.4 - lip", "panel's lower edge, up the slope from the crease (1.2 face + 0.2 pocket)")
     p("panel_x0", "-inner_x + clr_remove + block_out", "panel's tail end (user's left), the hatched block at the wall")
-    p("window_xc", "panel_x0 + panel_l - 2.70 - 67.50 / 2", "view-area centre x (ref_epd va_far, va_w): the LED line centres on it")
+    p("window_xc", "panel_x0 + panel_l - va_far - va_w / 2", "view-area centre x: the LED line centres on it")
 
-    # --- SEN66, zone wall, board ------------------------------------------------------------
-    C.add_sen66(s, m, "-inner_x + clr_remove", 20.0,
-                "; 1.8 behind the study's 18.2 so the high square inlet keeps a 3.4 mm path under the zone wall")
-    p("outlet_d", 20.5, "SEN66 outlet diameter (ref_sen66)")
-    p("outlet_x", "sen_x0 + 42.4", "outlet centre x (ref_sen66 outlet_x, inlet end left)")
-    p("outlet_z", "sen_top - 12.8", "outlet centre z (ref_sen66 outlet_y, module y down)")
+    # --- SEN66, zone wall, board, bosses ---------------------------------------------------
+    C.add_sen66(s, m)
     C.add_zone_and_board(s, m, "bezel + panel_t + clr_remove + guide_t + clr_remove",
                          "inner_x - board_clr - board_w")
     C.add_standoffs(s)
+    C.add_bosses(s)
+    p("sen_x0", "-tub_x + clr_remove", "SEN66 outlet end (left), beside the left rail")
+    p("sen_x1", "sen_x0 + sen_l", "SEN66 inlet end (right)")
+    p("sen_y0", f"{C.yb('sen_top')} + clr_remove",
+      "SEN66 connector face (front): its top front edge clr_remove behind the zone wall's slant")
+    p("sen_y1", "sen_y0 + sen_d", "SEN66 port face (rear)")
+    # ports from ref_sen66 (datasheet Fig. 8), module x from the inlet end, module y from the
+    # square-inlet edge; turned so x -> -x (inlet end right), y -> -z (square inlet high)
+    p("sen_out_x", sen("outlet_x"), "outlet centre from the inlet end (ref_sen66 outlet_x)")
+    p("sen_out_y", sen("outlet_y"), "outlet centre from the square-inlet edge (ref_sen66 outlet_y)")
+    p("outlet_d", sen("outlet_d"), "SEN66 outlet diameter (ref_sen66)")
+    p("sen_sq_x0", sen("inlet_sq_x0"), "square inlet from the inlet end (ref_sen66)")
+    p("sen_sq_x1", sen("inlet_sq_x1"), "square inlet to (ref_sen66)")
+    p("sen_rd_x", sen("inlet_rd_x"), "round inlet centre from the inlet end (ref_sen66)")
+    p("sen_rd_d", sen("inlet_rd_d"), "round inlet diameter (ref_sen66)")
+    p("outlet_x", "sen_x1 - sen_out_x", "derived: outlet centre x")
+    p("outlet_z", "sen_top - sen_out_y", "derived: outlet centre z")
+    p("inlet_x0", "min(sen_x1 - sen_sq_x1, sen_x1 - sen_rd_x - sen_rd_d / 2)", "derived: the inlets' left edge")
+    p("sen_plug_x0", 17.0, "SEN66 connector on its connector face, from the inlet end: scaled from datasheet Fig. 9 (README Frames); to confirm")
+    p("sen_plug_x1", 29.0, "SEN66 connector to (scaled, to confirm)")
+    p("plug_x0", "sen_x1 - sen_plug_x1", "derived: SEN66 plug's left edge (world)")
+    p("plug_x1", "sen_x1 - sen_plug_x0", "derived: SEN66 plug's right edge (world)")
 
-    # --- face positions on SW1, the LEDs, J7, the tongue (Task 3b) ---------------------------
-    p("sw_x", "board_x0 + 57.0", "SW1 actuator x (interface.yaml button): the dot and flexure axis")
-    p("sw_z", "board_z0 + board_t + 1.7", "SW1 actuator centre z (interface.yaml button)")
+    # --- outlet plenum and the port gaskets (I3, R25) -------------------------------------
+    p("port_gap", 3.0, "port face to the plenum plate: the inlets' air path (R25: 3.0 x 26.9 = 80.7 >= 77.3)")
+    p("plate_y0", "sen_y1 + port_gap", "derived: plenum plate front face (the baffle in front of the outlet grille)")
+    p("plate_y1", "plate_y0 + iwall", "derived: plenum plate back face; the plenum runs from here to the rear wall")
+    p("seat_d", 1.0, "gasket seat depth: the TPU gaskets sit this deep in grooves in the plate and the floor")
+    p("gasket_squeeze", 0.3, "TPU gasket squeeze as printed (R9: the check design sets 0, so the faces touch)")
+    p("ring_w", 1.5, "outlet ring wall (gasket_out)")
+    p("ring_clr", 0.25, "outlet ring bore over the port's edge")
+    p("ring_bore", "outlet_d + 2 * ring_clr", "derived: outlet ring bore (R25: its area is the outlet path's narrowest)")
+    p("ring_od", "ring_bore + 2 * ring_w", "derived: outlet ring outside diameter")
+    p("seal_w", 1.6, "inlet seal strip width (gasket_in)")
+    p("seal_x0", "inlet_x0 - 1.0 - seal_w", "derived: inlet seal strip, 1 mm left of the inlets (H1 is left of it)")
+
+    # --- tongue, HCHO pocket (M4, R26, I2) ------------------------------------------------
+    hole = B.TONGUE["mounting_hole"]
+    veml = B.TONGUE["veml7700"]["window_center"]
+    p("tongue_w", B.TONGUE["outline"][0], "tongue width (interface.yaml)")
+    p("tongue_dp", B.TONGUE["outline"][1], "tongue depth (interface.yaml)")
+    p("tongue_t", B.TONGUE["thickness"], "tongue thickness (interface.yaml)")
+    p("tongue_parts_h", B.TONGUE["max_part_height"], "tongue's tallest part (interface.yaml)")
+    p("tongue_hole_x", hole["center"][0], "tongue hole X (interface.yaml)")
+    p("tongue_hole_y", hole["center"][1], "tongue hole Y (interface.yaml)")
+    p("tongue_hole_d", hole["diameter"], "tongue hole diameter (interface.yaml)")
+    p("veml_x", veml[0], "VEML7700 window centre X on the tongue (interface.yaml)")
+    p("veml_z", veml[2], "VEML7700 window centre above the tongue's top face (interface.yaml)")
+    p("sfa_w", sfa("board_w"), "SFA40 breakout width (ref_sfa40)")
+    p("sfa_bt", sfa("board_t"), "SFA40 board thickness (ref_sfa40)")
+    p("sfa_cap", sfa("sensor_top"), "SFA40 cap top above the board's bottom: the opening (ref_sfa40)")
+    p("sfa_parts", sfa("qwiic_h"), "SFA40 tallest part above the board, its Qwiic connectors (ref_sfa40)")
+    p("sfa_hole_in", sfa("hole_in"), "SFA40 holes from the edges (ref_sfa40)")
+    p("sfa_hole_d", sfa("hole_d"), "SFA40 hole diameter (ref_sfa40)")
+    p("hx0", "sen_x1 + clr_align + iwall", "derived: HCHO pocket's interior left (its left wall is the SEN66's right end stop)")
+    p("sfa_x0", "hx0 + clr_align", "SFA40's left edge: it lies flat at the front right, opening up")
+    p("shelf_w", 0.8, "ledge the lid rests on along the wall that rises past it (a lap), outside the SFA40 so it drops in")
+    p("hx1", "sfa_x0 + sfa_w + clr_align + shelf_w", "derived: HCHO pocket's interior right")
+    p("sfa_y0", "bp_y1 + clr_align", "SFA40's front edge, behind the right boss pocket (its J2 Qwiic at the front, J1 at the rear; the rear plug has hy1 - sfa_y0 - sfa_w, about 3.0, to confirm)")
+    p("hy1", "sen_y1 - iwall", "derived: HCHO pocket's interior rear (the rear wall ends at the port face's plane, clear of the inlets' path)")
+    p("hcho_air", 1.4, "air over the SFA40's cap under the lid (R25 HCHO path: 25.4 x 1.4 = 35.6 >= 27.4)")
+    p("lid_z0", "floor_t + sfa_cap + hcho_air", "derived: HCHO lid underside")
+    p("lid_t", 1.2, "HCHO lid thickness")
+    p("cx0", "hx1 + iwall", "derived: HCHO chimney's interior left (right of the pocket, in front of H2)")
+    p("cy0", "bp_y1", "derived: chimney front: the right boss pocket's back wall")
+    p("cy1", "h2_y - standoff_d / 2 - clr_align", "derived: chimney rear: in front of H2")
+    p("hg_pitch", 2.4, "HCHO grille slot pitch: 1.2 slots, 1.2 bars (R26 higher open fraction)")
+    p("hg_margin", 1.2, "HCHO grille slots stop this far under the zone wall")
+    p("tongue_gap", 4.6, "air between the lip and the tongue's front edge: the slots in front of it stay open (M4)")
+    p("tongue_x1", "hx1 - 5.0", "tongue's right end (it lies turned 180 deg): room right of it for the air in front of it")
+    p("tongue_y0", "wall + tongue_gap", "tongue's front edge (VEML7700 window toward the lip)")
+    p("tongue_z0", "lid_z0 + lid_t", "tongue's bottom, on the HCHO lid")
+
+    # --- face positions on SW1, the LEDs, J7, USB-C, the tongue, the adapter (Task 3b) -------
+    btn, usb, fpc = main["button"], main["usb_c"], main["fpc"]
+    j7_w, _, _ = B.j7_body()
+    p("sw_cx", btn["actuator_center_x"], "SW1 actuator x on the board (interface.yaml button)")
+    p("sw_cz", btn["actuator_center_z"], "SW1 actuator centre above the board (interface.yaml button)")
+    p("sw_x", "board_x0 + sw_cx", "SW1 actuator x: the dot and flexure axis")
+    p("sw_z", "board_z0 + board_t + sw_cz", "SW1 actuator centre z")
     p("dot_f", "lip + (sw_z - lip) / cos_t", "dot centre along the front (f), on SW1's horizontal push axis")
     p("dot_d", 4.0, "orange dot diameter (top right, right of the panel pocket)")
-    p("led_z", "board_z0 + board_t + 1.0", "LED light centre z (interface.yaml leds light_center_z)")
-    p("j7_x0", "board_x0 + 28.8 - 7.75", "J7 mouth left end (interface.yaml fpc)")
-    p("j7_x1", "board_x0 + 28.8 + 7.75", "J7 mouth right end")
-    p("usb_x", "board_x0 + 16.2", "USB-C centre x (interface.yaml usb_c)")
-    p("usb_z", "board_z0 + board_t + 3.16 / 2", "USB-C centre z")
+    p("led_cz", main["leds"]["light_center_z"], "LED light centre above the board (interface.yaml leds)")
+    p("led_z", "board_z0 + board_t + led_cz", "LED light centre z")
+    p("j7_cx", fpc["center_x"], "J7 centre on the board (interface.yaml fpc)")
+    p("j7_w", j7_w, "J7 body width (interface.yaml fpc comment, board_sources)")
+    p("j7_x0", "board_x0 + j7_cx - j7_w / 2", "J7 mouth left end")
+    p("j7_x1", "board_x0 + j7_cx + j7_w / 2", "J7 mouth right end")
+    p("usb_cx", usb["center_x"], "USB-C centre on the board (interface.yaml usb_c)")
+    p("usb_sw", usb["shell"][0], "USB-C shell width (interface.yaml usb_c)")
+    p("usb_sh", usb["shell"][1], "USB-C shell height (interface.yaml usb_c)")
+    p("usb_x", "board_x0 + usb_cx", "USB-C centre x")
+    p("usb_z", "board_z0 + board_t + usb_sh / 2", "USB-C centre z")
     p("usb_well", "D - wall - (board_y0 + board_d)", "USB-C mouth inside the rear wall's inner face: the plug's well depth")
     p("usb_chamfer", 0.5, "USB-C opening chamfer (plan)")
-    p("adapter_x", "panel_x0 + 10.0", "FPC adapter centre x: its tail ZIF takes the folded tail's stiffened end")
-    p("adapter_s", "panel_s0 + 17.75", "FPC adapter centre up the slope: on the tail's centre line (ref_epd)")
-    p("adapter_t", "bezel + panel_t + 1.55 + 0.2 + 3.0", "FPC adapter bottom face depth (folded tail 1.55, adapter 3.0)")
+    p("tail_off", epd("tail_offset"), "panel tail centre off the short end's centre (ref_epd)")
+    p("fold_end", epd("fold_low") - epd("fold_out"), "folded tail's stiffened end from the panel's tail end (ref_epd fold_low - fold_out)")
+    p("tail_fold_d", epd("tail_t") + epd("contact_t") - epd("fold_z"), "folded tail's depth behind the panel (ref_epd)")
+    p("ad_l", ad("pcb_l"), "FPC adapter length along its signal path (ref_fpc_adapter; placeholder)")
+    p("ad_h", ad("pcb_t") + ad("zif_h"), "FPC adapter height (ref_fpc_adapter pcb_t + zif_h; placeholder)")
+    p("adapter_x", "panel_x0 + fold_end + ad_l / 2", "FPC adapter centre x: its tail ZIF at the folded tail's stiffened end")
+    p("adapter_s", "panel_s0 + panel_w / 2 - tail_off", "FPC adapter centre up the slope: on the tail's centre line")
+    p("adapter_t", "bezel + panel_t + tail_fold_d + 0.2 + ad_h", "FPC adapter's back face depth (folded tail, 0.2 air, the adapter)")
     p("ffc_len", 100.0, "FFC length: route about 45 (adapter to J7) + service loop about 50 to open the shell beside the base; a standard length")
-
-    # --- tongue, HCHO pocket, ducts ----------------------------------------------------------
-    p("baffle_x0", "outlet_x - 13.9", "outlet layer's left wall: right of the intake plenum, left of the outlet ring")
-    p("duct_d", 4.0, "outlet layer depth between its front wall and the outlet ring")
-    p("sfa_x0", "-inner_x + clr_remove + 1.5", "SFA40 board's left edge (standing, facing the rear wall)")
-    p("sfa_y0", "D - wall - 0.3 - 4.5", "SFA40 board's back face (4.5 deep with its parts)")
-    p("sfa_z0", "floor_t + 0.5", "SFA40 board's lower edge")
-    p("hcho_x1", "sfa_x0 + 25.4 + 5.2", "HCHO pocket's right wall: room for the Qwiic plug at J1")
-
-    # --- bodies -------------------------------------------------------------------------------
-    # fastening (I1): two floor bosses at the front corners (clear of the board's footprint, so the
-    # shell lowers past it) and one rear boss under the top wall at the rear left (69 mm from the
-    # antenna), screwed through the base's rear wall
-    inner = "inner_x - boss_d / 2 + 0.5"
-    floor_bosses = [(f"-({inner})", "wall + 3.0"), (inner, "wall + 3.0")]
-    rear = (f"-({inner})", "H - wall - boss_d / 2 + 0.5")
-    C.shell(s, floor_bosses, rear)
+    p("lsw_x", "tongue_x1 - veml_x", "light-sensor window x: the tongue's VEML7700 window (tongue turned 180 deg)")
+    p("lsw_z", "tongue_z0 + tongue_t + veml_z", "light-sensor window z: the VEML7700 window centre")
+    p("lsw_d", 2.5, "light-sensor window diameter (on the lip, in a gap in the slot rows)")
+    # intake rows (M6): both rows run between the boss pockets, with the window's gap
+    p("row_x0", "-bp_x0 + slot_bar", "intake slot rows' left end (inside the left boss pocket)")
+    p("row_x1", "bp_x0 - slot_bar", "intake slot rows' right end")
+    p("lsw_gap_x0", "lsw_x - lsw_d / 2 - slot_bar", "gap in the slot rows for the light-sensor window: left")
+    p("lsw_gap_x1", "lsw_x + lsw_d / 2 + slot_bar", "gap in the slot rows for the light-sensor window: right")
+    # --- bodies ------------------------------------------------------------------------------
+    C.shell(s)
     C.panel_pocket(s)
-    C.base_plate(s, floor_bosses, rear)
+    hcho_window(s)
+    C.base_plate(s)
+    C.rails(s)
     C.standoffs(s)
-    # HCHO pocket's own grille: vertical slots in the rear wall, in front of the SFA40's opening
-    p("hcho_slot_h", 14.0, "HCHO grille slot length (z)")
-    p("hcho_slot_x", "sfa_x0 + 6.5", "first HCHO grille slot x")
-    for i in range(4):
-        s.box(f"HCHO grille slot {i + 1}", [f"hcho_slot_x + {i} * 3.0", "D - wall - 1", "grille_min_z + 1"],
-              ["slot_w", "wall + 2", "hcho_slot_h"], operation="cut", targets=["base_plate"])
-    C.zone_wall(s, floor_bosses)
-    C.sen66_cradle(s)
-    C.gasket_out(s, "outlet_x", "outlet_z")
-    C.gasket_in(s, "sen_x0", "baffle_x0 - wall")
-    C.tongue_mount(s, "baffle_x0 - wall - 0.2", "wall + 0.4", "floor_t + 7.0")
-    p("lsw_x", "tongue_x1 - 18.35", "light-sensor window x: the tongue's VEML7700 window (interface.yaml; tongue turned 180 deg)")
-    p("lsw_z", "tongue_z0 + tongue_t + 1.95", "light-sensor window z: the VEML7700 window centre (interface.yaml)")
-    p("lsw_d", 2.5, "light-sensor window diameter (on the lip, left of the slots)")
+    plenum(s)
+    cradle(s)
     hcho_pocket(s)
-    baffle(s)
+    C.standoff_pilots(s)
+    C.base_screws(s)
+    C.base_side_clearance(s)
+    base_cuts(s)
+    C.zone_wall(s)
+    pass_through(s)
+    C.zone_seal(s)
+    s.box("SEN66 foam", ["sen_x0", "sen_y0", "floor_t"], ["sen_l", "sen_d", "foam"], body="sen66_foam")
+    gaskets(s)
+    hcho_lid(s)
+    grommets(s)
+    # outlet grille in the lower rear wall (M6, R18, R26): 1.2 slots at a 2.4 pitch from the left
+    p("out_pitch", 2.4, "outlet grille slot pitch (1.2 slots, 1.2 bars: R26 higher open fraction)")
+    p("out_n", 32, "outlet grille slot count: 32 x 1.2 x 17.3 = 664 mm2 >= 660.1 (R18). Whole number", unit="")
+    p("out_gx0", "-tub_x + 2.0", "outlet grille's left end, 2 mm inside the plenum")
+    p("out_gx1", "out_gx0 + out_n * out_pitch - (out_pitch - slot_w)", "derived: outlet grille's right end")
+    p("out_gz0", "grille_min_z", "outlet grille's lower edge (10 mm rule)")
+    p("out_gz1", "zw_z0 - rib_d", "outlet grille's upper edge: under the zone wall's rib seat")
+    # upper-rear exhaust for the electronics zone (M6), kept apart from the outlet grille (R26)
+    p("exh_x0", "usb_x + 8.0", "electronics exhaust left end: right of the USB-C opening")
+    p("exh_x1", "tub_x - 2.0", "electronics exhaust right end")
+    p("exh_z0", "H - wall - clr_remove - 12.0", "electronics exhaust lower edge, high on the rear wall")
+    p("exh_z1", "H - wall - clr_remove - 2.0", "electronics exhaust upper edge")
+
     return s
 
 
-def _slant_z(y: str) -> str:
-    """Height where the zone wall's slanted back face is at depth y."""
-    return f"lip + (({y}) * cos_t - zw_tf - zone_t) / sin_t"
+def plenum(s: Script) -> None:
+    """The outlet plenum, part of base_plate: the plate (the baffle in front of the outlet grille,
+    with the ring's seat and bore) between the side rails, from the floor to the zone wall, which
+    rests on its top edge and on the rear-wall rib. H1 merges with the plate, which braces it."""
+    s.box("Plenum plate", ["-tub_x - 0.5", "plate_y0", "floor_t - 0.5"], ["2 * tub_x + 1", "iwall", "zw_z0 - floor_t + 0.5"],
+          operation="join", targets=["base_plate"])
 
 
-def baffle(s: Script) -> None:
-    """The outlet duct's walls, in two printed pieces.
-    - `outlet_duct`: the front layer's walls. They take the outlet air from the outlet ring,
-      right along the module's front, to its right end, and seal it from the intake plenum (in
-      front and on the left).
-    - `baffle`: the wall in front of the rear outlet grille. With a wall beside the cable bay
-      behind the module, it closes the rear plenum (outlet grille behind a baffle, plan). The air
-      reaches the rear plenum along the module's right end."""
-    fy0, fy1 = "sen_y0 - gasket_t - duct_d - wall", "sen_y0 - gasket_t - duct_d"
-    with s.sketch("Duct front wall profile", "YZ", offset="baffle_x0 - wall") as sk:
-        sk.polyline([(fy0, "floor_t"), (fy1, "floor_t"), (fy1, _slant_z(fy1)), (fy0, _slant_z(fy0))])
-    s.extrude("Duct front wall", "Duct front wall profile", "inner_x - clr_remove - (baffle_x0 - wall)", body="outlet_duct")
-    with s.sketch("Duct left wall profile", "YZ", offset="baffle_x0 - wall") as sk:
-        sk.polyline([(fy1, "floor_t"), ("sen_y0", "floor_t"), ("sen_y0", "zw_z0"),
-                     ("(zw_tf + zone_t + (zw_z0 - lip) * sin_t) / cos_t", "zw_z0"), (fy1, _slant_z(fy1))])
-    s.extrude("Duct left wall", "Duct left wall profile", "wall", operation="join", targets=["outlet_duct"])
-    s.box("Rear plenum front wall", ["hcho_x1", "hcho_y0 - wall", "floor_t"],
-          ["sen_x0 + sen_l + clr_align + rail_t + wall - hcho_x1", "wall", "zw_z0 - floor_t"], body="baffle")
-    s.box("Cable bay right wall", ["sen_x0 + sen_l + clr_align + rail_t", "sen_y0 + sen_d", "floor_t"],
-          ["wall", "hcho_y0 - (sen_y0 + sen_d)", "zw_z0 - floor_t"], operation="join", targets=["baffle"])
+def cradle(s: Script) -> None:
+    """The SEN66 cradle, part of base_plate: front rails on the floor (left and right of its
+    connector's plug), clr_align in front of the module. Its left end lies against the left rail,
+    its right end against the HCHO pocket's left wall, its port face on the gaskets."""
+    p = s.param
+    p("rail_h", 4.0, "cradle rail height above the floor")
+    y = "sen_y0 - clr_align - iwall"
+    s.box("Cradle front rail L", ["sen_x0", y, "floor_t - 0.5"], ["plug_x0 - 1.0 - sen_x0", "iwall", "rail_h + 0.5"],
+          operation="join", targets=["base_plate"])
+    s.box("Cradle front rail R", ["plug_x1 + 1.0", y, "floor_t - 0.5"], ["sen_x1 - plug_x1 - 1.0", "iwall", "rail_h + 0.5"],
+          operation="join", targets=["base_plate"])
 
 
 def hcho_pocket(s: Script) -> None:
-    """`hcho_pocket`: the SFA40's sealed pocket at the rear left, in the sensor zone (airQ only).
-    The SFA40 stands with its opening facing its own grille in the rear wall. The zone wall above,
-    the floor, the left side wall and the rear wall close it."""
-    s.param("hcho_y0", "sfa_y0 - clr_remove", "derived: HCHO pocket's front wall back face")
-    s.box("HCHO pocket front wall", ["-inner_x + clr_remove", "hcho_y0 - wall", "floor_t"],
-          ["hcho_x1 - (-inner_x + clr_remove)", "wall", "zw_z0 - floor_t"], body="hcho_pocket")
-    s.box("HCHO pocket side wall", ["hcho_x1 - wall", "hcho_y0", "floor_t"],
-          ["wall", "D - wall - clr_remove - hcho_y0", "zw_z0 - floor_t"], operation="join", targets=["hcho_pocket"])
+    """The SFA40's sealed pocket at the front right, part of base_plate (R26: off the rear wall,
+    which the outlet grille needs whole). The SFA40 lies flat on pins through its holes, opening
+    up. The lid closes the pocket (laps on the walls' tops, the lip rib and a shelf); the tongue
+    lies on the lid. A chimney in front of H2 takes the air to the HCHO grille, cut in the right
+    rail behind a window in the shell's side wall."""
+    s.box("HCHO pocket left wall", ["sen_x1 + clr_align", "wall - 0.5", "floor_t - 0.5"],
+          ["iwall", "hy1 + iwall - wall + 0.5", "lid_z0 - floor_t + 0.5"], operation="join", targets=["base_plate"])
+    s.box("HCHO pocket rear wall", ["sen_x1 + clr_align", "hy1", "floor_t - 0.5"], ["cx0 - sen_x1 - clr_align", "iwall", "lid_z0 - floor_t + 0.5"],
+          operation="join", targets=["base_plate"])
+    s.box("HCHO lid front rib", ["sen_x1 + clr_align", "wall - 0.5", "lid_z0 - shelf_w"], ["bp_x0 - sen_x1 - clr_align", "shelf_w + 0.5", "shelf_w"],
+          operation="join", targets=["base_plate"])
+    # the chimney's left wall: from the lip to the pocket's rear, up to the zone wall's underside
+    pts = [("bp_y1 - iwall", "floor_t - 0.5"), ("hy1 + iwall", "floor_t - 0.5"), ("hy1 + iwall", "zw_z0"),
+           (C.yb("zw_z0"), "zw_z0"), (C.yb("ledge_z0"), "ledge_z0"), ("bp_y1 - iwall", "ledge_z0")]
+    with s.sketch("HCHO chimney wall profile", "YZ", offset="hx1") as sk:
+        sk.polyline(pts)
+    s.extrude("HCHO chimney wall", "HCHO chimney wall profile", "iwall", operation="join", targets=["base_plate"])
+    # the lid's shelves: along the chimney wall, along the boss pocket's back wall and its inner wall
+    s.box("HCHO lid shelf", ["hx1 - shelf_w", "bp_y1 - 0.5", "lid_z0 - shelf_w"], ["shelf_w + 0.5", "hy1 - bp_y1 + 0.5", "shelf_w"],
+          operation="join", targets=["base_plate"])
+    s.box("HCHO lid shelf back", ["bp_x0 - shelf_w", "bp_y1 - 0.5", "lid_z0 - shelf_w"], ["hx1 - bp_x0 + shelf_w", "shelf_w + 0.5", "shelf_w"],
+          operation="join", targets=["base_plate"])
+    s.box("HCHO lid shelf front", ["bp_x0 - shelf_w", "wall - 0.5", "lid_z0 - shelf_w"], ["shelf_w + 0.5", "bp_y1 - wall + 0.5", "shelf_w"],
+          operation="join", targets=["base_plate"])
+    s.box("HCHO chimney rear wall", ["cx0 - 0.5", "cy1", "floor_t - 0.5"], ["tub_x - cx0 + 1", "iwall", "zw_z0 - floor_t + 0.5"],
+          operation="join", targets=["base_plate"])
+    for i, (dx, dy) in enumerate(((0, 0), (1, 0), (0, 1), (1, 1)), 1):
+        x = f"sfa_x0 + sfa_hole_in + {dx} * (sfa_w - 2 * sfa_hole_in)"
+        y = f"sfa_y0 + sfa_hole_in + {dy} * (sfa_w - 2 * sfa_hole_in)"
+        s.cylinder(f"SFA40 pin {i}", [x, y, "floor_t - 0.5"], "sfa_hole_d - 2 * clr_align", "sfa_bt + 0.5",
+                   operation="join", targets=["base_plate"])
+
+
+def base_cuts(s: Script) -> None:
+    """Cuts in base_plate after every join: the gaskets' seats and the outlet bore, the window from
+    the HCHO pocket into its chimney, and the HCHO grille."""
+    s.cylinder("Outlet ring seat", ["outlet_x", "plate_y0 - 0.5", "outlet_z"], "ring_od + 2 * clr_align", "seat_d + 0.5",
+               axis="Y", operation="cut", targets=["base_plate"])
+    s.cylinder("Outlet bore", ["outlet_x", "plate_y0 - 1", "outlet_z"], "ring_bore", "iwall + 2", axis="Y",
+               operation="cut", targets=["base_plate"])
+    # H1 is braced by the plate; below its pilot hole its back is trimmed to the plate, so the
+    # plenum keeps its section behind it (R25)
+    s.param("h1_trim_z", "board_z0 - pilot_depth - 1.0", "derived: top of H1's trim in the plenum (below its pilot hole)")
+    s.box("H1 plenum trim", ["h1_x - standoff_d / 2 - 0.5", "plate_y1 + 0.6", "floor_t"],
+          ["standoff_d + 1", "h1_y + standoff_d / 2 + 0.5 - plate_y1 - 0.6", "h1_trim_z - floor_t"], operation="cut", targets=["base_plate"])
+    s.box("Inlet seal groove", ["seal_x0 - clr_align", "sen_y1 - 0.5", "floor_t - seat_d"],
+          ["seal_w + 2 * clr_align", "plate_y0 + seat_d - sen_y1 + 0.5", "zw_z0 - floor_t + seat_d + 0.5"],
+          operation="cut", targets=["base_plate"])
+    s.box("HCHO chimney window", ["hx1 - 0.5", "cy0 + 0.8", "floor_t"], ["iwall + 1", "cy1 - cy0 - 1.6", "lid_z0 - shelf_w - floor_t"],
+          operation="cut", targets=["base_plate"])
+    for i in range(5):
+        y = f"cy0 + 0.6 + {i} * hg_pitch"
+        s.box(f"HCHO grille slot {i + 1}", ["tub_x - 0.5", y, "grille_min_z"],
+              ["iwall + 1", "slot_w", f"{C.z_under(y)} - hg_margin - grille_min_z"], operation="cut", targets=["base_plate"])
+
+
+def hcho_window(s: Script) -> None:
+    """The window in the shell's right side wall in front of the HCHO grille (the grille's slots
+    are in the base's right rail behind it). Its lower edge is on the 10 mm line."""
+    top = f"{C.z_under('cy0 + 0.6 + 4 * hg_pitch')} - hg_margin + 0.6"
+    s.box("HCHO window", ["inner_x - 0.5", "cy0", "grille_min_z"], ["wall + 1", "cy1 - cy0", f"{top} - grille_min_z"],
+          operation="cut", targets=["shell"])
+
+
+def pass_through(s: Script) -> None:
+    """The cable pass-through in the zone wall's slant at the left (I2): the SEN66 cable (J2) and
+    the SFA40's Qwiic cable (J4) go up through grommet_zone, left of the adapter and behind the
+    folded tail, to the board's left edge."""
+    p = s.param
+    p("pt_x0", "-tub_x + 0.3", "pass-through left end (inside the left rail)")
+    p("pt_x1", "pt_x0 + 6.3", "pass-through right end (left of the adapter)")
+    p("pt_y0", f"{C.yb('ledge_z0')} + 0.1", "pass-through front, behind the ledge")
+    p("pt_y1", "pt_y0 + 4.4", "pass-through rear")
+    p("pt_z0", "ledge_z0 - 0.3", "grommet's lower face")
+    p("pt_z1", "ledge_z1 + 10.5", "grommet's upper face: the slot passes the whole slant between pt_y0 and pt_y1")
+    s.box("Pass-through", ["pt_x0", "pt_y0", "pt_z0"], ["pt_x1 - pt_x0", "pt_y1 - pt_y0", "pt_z1 - pt_z0"],
+          operation="cut", targets=["zone_wall"])
+
+
+def gaskets(s: Script) -> None:
+    """`gasket_out` (TPU 95A): the outlet ring, from the port face round the outlet into its seat
+    in the plate. `gasket_in` (TPU 95A): the strip on the port face between the inlets and the
+    ring, from its groove in the floor to the zone wall and into its groove in the plate. They
+    separate the port groups (I3). At gasket_squeeze 0 their faces touch the module (R9)."""
+    s.cylinder("Outlet ring", ["outlet_x", "sen_y1 - gasket_squeeze", "outlet_z"], "ring_od",
+               "port_gap + seat_d + gasket_squeeze", axis="Y", body="gasket_out")
+    s.cylinder("Outlet ring bore", ["outlet_x", "sen_y1 - gasket_squeeze - 1", "outlet_z"], "ring_bore",
+               "port_gap + seat_d + gasket_squeeze + 2", axis="Y", operation="cut", targets=["gasket_out"])
+    s.box("Inlet seal", ["seal_x0", "sen_y1 - gasket_squeeze", "floor_t - seat_d"],
+          ["seal_w", "port_gap + seat_d + gasket_squeeze", "zw_z0 - floor_t + seat_d"], body="gasket_in")
+
+
+def hcho_lid(s: Script) -> None:
+    """`hcho_lid`: closes the HCHO pocket and carries the tongue (the tongue mount): it rests on
+    the pocket's walls, the lip rib and the shelf; posts press the SFA40 onto its pins (I2
+    retention); the tongue's pin goes through the tongue's M2 hole."""
+    with s.sketch("HCHO lid outline", "XY", offset="lid_z0") as sk:
+        sk.polyline([("sen_x1 + clr_align", "wall + clr_remove"), ("bp_x0 - clr_remove", "wall + clr_remove"),
+                     ("bp_x0 - clr_remove", "bp_y1 + clr_remove"), ("hx1 - clr_remove", "bp_y1 + clr_remove"),
+                     ("hx1 - clr_remove", "hy1 + iwall"), ("sen_x1 + clr_align", "hy1 + iwall")])
+    s.extrude("HCHO lid", "HCHO lid outline", "lid_t", body="hcho_lid")
+    for i, (dx, dy) in enumerate(((0, 0), (1, 0), (0, 1), (1, 1)), 1):
+        x = f"sfa_x0 + sfa_hole_in + {dx} * (sfa_w - 2 * sfa_hole_in)"
+        y = f"sfa_y0 + sfa_hole_in + {dy} * (sfa_w - 2 * sfa_hole_in)"
+        s.cylinder(f"SFA40 hold-down {i}", [x, y, "floor_t + sfa_bt"], "sfa_hole_d + 1.4", "lid_z0 - floor_t - sfa_bt + 0.5",
+                   operation="join", targets=["hcho_lid"])
+    s.cylinder("Tongue pin", ["tongue_x1 - tongue_hole_x", "tongue_y0 + tongue_hole_y", "lid_z0 + lid_t - 0.5"],
+               "tongue_hole_d - 2 * clr_align", "tongue_t + 1.5", operation="join", targets=["hcho_lid"])
+    s.param("lid_hole_l", 5.0, "lid cable hole length along x (grommet_tongue's size)")
+    s.param("lid_hole_w", 3.0, "lid cable hole width along y")
+    s.box("Lid cable hole", ["sfa_x0 + sfa_w / 2 - lid_hole_l / 2", "hy1 - lid_hole_w - 0.6", "lid_z0 - 0.5"], ["lid_hole_l", "lid_hole_w", "lid_t + 1"],
+          operation="cut", targets=["hcho_lid"])
+
+
+def grommets(s: Script) -> None:
+    """TPU grommets where the cables pass a sealed wall (I2): `grommet_zone` in the zone wall's
+    pass-through (SEN66 cable and the SFA40's Qwiic cable to J4), `grommet_j4` in the HCHO
+    pocket's left wall, `grommet_tongue` in the lid (the SFA40's Qwiic to the tongue). Each fills
+    its opening; its holes take the cables (to confirm against the cables bought)."""
+    p = s.param
+    p("cable_gh_d", 3.0, "SEN66 cable (JST GH, 6 wires) bundle diameter; to confirm")
+    p("cable_qw_d", 2.4, "Qwiic cable diameter; to confirm")
+    s.box("Zone grommet", ["pt_x0", "pt_y0", "pt_z0"], ["pt_x1 - pt_x0", "pt_y1 - pt_y0", "pt_z1 - pt_z0"], body="grommet_zone")
+    s.cylinder("Zone grommet hole GH", ["pt_x0 + 1.7", "pt_y0 + 1.6", "pt_z0 - 1"], "cable_gh_d", "pt_z1 - pt_z0 + 2",
+               operation="cut", targets=["grommet_zone"])
+    s.cylinder("Zone grommet hole Qwiic", ["pt_x1 - 1.5", "pt_y1 - 1.3", "pt_z0 - 1"], "cable_qw_d",
+               "pt_z1 - pt_z0 + 2", operation="cut", targets=["grommet_zone"])
+    p("grommet_s", 4.0, "J4 grommet's square opening in the HCHO pocket's left wall")
+    s.box("J4 grommet cut", ["sen_x1 + clr_align - 0.3", "wall + 0.6", "floor_t"], ["iwall + 0.6", "grommet_s", "grommet_s"],
+          operation="cut", targets=["base_plate"])
+    s.box("J4 grommet", ["sen_x1 + clr_align - 0.3", "wall + 0.6", "floor_t"], ["iwall + 0.6", "grommet_s", "grommet_s"], body="grommet_j4")
+    s.cylinder("J4 grommet hole", ["sen_x1 + clr_align - 1", "wall + 2.6", "floor_t + 2.0"], "cable_qw_d", "iwall + 2",
+               axis="X", operation="cut", targets=["grommet_j4"])
+    s.box("Tongue grommet", ["sfa_x0 + sfa_w / 2 - lid_hole_l / 2", "hy1 - lid_hole_w - 0.6", "lid_z0 - 0.3"], ["lid_hole_l", "lid_hole_w", "lid_t + 0.6"],
+          body="grommet_tongue")
+    s.cylinder("Tongue grommet hole", ["sfa_x0 + sfa_w / 2", "hy1 - 2.1", "lid_z0 - 1"], "cable_qw_d", "lid_t + 2",
+               operation="cut", targets=["grommet_tongue"])

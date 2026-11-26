@@ -206,6 +206,69 @@ def outlet_grille(m: Model) -> dict:
             "meets_floor": area >= OUTLET_FLOOR}
 
 
+# --- R25 / R26 (fix round 1): the outlet path and the HCHO pocket against the outlet grille ----
+
+ZW_TF = 7.2        # the zone wall's slanted part: front face depth behind the slope (airq zw_tf)
+SLAB = 1.2         # the zone wall's ledge (airq ledge_t)
+RIB = 1.6          # the zone wall's seat on the rear wall over the outlet plenum (airq rib_d)
+PORT_OUTLET = 330.1
+
+
+def _z_under(m: Model, y: float) -> float:
+    """The zone wall's underside at depth y: the ledge, the slant, the flat part over the SEN66."""
+    zw_z0 = sen_top(m) + m.zone_gap
+    return min(zw_z0, max(m.lip - SLAB, m.lip + (y * m.c - ZW_TF - m.zone_wall) / m.s))
+
+
+def front_layer(m: Model, y_port: float, under_ledge: bool = False, step: float = 0.01) -> float:
+    """The ports-forward pose (3a before fix round 1): the section, normal to x, of the sensor zone
+    in front of the SEN66's port face (at y_port) under the zone wall. That is the most an outlet
+    duct running along the module's front, to its end and back, can have (R25 needs 330.1).
+    under_ledge: also take the strip under the ledge, which is the intake slots' plenum."""
+    y0 = m.wall if under_ledge else (m.lip - SLAB - m.lip) * m.s / m.c + (ZW_TF + m.zone_wall) / m.c
+    n = int((y_port - y0) / step)
+    return sum((_z_under(m, y0 + (i + 0.5) * step) - m.floor) * step for i in range(n))
+
+
+def hcho_alternatives(m: Model, sfa: float = 25.4, plug: float = 5.2, plug_up: float = 5.0) -> list[dict]:
+    """R26: the HCHO pocket and the outlet grille, alternatives worked with numbers (m: the R22
+    lip model as built, lip 15, H 51). The grille runs on the rear wall from the 10 mm line up to
+    the zone wall (or its seat, as built), 2 mm in from the ends, 1.2 slots at a 3.0 pitch
+    (40 %, the coupon's) or a 2.4 pitch (50 %). R18 asks 660.1 open."""
+    inner = m.W / 2 - m.wall - m.clr                      # 45.5: the base's parts inside the shell
+    h = sen_top(m) + m.zone_gap - m.grille_min_z          # 18.9: 10 mm line to the zone wall
+    sfa_x0 = -inner + 1.5                                 # 3a: the SFA40 1.5 from the left wall
+    rows = []
+
+    def row(name, x0, x1, height, notes, fits=True):
+        w = x1 - x0
+        n40, n50 = math.floor((w + 1.8) / 3.0), math.floor((w + 1.2) / 2.4)     # 1.2 slots, 1.8 / 1.2 bars
+        out = {"name": name, "grille": (x0, x1), "height": height, "slots_40": n40, "slots_50": n50,
+               "open_40": n40 * m.slot_w * height, "open_50": n50 * m.slot_w * height, "fits": fits, "notes": notes}
+        out["meets"] = fits and max(out["open_40"], out["open_50"]) >= 2 * PORT_OUTLET
+        rows.append(out)
+
+    row("3a as built: SFA40 standing at the rear left, facing its grille in the rear wall",
+        sfa_x0 + sfa + plug + m.wall, inner - 2.0, h, "the pocket and its plug room take the rear wall's left 34 mm")
+    row("narrower pocket, the plug leaving upward", sfa_x0 + sfa + m.clr + m.wall, inner - 2.0, h,
+        f"the board stands {sfa} tall and the plug needs {plug_up} above it: {sfa + plug_up:.1f} > "
+        f"{h + m.grille_min_z - m.floor:.1f} from the floor to the zone wall, so it does not fit",
+        fits=sfa + plug_up <= h + m.grille_min_z - m.floor)
+    row("upper-rear exhaust kept separate (no outlet grille above the zone wall)", sfa_x0 + sfa + plug + m.wall,
+        inner - 2.0, h, "the rear wall above the zone wall is the electronics zone's exhaust: joining it to the outlet "
+        "would open the SEN66's outlet path to the case air (plan), so it adds nothing")
+    row("SFA40 along the right side wall, low side grille; ports forward (the pose of 3a)", -inner + 2.0, inner - 2.0, h,
+        "the rear wall is free (40 % by slot count is short too), but the SFA40 (25.4 x 25.4 standing, y 18-43) meets H2's standoff (y 21.6-26.0 at the "
+        "right wall), and with the ports forward the outlet duct in front of the module has at most "
+        f"{front_layer(m, 20.0, under_ledge=True):.0f} mm2 (R25: 330.1)", fits=False)
+    tub = inner - 1.6                                    # 43.9: inside the base's side rails
+    row("chosen: ports to the rear; SFA40 flat at the front right under the tongue, its grille in the right side",
+        -tub + 2.0, -tub + 2.0 + 32 * 2.4 - 1.2, h - RIB,
+        "the outlet plenum spans the rear behind the module; 50 % open (32 slots) reaches R18; 40 % over the "
+        f"plenum's {2 * tub - 4:.1f} mm would give {math.floor((2 * tub - 4 + 1.8) / 3.0) * m.slot_w * (h - RIB):.0f}")
+    return rows
+
+
 # --- the main board's section ------------------------------------------------------------
 
 @lru_cache(maxsize=1)
