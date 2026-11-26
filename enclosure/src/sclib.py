@@ -346,3 +346,13 @@ class Sketch:
     def circle(self, center, diameter):
         self.s._check_exprs(diameter)
         self.s.cmd("sketch.circle.center", center=self._point(center), diameter=diameter)
+
+    def text(self, content: str, at, height, expression: bool = False, align: str = "center"):
+        """Text outlines with the baseline starting at `at` (expressions) and capital height
+        `height`. `content` is the words, or with `expression=True` a text expression over the
+        parameters (`"number(clr_t1, 2)"`, `"'L' + number(w, 1)"`), so a label follows its value.
+        The glyph outlines extrude like any profile (a deboss is a cut); the sketch solves at dof 0."""
+        self.s._check_exprs(height)
+        self._point(at)
+        key = "text_expression" if expression else "text"
+        self.s.cmd("sketch.text", **{key: content}, at=list(at), height=height, align=align)

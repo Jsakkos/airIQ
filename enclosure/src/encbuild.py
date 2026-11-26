@@ -2,13 +2,19 @@
 
 Each design in DESIGNS is a generator module with `DESIGN` (the design's name, which
 `component.insert_design` gives the component), `OUTPUT` (its .sc file, relative to enclosure/)
-and `build() -> sclib.Script`.
+and `build() -> sclib.Script`. A design that is printed also has `EXPORTS`: a list of files
+(.3mf, .step, .stl, ... relative to enclosure/) written beside the design on every build.
 
 `build(name)` writes the script to enclosure/.build/<name>.json (gitignored), runs it, saves the
 design without SolidCraft's model cache (the cache records timings, so saves would differ every
 run) to enclosure/.build/<OUTPUT>, checks every sketch solved at dof 0, and copies the file to
 enclosure/<OUTPUT> when it is at most COMMIT_LIMIT bytes and its contents changed. A design
 larger than that stays in enclosure/.build/ (ruling R8: keep committed designs light).
+
+Exports: `solidcraft-cli run --out` writes each of the design's EXPORTS into enclosure/.build/
+first (meshes at EXPORT_QUALITY), a 3MF is reopened to check it holds one part per body of the
+design, and each file is copied to enclosure/ when its bytes changed. Task 5 reuses this for every
+printed part: list its files in EXPORTS.
 """
 from __future__ import annotations
 
@@ -24,6 +30,7 @@ from sclib import ENCLOSURE
 
 BUILD_DIR = ENCLOSURE / ".build"
 COMMIT_LIMIT = 5 * 1024 * 1024          # R8: 5 MB
+EXPORT_QUALITY = "standard"                 # mesh chord 2e-4 of a body's size (3MF, STL): 0.013 mm on a 66 mm plate
 DEFAULT_CLI = Path(r"C:\Program Files\SolidCraft\solidcraft-cli.exe")
 
 # design key -> generator module (enclosure/src/<module>.py)
@@ -34,6 +41,7 @@ DESIGNS = {
     "fpc-adapter": "ref_fpc_adapter",
     "airq-main": "ref_pcb_main",
     "airq-tongue": "ref_pcb_tongue",
+    "coupons": "coupons",
 }
 
 
@@ -118,8 +126,24 @@ def same_contents(a: Path, b: Path) -> bool:
         return names == sorted(zb.namelist()) and all(entry(za, n) == entry(zb, n) for n in names)
 
 
+def exports_of(name: str) -> list[str]:
+    """The files a design exports (paths relative to enclosure/), none for a reference part."""
+    return list(getattr(module(name), "EXPORTS", []))
+
+
+def eval_bodies(path: Path, cli: str, json_out: Path) -> dict:
+    """Reopen a file (.3mf, .step, .sc) and return {body name: bounding box} of what imports."""
+    json_out.unlink(missing_ok=True)
+    proc = subprocess.run([cli, "eval", str(path), "--quiet", "--json-out", str(json_out)],
+                          capture_output=True, text=True)
+    if proc.returncode != 0 or not json_out.exists():
+        raise RuntimeError(f"solidcraft-cli eval {path.name} failed: {proc.stderr.strip() or proc.stdout.strip()}")
+    return {b["name"]: b["bbox"] for b in json.loads(json_out.read_text(encoding="utf-8"))["bodies"]}
+
+
 def build(name: str, cli: str | None = None, commit: bool = True) -> dict:
-    """Build one design. Returns {design, file, bytes, committed, bodies, warnings}."""
+    """Build one design. Returns {design, file, bytes, committed, bodies, warnings, exports}, where
+    exports is [{file, bytes, committed, parts}] (parts: bodies a 3MF reopens as, else None)."""
     cli = cli or cli_path()
     if not cli:
         raise RuntimeError("solidcraft-cli not found (set SOLIDCRAFT_CLI)")
@@ -133,7 +157,15 @@ def build(name: str, cli: str | None = None, commit: bool = True) -> dict:
     script = script_for(name, built.resolve())
     script_path = BUILD_DIR / f"{name}.json"
     script_path.write_text(json.dumps(script, indent=1), encoding="utf-8")
-    results = run_script(script_path, cli, BUILD_DIR / f"{name}.results.json")
+    exports = [(BUILD_DIR / rel, ENCLOSURE / rel) for rel in exports_of(name)]
+    extra = []
+    for built_export, _ in exports:
+        built_export.parent.mkdir(parents=True, exist_ok=True)
+        built_export.unlink(missing_ok=True)
+        extra += ["--out", str(built_export.resolve())]
+    if exports:
+        extra += ["--quality", EXPORT_QUALITY]
+    results = run_script(script_path, cli, BUILD_DIR / f"{name}.results.json", extra)
     warnings = check_results(name, script["commands"], results)
     measure = results[-1]
     bodies = {b["name"]: b["bbox"] for b in measure["bodies"]}
@@ -143,5 +175,19 @@ def build(name: str, cli: str | None = None, commit: bool = True) -> dict:
     if committed and not same_contents(built, target):
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(built, target)
+    done = []
+    for built_export, target_export in exports:
+        parts = None
+        if built_export.suffix == ".3mf":
+            parts = eval_bodies(built_export, cli, BUILD_DIR / f"{name}.{built_export.stem}.parts.json")
+            if len(parts) != len(bodies):
+                raise RuntimeError(f"{name}: {built_export.name} reopens with {len(parts)} parts, "
+                                   f"the design has {len(bodies)} bodies")
+        keep = commit and built_export.stat().st_size <= COMMIT_LIMIT
+        if keep and not (target_export.exists() and target_export.read_bytes() == built_export.read_bytes()):
+            target_export.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(built_export, target_export)
+        done.append({"file": target_export if keep else built_export, "bytes": built_export.stat().st_size,
+                     "committed": keep, "parts": parts})
     return {"design": mod.DESIGN, "file": target if committed else built, "bytes": size,
-            "committed": committed, "bodies": bodies, "warnings": warnings}
+            "committed": committed, "bodies": bodies, "warnings": warnings, "exports": done}

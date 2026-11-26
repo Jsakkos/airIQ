@@ -3,3 +3,5 @@
 # SolidCraft designs are zip containers; `git config diff.solidcraft.textconv "solidcraft-cli textconv"`
 # shows them as text in git diff (enclosure/README.md)
 *.sc -text diff=solidcraft
+# printable exports are written byte for byte by enclosure/build.py: no line-ending conversion
+enclosure/export/* -text

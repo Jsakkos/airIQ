@@ -14,11 +14,13 @@ Contents:
 - [Reference parts](#reference-parts)
 - [Frames](#frames)
 - [Using the references in an enclosure design](#using-the-references-in-an-enclosure-design)
+- [Printing the coupons](#printing-the-coupons)
+- [Coupon results](#coupon-results)
 - [Sources](#sources)
 - [To confirm](#to-confirm)
 
-Later tasks add their own sections: the coupon results (Task 2), the layout study and check
-table (Tasks 3 and 4), and the print and assembly guide (Task 5).
+Later tasks add their own sections: the layout study and check table (Tasks 3 and 4), and the
+print and assembly guide (Task 5). The print-test coupons (Task 2) are below.
 
 ## Files
 
@@ -28,6 +30,9 @@ table (Tasks 3 and 4), and the print and assembly guide (Task 5).
 | `src/sclib.py` | Shared generator helpers: parameters, named features, dof-0 sketches, configurations |
 | `src/encbuild.py` | The design registry (`DESIGNS`) and the build: script, `solidcraft-cli run`, save, checks |
 | `src/ref_*.py` | One generator per reference part (`ref_pcb.py` wraps the board STEP files) |
+| `src/coupons.py` | The print-test coupons' generator |
+| `coupons.sc` | The coupons design, built from `src/coupons.py` (committed) |
+| `export/` | Printable exports (`coupons.3mf`, `coupons.step`), written by `build.py` (committed) |
 | `reference/*.sc` | The reference designs, built from the generators (committed) |
 | `.build/` | Generated scripts, run results and anything not committed (gitignored) |
 
@@ -50,8 +55,14 @@ uv run --with pytest --with pyyaml pytest tests/enclosure   # the checks
 3. Saves the design to `.build/reference/` without SolidCraft's model cache. The cache records
    timings, so leaving it in would make every save differ.
 4. Fails if any sketch is above dof 0.
-5. Copies the file to `reference/` if it is at most 5 MB and its contents changed (ruling R8). A
-   larger design stays in `.build/`, and `build.py` says so.
+5. Copies the file to its place (`reference/...` or `enclosure/`) if it is at most 5 MB and its
+   contents changed (ruling R8). A larger design stays in `.build/`, and `build.py` says so.
+6. Writes the design's exports, if its module has an `EXPORTS` list, into `.build/export/` through
+   `solidcraft-cli run --out` (meshes at `EXPORT_QUALITY`, a chord of 2e-4 of each body's size).
+   A `.3mf` is reopened with `solidcraft-cli eval`, and the build fails unless it holds one part
+   per body of the design. Each export is copied to `export/` when its bytes changed. The same
+   input gives the same bytes. Task 5 reuses this for every printed part: list its files in
+   `EXPORTS` (for example `["export/airq-shell.3mf", "export/airq-shell.step"]`).
 
 An unchanged design leaves the committed file untouched. When comparing builds, the random
 identities SolidCraft gives configuration rows are ignored.
@@ -196,6 +207,70 @@ The component is named after the design (`ref_sen66`, …).
   endings). Re-run `build.py airq-main airq-tongue` after re-exporting `hardware/step/`; a test
   fails until you do.
 
+## Printing the coupons
+
+Print these before any enclosure. Their results set the clearance defaults the enclosures use
+(`clr_align`, `clr_remove`, `clr_snap`, `slot_w`, `flex_*`), so the coupons are built to test the
+fits the enclosures need (ruling R20). `export/coupons.3mf` holds every coupon as its own part (8
+parts); `export/coupons.step` holds the same bodies. They are laid out flat on one 109.5 x 96.2 mm
+sheet, spaced 6 mm apart, so print them together or drag them apart in the slicer. Solid, they come
+to about 17 cm3 (about 21 g of PETG), less with infill.
+
+**Material and settings.**
+
+- Print in the material the enclosures will use: ASA if the printer is enclosed, PETG otherwise,
+  on textured PEI, with the nozzle, layer height, walls and XY-compensation settings you will use
+  for the enclosures. Change nothing between the coupons and the enclosures, or the results do not
+  carry over. A 0.4 mm nozzle and 0.2 mm layers are assumed.
+- No supports, no brim, no raft. Every coupon prints without supports in the orientation below.
+- Colour: the shell's colour (warm white) for everything except the two clear bars.
+
+| Part (3MF object) | Size (mm) | Orientation | Material |
+|---|---|---|---|
+| `coupon_clr_pegs` | 66 x 28 x 8 | as laid out: plate on the bed, pegs and tabs up | shell material |
+| `coupon_clr_holes` | 66 x 28 x 3 | as laid out: plate on the bed, labels up | shell material |
+| `coupon_grille` | 37.5 x 40 x 1.8 | **face down** on the textured PEI (the plate is flat on the bed; labels on top) | shell material |
+| `coupon_insert` | 30 x 15 x 7 | as laid out: plate on the bed, bosses up | shell material |
+| `coupon_flexure` | 44 x 11.3 x 4.9 | as laid out: standing on the bed, beams vertical. Print the beams with perimeters only (no infill reaches a 1 mm wall) | shell material |
+| `coupon_lg_body` | 19.1 x 11.2 x 3.2 | as laid out: slots and pocket open upward | **opaque**: the shell's colour |
+| `coupon_lg_bar_lit`, `coupon_lg_bar_dark` | 16 x 3 x 2 each | as laid out: lying on the 3 mm face | **clear or natural PETG** |
+
+For a two-material or AMS print, assign the two bars to the clear filament and everything else to
+the shell filament. On a single-material printer, print the two bars on their own (a second job in
+clear PETG) and the rest in the shell material. The bars lie beside the body as they print: after
+printing, drop one bar in each slot.
+
+**What each coupon tests, and what to report.** The debossed number on each feature is its value in
+mm. On the fit plates it is the per-side clearance, so a hole or slot is the peg or tab plus twice
+that number.
+
+| Coupon | What to do | Report |
+|---|---|---|
+| Clearance (pegs and holes, tabs and slots) | Push peg *n* into hole *n* and tab *n* into slot *n*, for each of 0.10, 0.15, 0.20, 0.25, 0.30. Round fits and rectangular fits are separate tests | For each fit type and each clearance: does not enter / enters only with force or a tool / enters by hand and holds without play / slides in and out freely / rattles. Name the tightest clearance that assembles by hand and the tightest that slides freely and releases without scraping, for each type. These pick `clr_align` (located part), `clr_remove` (part that lifts off) and `clr_snap` (latch) |
+| Grille (3 slots at 1.0, 1.2, 1.5 mm; the back row are 45-degree louvres labelled L) | Look through the slots against a light, and probe each with a 1 mm feeler or a drill bit | Which widths print clean and open (no strings, no bridging, no closed slot), for straight and for louvre slots, and whether the louvres' overhang flank droops. Picks `slot_w` |
+| Insert boss (M2 heat-set insert holes 3.1, 3.2, 3.3 mm, 4.0 deep; **sizes to confirm** with your inserts) | Heat in an M2 insert in each boss from its top (the enclosures enter it from underneath) with the iron you will use. Then turn an M2 screw in and out and try to pull the insert out | Which hole holds: insert seats flush, does not spin under a screwdriver, does not pull out by hand, and the boss neither cracks nor bulges. Note the insert length and brand |
+| Button flexure (A with a stand-in for SW1, B without) | Press the pad's outer face (the face away from the board stub) with a fingertip, toward the stub. A: the pad closes up on the stand-in's actuator stub after 0.10 mm. B: the pad moves freely until the lug on its stop side meets the stop block, after 0.30 mm | Whether the pad returns fully after 50 presses and stays uncracked, whether it bottoms on the hard stop (B) and cannot press the stub any further (A), the feel and rough force, and the rest gap you can see at A. The stand-in is rigid, so the switch's own click cannot be felt: if you have a spare SKRTLAE010, hold it against the stub's position to judge the click (optional). Picks `flex_t`, `flex_gap` and the `flex_*` family |
+| Light guide (3 x 2 mm clear bar, SK6812SIDE pocket, 1.2 mm opaque divider, a second bar past the divider) | Drop one bar in each slot, put an SK6812SIDE (or a phone torch held against the pocket) at the pocket end, and look at both bars in a dim room | Whether the lit bar glows evenly and the dark bar stays dark (light leaking past the divider, through the floor or through the top), with the shell colour and material you printed the body in. If it leaks, reprint the body in black and say so |
+
+## Coupon results
+
+**Pending owner print.** Nothing below has been measured. The plan's defaults stay in force until
+the owner prints the coupons and reports: `clr_align` 0.15, `clr_remove` 0.20, `clr_snap` 0.25,
+`slot_w` 1.2, `flex_*` as in `src/coupons.py`. When results arrive (Task 2 Step 3), fill the table
+and change the defaults in `src/coupons.py` (and in the enclosure generators that read them),
+rebuild and commit with `feat(enclosure): print-test coupons and results`.
+
+| Test | Result | Decision | Default until then |
+|---|---|---|---|
+| Round peg and hole, 0.10 / 0.15 / 0.20 / 0.25 / 0.30 | pending owner print | tightest by hand: ?; tightest free: ? | `clr_align` 0.15, `clr_remove` 0.20, `clr_snap` 0.25 |
+| Rectangular tab and slot, 0.10 / 0.15 / 0.20 / 0.25 / 0.30 | pending owner print | tightest by hand: ?; tightest free: ? | as above |
+| Grille slots 1.0 / 1.2 / 1.5, straight | pending owner print | clean widths: ? | `slot_w` 1.2 |
+| Grille 45-degree louvres 1.0 / 1.2 / 1.5 | pending owner print | clean widths: ?; flank droop: ? | `slot_w` 1.2 |
+| M2 heat-set insert hole 3.1 / 3.2 / 3.3, 4.0 deep | pending owner print | holding hole: ? (insert: ?) | to confirm with the owner's inserts (R20) |
+| Button flexure A (SW1 stand-in) | pending owner print | returns / cracks: ?; rest gap: ? | `flex_t` 1.0, `flex_gap` 0.10 |
+| Button flexure B (hard stop) | pending owner print | bottoms at 0.30: ?; feel and force: ? | `flex_stop` 0.30 (gap + 0.20 travel) |
+| Light guide, divider 1.2 | pending owner print | leak past the divider: ? | `divider` 1.2 |
+
 ## Sources
 
 Every dimension comes from these documents; none of them is committed (R5).
@@ -214,6 +289,8 @@ Every dimension comes from these documents; none of them is committed (R5).
 | Qwiic connector body | This repository: `interface.yaml` `mechanical.main.j_qwiic_tongue.body` (6.0 × 4.95, 2.9 high) and `hardware/kicad/lib/README.md` fix 12 | The same JST SM04B-SRSS-TB part |
 | FPC adapter | None: the owner's description (R6), about 20 × 12 mm with a ZIF at each end; ZIF size as J7 (`interface.yaml` `mechanical.main.fpc`) | All to confirm |
 | Boards | `hardware/step/airq-main.step`, `airq-tongue.step` (Plan 2) | Frames: `interface.yaml` `mechanical.*.step` |
+| SW1 stand-in (flexure coupon) | This repository: `interface.yaml` `mechanical.main.button` (Alps SKRTLAE010: side push, actuator 2.0 wide, tip 0.24 beyond the edge, centre 1.7 above the board top; the comment gives the body, 4.5 x 3.4, 3.3 high), with 0.2 mm travel and 1.6 N from the same comment | The actuator's height (1.0) is a guess |
+| SK6812SIDE (light-guide coupon) | Ruling R20 and `interface.yaml` `mechanical.main.leds` (light centre 1.0 above the board) | Body 4.0 x 1.6 x 2.0, light face 4.0 x 2.0 |
 
 ## To confirm
 
@@ -243,6 +320,17 @@ These values are parameters, so a correction is a parameter change and a rebuild
 **FPC adapter**
 
 - Every size (placeholder).
+
+**Coupons**
+
+- The M2 insert hole sizes (3.1 / 3.2 / 3.3 mm, 4.0 deep) and boss (6.0 mm): confirm with the
+  owner's inserts. The test is the coupon.
+- The SW1 actuator's height (`sw_act_h`, 1.0) and the body size (4.5 x 3.4 x 3.3, from the
+  `interface.yaml` comment: the STEP part is named L4.6-W3.4-H3.4).
+- The beam stiffness: a 1.0 x 4.9 x 12 mm PETG cantilever is about 0.3 N at the 0.30 mm stop (E
+  about 1.5 GPa, an estimate). The print decides `flex_t`.
+- The hard stop's 0.30 mm gap, and `flex_gap` 0.10, are at the limit of what a 0.4 mm nozzle
+  resolves, so judge them by the stop engaging, not by measuring.
 
 **Main board**
 

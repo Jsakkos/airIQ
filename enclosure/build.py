@@ -47,6 +47,14 @@ def main(argv=None) -> int:
         for body, bb in shown.items():
             size = " x ".join(f"{hi - lo:.3f}" for lo, hi in zip(bb["min"], bb["max"]))
             print(f"    {body:28} {size}   min {[round(v, 3) for v in bb['min']]}")
+        for ex in r["exports"]:
+            where = ex["file"].relative_to(encbuild.ENCLOSURE.parent)
+            parts = f", reopens with {len(ex['parts'])} parts" if ex["parts"] is not None else ""
+            print(f"    export {where} ({ex['bytes'] / 1024:.0f} KB{parts})"
+                  + ("" if ex["committed"] else "  (not committed)"))
+            for part, bb in (ex["parts"] or {}).items():
+                size = " x ".join(f"{hi - lo:.3f}" for lo, hi in zip(bb["min"], bb["max"]))
+                print(f"      {part:26} {size}   min {[round(v, 3) for v in bb['min']]}")
         for w in r["warnings"]:
             print(f"    warning: {w}")
     return 0

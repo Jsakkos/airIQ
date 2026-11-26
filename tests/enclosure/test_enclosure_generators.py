@@ -66,12 +66,13 @@ def values_with(script, **override) -> dict:
 
 def test_component_names_are_the_plan_interfaces():
     """Plan 3 Task 1 'Produces': ref_sen66, ref_epd, ref_sfa40, ref_main, ref_tongue; R6 adds
-    ref_fpc_adapter. insert_design names the component after the design."""
+    ref_fpc_adapter; Task 2 adds the coupons design. insert_design names the component after
+    the design."""
     assert {encbuild.module(n).DESIGN for n in encbuild.DESIGNS} == {
-        "ref_sen66", "ref_epd", "ref_sfa40", "ref_main", "ref_tongue", "ref_fpc_adapter"}
+        "ref_sen66", "ref_epd", "ref_sfa40", "ref_main", "ref_tongue", "ref_fpc_adapter", "coupons"}
     for name, s in SCRIPTS.items():
         assert s.commands[0] == {"command": "file.new", "params": {"name": encbuild.module(name).DESIGN}}
-        assert encbuild.module(name).OUTPUT.startswith("reference/")
+        assert encbuild.module(name).OUTPUT.startswith("reference/") == (name != "coupons")
 
 
 @pytest.mark.parametrize("name", list(encbuild.DESIGNS))
@@ -109,6 +110,8 @@ def test_every_body_is_named(name):
                     "epd_tail_folded_contacts"],
         "sfa40-breakout": ["sfa40_board", "sfa40_sensor", "sfa40_opening", "sfa40_qwiic_j1", "sfa40_qwiic_j2"],
         "fpc-adapter": ["fpc_adapter_pcb", "fpc_adapter_zif_tail", "fpc_adapter_zif_ffc"],
+        "coupons": ["coupon_clr_pegs", "coupon_clr_holes", "coupon_grille", "coupon_insert",
+                    "coupon_flexure", "coupon_lg_body", "coupon_lg_bar_lit", "coupon_lg_bar_dark"],
     }[name]
     assert SCRIPTS[name].bodies == expected
 
