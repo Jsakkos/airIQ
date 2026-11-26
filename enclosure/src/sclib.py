@@ -234,7 +234,8 @@ class Script:
                 body: str | None = None, operation: str = "new",
                 targets: list[str] | None = None) -> int:
         """solid.revolve of a sketch about the axis through `origin` (expressions) along
-        `direction` (numbers); the profile turns right-handed about `direction`."""
+        `direction` (numbers). The profile leaves its sketch plane the way the sketch's normal
+        points (SolidCraft's default `sketch_normal` convention), whichever way `direction` points."""
         self._check_exprs(*origin)
         params = {"sketch": sketch, "axis": {"origin": list(origin), "dir": list(direction)},
                   "angle": angle, "operation": operation}
@@ -256,9 +257,10 @@ class Script:
 
     # sketches
     @contextmanager
-    def sketch(self, name: str, plane: str, offset: str | float | None = None):
-        """A named sketch. Yields a `Sketch`; on exit the sketch is solved (the build checks
-        dof 0) and finished."""
+    def sketch(self, name: str, plane, offset: str | float | None = None):
+        """A named sketch on `plane` ("XY", "XZ", "YZ" or {origin, x_dir, y_dir}), moved along
+        its normal by `offset`. Yields a `Sketch`; on exit the sketch is solved (the build
+        checks dof 0) and finished."""
         params = {"plane": plane}
         if offset is not None:
             self._check_exprs(offset)
