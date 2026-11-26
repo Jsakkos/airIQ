@@ -95,15 +95,26 @@ def union(boxes) -> dict:
             "max": [max(b["max"][i] for b in boxes) for i in range(3)]}
 
 
+def entry(z: zipfile.ZipFile, name: str) -> bytes:
+    """A container file's contents, with what SolidCraft makes up afresh on every build left
+    out: configuration rows get random identities (`configs.row_identities`)."""
+    data = z.read(name)
+    if name != "document.json":
+        return data
+    doc = json.loads(data)
+    doc.get("configs", {}).pop("row_identities", None)
+    return json.dumps(doc, sort_keys=True).encode()
+
+
 def same_contents(a: Path, b: Path) -> bool:
-    """Two .sc containers hold the same files (the zip bytes may differ)."""
+    """Two .sc containers hold the same design (the zip bytes may differ)."""
     if not (a.exists() and b.exists()):
         return False
     if a.read_bytes() == b.read_bytes():
         return True
     with zipfile.ZipFile(a) as za, zipfile.ZipFile(b) as zb:
         names = sorted(za.namelist())
-        return names == sorted(zb.namelist()) and all(za.read(n) == zb.read(n) for n in names)
+        return names == sorted(zb.namelist()) and all(entry(za, n) == entry(zb, n) for n in names)
 
 
 def build(name: str, cli: str | None = None, commit: bool = True) -> dict:
@@ -112,6 +123,8 @@ def build(name: str, cli: str | None = None, commit: bool = True) -> dict:
     if not cli:
         raise RuntimeError("solidcraft-cli not found (set SOLIDCRAFT_CLI)")
     mod = module(name)
+    if hasattr(mod, "prepare"):
+        mod.prepare()                       # inputs the script reads (staged STEP files)
     built = BUILD_DIR / mod.OUTPUT
     built.parent.mkdir(parents=True, exist_ok=True)
     if built.exists():

@@ -100,6 +100,9 @@ def build() -> Script:
                         "(airQ, interface.yaml fpc.airq_fit). Whole number, 0 or 1", unit="", favorite=True)
     p("fold_out", 0.5, f"folded: flat run past the outline before the bend, 0.2 .. 1.5; {TC}")
     p("fold_r", 1.0, f"folded: inner bend radius, 0.5 .. 1.5 (the lower leg must stay under z = 0); {TC}")
+    p("fold_angle", 180, "folded: the tail turns back under the panel (interface.yaml fpc.airq_fit "
+                         "tail_fold). 180 deg only: fold_low and the legs after the bend assume a half turn",
+      unit="deg")
     p("flex_len", "tail_len - stiff_len", "derived: the part that can bend (8.2 mm)")
     p("fold_low", "flex_len - fold_out - pi * (fold_r + tail_t / 2)",
       "derived: flexible length left under the panel after the bend")
@@ -135,7 +138,7 @@ def build() -> Script:
                   offset="fold_out") as sk:
         sk.rect("tail_z", "root_gap", "tail_z + tail_t", "root_gap + root_w")
     s.revolve("Fold bend", "Fold bend section", ["-fold_out", 0, "tail_z - fold_r"], [0, 1, 0],
-              "180 deg", operation="join", targets=["epd_tail_folded"])
+              "fold_angle", operation="join", targets=["epd_tail_folded"])
     s.box("Fold lower leg", ["-fold_out", "root_gap", "fold_z - tail_t"],
           ["fold_low", "root_w", "tail_t"], operation="join", targets=["epd_tail_folded"])
     s.box("Fold stiffened end", ["fold_low - fold_out", "narrow_y0", "fold_z - tail_t"],
