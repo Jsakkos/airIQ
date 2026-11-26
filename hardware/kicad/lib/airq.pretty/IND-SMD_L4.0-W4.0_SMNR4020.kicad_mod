@@ -19,11 +19,11 @@
 	(pad 1 smd rect (at 1.93 0.00 0.00) (size 1.874 3.520) (layers F.Cu F.Paste F.Mask))
 	(pad 2 smd rect (at -1.93 0.00 0.00) (size 1.874 3.520) (layers F.Cu F.Paste F.Mask))
 	(fp_circle (center 2.02 -2.00) (end 2.05 -2.00) (layer F.SilkS) (width 0.06))
-	(fp_line (start -2.00 2.00) (end -2.00 -2.00) (layer F.CrtYd) (width 0.05))
-	(fp_line (start -2.00 -2.00) (end 2.00 -2.00) (layer F.CrtYd) (width 0.05))
-	(fp_line (start 2.00 -2.00) (end 2.00 2.00) (layer F.CrtYd) (width 0.05))
-	(fp_line (start 2.00 2.00) (end -2.00 2.00) (layer F.CrtYd) (width 0.05))
-	(model "${KIPRJMOD}/../lib/airq.3dshapes/IND-SMD_L4.0-W4.0-H2.0.step"
+	(fp_line (start -3.12 -2.25) (end 3.12 -2.25) (layer F.CrtYd) (width 0.05))
+	(fp_line (start 3.12 -2.25) (end 3.12 2.25) (layer F.CrtYd) (width 0.05))
+	(fp_line (start 3.12 2.25) (end -3.12 2.25) (layer F.CrtYd) (width 0.05))
+	(fp_line (start -3.12 2.25) (end -3.12 -2.25) (layer F.CrtYd) (width 0.05))
+	(model "${KICAD10_3DMODEL_DIR}/Inductor_SMD.3dshapes/L_APV_ANR4030.step"
 		(offset (xyz 0.000 0.000 0.000))
 		(scale (xyz 1 1 1))
 		(rotate (xyz 0 0 0))

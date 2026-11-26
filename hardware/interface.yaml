@@ -83,6 +83,84 @@ mechanical:
       center_x: 15.0               # pin 1 (GND) at x 13.5, pin 4 (SCL) at x 16.5
       body: [[12.0, 8.1], [18.0, 12.36]]  # 2.95 high
 
+  # Main board (hardware/src/main/layout.yaml, hardware/kicad/main/), shared by the airQ and the airQ
+  # mini. Frame: origin at the board's top-left corner (KiCad grid origin, as in layout.yaml), +X right,
+  # +Y toward the FRONT edge, +Z up from the top (component) surface. Seen from in front of the device
+  # (looking at the front edge, +Y toward the viewer), +X is the viewer's right: left/right below are as
+  # the user sees them. All parts are on top; the bottom is flat (pours, vias; J6's pads are unfitted).
+  main:
+    front_edge: +Y                 # LEDs, FPC, J_LED_EXT and the button look out of the y = 30 edge
+    outline: [60.0, 30.0]          # W x H rectangle, square corners (global limit 60 x 30)
+    thickness: 1.6
+    max_part_height: 4.25          # J_SEN66 (JST GH side entry); the module is 3.1, the button 3.35
+    step:                          # kicad-cli pcb export step --grid-origin (checked in SolidCraft)
+      x: X                         # STEP x = X
+      y: -Y                        # STEP y = -Y (KiCad's 3-D frame has Y up)
+      z: Z + 1.6                   # parts sit on the top face at STEP z = 1.6; board bottom at z = 0
+    mounting_holes:                # M2, non-plated
+      diameter: 2.2
+      centers: [[8.55, 2.6], [57.4, 22.8]]   # H1 rear-left (8 mm from the USB-C), H2 front-right (button)
+      clear_diameter: 4.4          # no tracks or vias (screw head / boss); the GND pour runs up to the hole
+    antenna:                       # ESP32-C6-WROOM-1 (U3, PROVISIONAL R22) at the rear-right corner
+      module_body: [[41.0, -5.99], [59.0, 19.51]]   # 18 x 25.5, 3.1 high; part of it hangs over the edge
+      overhang: 5.99               # the 6.0 mm antenna strip lies beyond the rear edge (y < 0)
+      feed_side: +X                # Espressif keep-out: >= 15 mm toward -X, 2 mm toward +X
+      keepout: [[26.0, -6.0], [61.0, 0.5]]   # rule area ANTENNA_KEEPOUT: no copper, no pour, both layers
+      clearance_note: keep >= 15 mm of plastic-only space round the antenna strip in the enclosure
+    usb_c:                         # J1, 16-pin USB-C receptacle (C2765186), top mount
+      edge: -Y                     # rear edge; plug enters along +Y
+      center_x: 16.2
+      mouth_y: 0.03                # shell front face, flush with the rear edge
+      shell: [8.94, 3.16]          # W x H of the shell (z 0 .. 3.16); length 7.35 into the board
+    fpc:                           # J7, J_EPD, 24-pin 0.5 mm FPC, back-flip, double-sided contacts
+      edge: +Y                     # the panel's FPC tail enters along -Y
+      center_x: 28.8
+      mouth_y: 30.0                # body front face on the edge; body 15.5 wide x 5.4 deep x 2.0 high
+      pin1_x: 34.55                # pin 1 on the viewer's right, pin 24 at x 23.05
+      insertion: unfolded, display side up -> FPC pin i on connector pin i (lib README, R27)
+    j_sen66:                       # J2, JST GH 6-pin side entry (SM06B-GHS-TB)
+      edge: -X                     # left edge; the cable leaves toward -X
+      center_y: 9.12
+      mating_face_x: 0.35
+      pin1_y: 5.99                 # pin 1 (VDD) at the rear end
+      body: [[0.35, 3.75], [5.21, 14.5]]  # 4.25 high
+    j_qwiic_aux:                   # J4, JST SH 4-pin side entry (SM04B-SRSS-TB)
+      edge: -X
+      center_y: 18.69
+      mating_face_x: 0.64
+      pin1_y: 17.19                # GND; pin 1 on the left seen into the mouth
+      body: [[0.64, 15.69], [5.59, 21.69]]  # 2.9 high
+    j_qwiic_tongue:                # J3, JST SH 4-pin side entry, cable to the sense tongue
+      edge: -X
+      center_y: 26.19
+      mating_face_x: 0.64
+      pin1_y: 24.69
+      body: [[0.64, 23.19], [5.59, 29.19]]
+    j_led_ext:                     # J5, JST SH 3-pin side entry (SM03B-SRSS-TB)
+      edge: +Y
+      center_x: 50.85
+      mating_face_y: 29.21
+      pin1_x: 49.85                # +5V; pin 1 on the viewer's left
+      body: [[48.35, 24.26], [53.35, 29.21]]  # 2.9 high
+    leds:                          # SK6812SIDE-A, side emitting toward +Y; chain D1 -> D2 -> D3 -> D4
+      faces: +Y
+      face_y: 30.0                 # light face on the front edge; body 4.0 x 1.6 x 2.0 high
+      light_center_z: 1.0          # centre of the 4.0 x 2.0 light face, above the board
+      chain:                       # firmware index -> position: 0, 1 = mini CO2 half (left), 2, 3 = PM2.5 (right)
+        - {index: 0, ref: D1, center_x: 12.6, half: co2}
+        - {index: 1, ref: D2, center_x: 17.7, half: co2}
+        - {index: 2, ref: D3, center_x: 39.9, half: pm25}
+        - {index: 3, ref: D4, center_x: 45.0, half: pm25}
+      divider_gap: [19.7, 37.9]    # clear x between LED1 and LED2 (the FPC sits there); halves meet at 28.8
+    button:                        # SW1, Alps SKRTLAE010, side push toward -Y, 1.6 N, 0.2 mm travel
+      edge: +Y                     # front-right
+      actuator_center_x: 57.0
+      actuator_width: 2.0
+      actuator_tip_y: 30.24        # 0.24 mm beyond the front edge (at rest)
+      actuator_center_z: 1.7       # Alps drawing; body 4.5 x 3.4, 3.3 high
+    aux_uart:                      # J6, J_AUX_UART, 1 x 6 2.54 mm through-hole pads, not fitted
+      pin1: [8.0, 17.45]           # pins 1..6 along +X to x 20.7
+
 # GPIOs the design must not use.
 # GPIO12/13 are USB D-/D+. GPIO10/11 are not exposed by the ESP32-C6-MINI-1 module,
 # so they cannot appear in `signals` anyway.

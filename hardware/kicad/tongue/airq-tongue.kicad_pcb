@@ -509,7 +509,7 @@
 		(uuid "4f4d9953-8da6-53fb-a679-b560f612d9f2")
 		(at 104.5 104.5)
 		(property "Reference" "U1"
-			(at 0 -4.4 0)
+			(at 0 3.9 0)
 			(layer "F.SilkS")
 			(uuid "618c643d-60a9-5b5a-8c90-c858075d0693")
 			(effects
@@ -916,7 +916,7 @@
 		(uuid "a393b1f6-f712-5b43-996b-c8886ea52f89")
 		(at 118.35 102.1)
 		(property "Reference" "U2"
-			(at 0 -4 0)
+			(at -2.85 3.9 0)
 			(layer "F.SilkS")
 			(uuid "25e7e3d9-0add-5d0e-b3da-76b91a2f21cd")
 			(effects

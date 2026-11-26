@@ -141,6 +141,7 @@ class BuildResult:
     hand_edges: list[str]     # UUIDs of Edge.Cuts items not from layout.yaml (kept)
     erc: Counter              # (severity, violation type) -> count
     drc: Counter
+    edges_replaced: bool = False  # the board's generated Edge.Cuts differed from layout.yaml
 
     def errors(self, routed: bool) -> int:
         """ERC errors plus DRC errors; unrouted connections only count once `routed`."""
@@ -160,7 +161,8 @@ def build(src_dir: Path, build_dir: Path, board: str) -> BuildResult:
     erc = run_erc(sch, build_dir / f"{board}-erc.json")
     drc = run_drc(pcb, build_dir / f"{board}-drc.json")
     export_fab(sch, pcb, build_dir, board)
-    return BuildResult(sch, pcb, [*written, pcb], layout.unplaced, layout.hand_edges, erc, drc)
+    return BuildResult(sch, pcb, [*written, pcb], layout.unplaced, layout.hand_edges, erc, drc,
+                       layout.edges_replaced)
 
 
 def main(argv: list[str]) -> int:
@@ -177,6 +179,10 @@ def main(argv: list[str]) -> int:
     print(f"schematic: {res.sch.relative_to(REPO)}\nboard:     {res.pcb.relative_to(REPO)}")
     if res.unplaced:
         print("no placement entry (kept or parked beside the board): " + ", ".join(res.unplaced))
+    if res.edges_replaced:
+        print("Edge.Cuts outline/cutouts replaced from layout.yaml (they differed on the board): "
+              "expected after editing layout.yaml; an outline edited in KiCad is lost, so copy "
+              "such an edit into layout.yaml `board`")
     if res.hand_edges:
         print(f"Edge.Cuts items drawn in KiCad, kept (move them into layout.yaml): "
               f"{len(res.hand_edges)}")

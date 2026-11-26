@@ -2619,8 +2619,7 @@
 			)
 		)
 		(property "Role" "J_QWIIC_TONGUE"
-			(at 63.5 96.52 0)
-			(hide yes)
+			(at 62.23 99.06 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects

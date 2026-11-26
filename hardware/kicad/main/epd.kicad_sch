@@ -4804,8 +4804,7 @@
 			)
 		)
 		(property "Role" "J_EPD"
-			(at 254 104.14 0)
-			(hide yes)
+			(at 254 146.05 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects

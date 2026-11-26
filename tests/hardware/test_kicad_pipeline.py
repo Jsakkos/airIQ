@@ -107,21 +107,14 @@ def board_build(request, tmp_path_factory):
 
 
 def test_board_is_clean(board_build):
-    """ERC and DRC clean. The main board is not routed yet (Task 5); the tongue is fully routed.
-
-    ERC holds on both boards at every stage. The main board's DRC and placement checks wait until
-    it is laid out: while the build still parks parts beside its outline (Task 4 drew the
-    schematic, Task 5 places it), this test reports an expected failure and says how many."""
+    """ERC and DRC clean on both boards, which are placed and fully routed: no error of any kind
+    (unrouted connections included), every part placed from layout.yaml, no Edge.Cuts drawn by hand,
+    and no silkscreen on or over a board edge (reference texts are placed from layout.yaml)."""
     board, _, res = board_build
     assert not [k for (sev, k) in res.erc if sev == "error"], res.erc
-    if board == "main" and res.unplaced:
-        pytest.xfail(f"main board not laid out yet (Task 5): {len(res.unplaced)} parts parked "
-                     f"beside the outline; DRC {dict(res.drc)}")
-    routed = board == "tongue"
-    assert res.errors(routed=routed) == 0, (res.erc, res.drc)
-    if not routed:
-        assert {k for (sev, k) in res.drc if sev == "error"} <= {"unconnected_items"}
-    assert res.unplaced == [] and res.hand_edges == []
+    assert res.errors(routed=True) == 0, (res.erc, res.drc)
+    assert res.unplaced == [] and res.hand_edges == [] and not res.edges_replaced
+    assert not [k for (_, k) in res.drc if k == "silk_edge_clearance"], res.drc
 
 
 def test_rebuilding_the_committed_project_changes_nothing(board_build):
@@ -212,7 +205,8 @@ def test_routing_zones_and_drawn_cutouts_survive_rebuilds(tmp_path):
     tree = parse(pcb.read_text(encoding="utf-8"))
     uuids = {str(atom(i, "uuid")) for i in tree[1:] if isinstance(i, list) and atom(i, "uuid")}
     assert {f"0d1f5b1e-0000-4000-8000-00000000000{i}" for i in range(1, 5)} <= uuids
-    (zone,) = children(tree, "zone")
+    zone = next(z for z in children(tree, "zone")
+                if atom(z, "uuid") == "0d1f5b1e-0000-4000-8000-000000000003")
     assert child(zone, "filled_polygon") is not None          # filled by DRC, saved
     assert first.hand_edges == ["0d1f5b1e-0000-4000-8000-000000000004"]
     snapshot = {p.name: p.read_bytes() for p in first.written}

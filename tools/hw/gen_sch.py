@@ -37,6 +37,7 @@ SCH_VERSION = "20260306"  # what KiCad 10.0 writes
 GRID = 1.27
 _NS = uuid.UUID("0c6d1c52-5f43-4b0e-9a63-2b1f0f6a7e10")
 _FONT = ["font", ["size", "1.27", "1.27"]]
+SHOWN_FIELDS = {"Role"}   # extra fields drawn on the sheet (the others are hidden)
 
 
 def uid(*parts: str) -> QStr:
@@ -91,11 +92,17 @@ def pin_outward(pin: Pin, part: PartSrc) -> int:
     return to_sheet_angle((pin.angle + 180) % 360, part.rot, part.mirror)
 
 
+def pin_stub(pin: Pin, part: PartSrc) -> float:
+    """The wire length out of `pin`: its own `stub` entry (by number, then name), else the part's."""
+    return part.pin_stubs.get(pin.number, part.pin_stubs.get(pin.name, part.stub))
+
+
 def label_point(pin: Pin, part: PartSrc) -> tuple[float, float]:
-    """Where the pin's label or power symbol goes: `stub` mm out from its connection point."""
+    """Where the pin's label or power symbol goes: its stub length out from its connection point."""
     x, y = pin_end(pin, part)
     a = math.radians(pin_outward(pin, part))
-    return round(x + part.stub * round(math.cos(a)), 4), round(y - part.stub * round(math.sin(a)), 4)
+    s = pin_stub(pin, part)
+    return round(x + s * round(math.cos(a)), 4), round(y - s * round(math.sin(a)), 4)
 
 
 def _on_grid(v: float) -> bool:
@@ -196,6 +203,12 @@ def _resolve(sheet: SheetSrc, p: PartSrc, libs: Libraries, interface: dict | Non
     nets = _pin_nets(where, p, pins, interface, problems)
     if nets is None:
         return None
+    known = {str(prop[1]) for prop in children(sym, "property")} | set(p.fields) | {"LCSC"}
+    for name in sorted(set(p.fields_at) - known):
+        problems.append(f"{where}: fields_at.{name}: the part has no field {name}")
+    pin_keys = {pin.number for pin in pins} | {pin.name for pin in pins}
+    for key in sorted(set(p.pin_stubs) - pin_keys):
+        problems.append(f"{where}: stub.{key}: {p.symbol} has no pin {key}")
     power = is_power_symbol(sym)
     if power and not p.ref.startswith("#"):
         problems.append(f"{where}: power symbol references must start with '#'")
@@ -272,6 +285,9 @@ def _placed_fields(pl: Placed, ref: str) -> list[list]:
     if p.lcsc is not None:
         extra["LCSC"] = p.lcsc
     out = []
+    value_at = p.at
+    # field text angles are stored in the symbol's own frame: this one reads horizontally on the page
+    flat = "90" if p.rot in (90, 270) else "0"
     for prop in children(sym, "property"):
         name = str(prop[1])
         if name.startswith("ki_"):
@@ -279,10 +295,20 @@ def _placed_fields(pl: Placed, ref: str) -> list[list]:
         val = values[name] if name in values else extra.pop(name, prop[2])
         at = child(prop, "at")
         x, y = to_sheet(float(at[1]), float(at[2]), p.at, p.rot, p.mirror)
+        if name in p.fields_at:
+            x, y = p.at[0] + p.fields_at[name][0], p.at[1] + p.fields_at[name][1]
+        if name == "Value":
+            value_at = (x, y)
         rest = [c for c in prop[3:] if isinstance(c, list) and c[0] not in ("at", "id")]
-        angle = at[3] if len(at) > 3 else "0"
+        angle = flat if name in p.fields_at else (at[3] if len(at) > 3 else "0")
         out.append(["property", QStr(name), QStr(val), ["at", num(x), num(y), angle], *rest])
     for name, val in extra.items():
+        if name in SHOWN_FIELDS:
+            # shown, so the reader can tell same-part connectors apart (J_QWIIC_TONGUE vs AUX)
+            dx, dy = p.fields_at.get(name, (value_at[0] - p.at[0], value_at[1] - p.at[1] + 2.54))
+            out.append(["property", QStr(name), QStr(val),
+                        ["at", num(p.at[0] + dx), num(p.at[1] + dy), flat], _effects()])
+            continue
         out.append(["property", QStr(name), QStr(val), ["at", num(p.at[0]), num(p.at[1]), "0"],
                     ["hide", "yes"], _effects()])
     return out
@@ -392,7 +418,7 @@ def generate_schematics(design: Design, libs: Libraries) -> dict[str, str]:
                     items.append(["no_connect", ["at", num(end[0]), num(end[1])],
                                   ["uuid", uid(design.name, "nc", key)]])
                     continue
-                if pl.src.stub:
+                if pin_stub(pin, pl.src):
                     tip = label_point(pin, pl.src)
                     items.append(["wire", ["pts", ["xy", num(end[0]), num(end[1])],
                                            ["xy", num(tip[0]), num(tip[1])]],

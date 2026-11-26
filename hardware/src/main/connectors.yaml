@@ -15,6 +15,7 @@ notes:
   - {text: "SEN66 VDD: 10 uF at the connector (R15)", at: [17.78, 109.22], size: 1.8}
   - {text: "Qwiic sockets, JST SH 4-pin side entry (pin order: hardware/interface.yaml)\nJ_QWIIC_TONGUE: cable to the sense tongue (SHT45, VEML7700)\nJ_QWIIC_AUX: spare, e.g. SFA40 formaldehyde (airQ)\nPins 5, 6 = fitting nails", at: [129.54, 63.5], size: 1.8}
   - {text: "J_LED_EXT: off-board LED segment, JST SH 3-pin\n+5V, LED_DOUT_5V (DOUT of the last on-board LED), GND\nPins 4, 5 = fitting nails", at: [17.78, 124.46], size: 1.8}
+  - {text: "H1, H2: M2 mounting holes (2.2 mm, non-plated)", at: [17.78, 177.8], size: 1.8}
   - {text: "J_AUX_UART: 2.54 mm pads, NOT FITTED (DNP)\nROM-UART recovery: hold BUTTON low, pulse EN\n(U0TXD = GPIO16, U0RXD = GPIO17).\nThe same pads take a future mmWave presence sensor.", at: [129.54, 124.46], size: 1.8}
 
 parts:
@@ -38,6 +39,7 @@ parts:
     at: [142.24, 91.44]
     rot: 270                          # pins on the right, 1..4 from the top
     stub: 5.08                        # markers clear of the rotated reference text
+    fields_at: {Reference: [-1.27, -13.97], Role: [-1.27, 15.24]}   # clear of the labels
     fields: {Role: J_QWIIC_TONGUE}
     pins: {"5": NC, "6": NC}          # fitting nails
   J4:
@@ -45,6 +47,7 @@ parts:
     at: [203.2, 91.44]
     rot: 270
     stub: 5.08
+    fields_at: {Reference: [-1.27, -13.97], Role: [-1.27, 15.24]}   # clear of the labels
     fields: {Role: J_QWIIC_AUX}
     pins: {"5": NC, "6": NC}
 
@@ -54,6 +57,16 @@ parts:
     at: [55.88, 148.59]
     fields: {Role: J_LED_EXT}
     pins: {"4": NC, "5": NC}          # fitting nails
+
+  # -- M2 mounting holes (non-plated, no BOM line, not placed by JLC)
+  H1:
+    symbol: Mechanical:MountingHole
+    at: [25.4, 185.42]
+    footprint: MountingHole:MountingHole_2.2mm_M2
+  H2:
+    symbol: Mechanical:MountingHole
+    at: [40.64, 185.42]
+    footprint: MountingHole:MountingHole_2.2mm_M2
 
   # -- Aux UART / programming header: 1 x 6 2.54 mm pads, not fitted (pins 1-6: interface.yaml)
   J6:

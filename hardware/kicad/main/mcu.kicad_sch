@@ -2507,7 +2507,7 @@
 		(dnp no)
 		(uuid "0e161851-5ba5-5d4f-91f7-43a9e9b89b6c")
 		(property "Reference" "U3"
-			(at 101.6 78.74 0)
+			(at 88.9 83.82 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -2593,8 +2593,7 @@
 			)
 		)
 		(property "Role" "MCU"
-			(at 101.6 104.14 0)
-			(hide yes)
+			(at 101.6 129.54 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects

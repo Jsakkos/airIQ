@@ -54,11 +54,14 @@ custom_rules: |
     (constraint disallow pad)
     (condition "A.intersectsArea('SHT45_ISOLATION') && !A.memberOfFootprint('U1')"))
 
-# REF: [x, y, rotation]
+# REF: [x, y, rotation], or {at: [x, y, rotation], ref: [dx, dy] | [dx, dy, angle] | hide}
 placement:
-  U1: [4.5, 4.5, 0]          # SHT45: pads 3/4 (VDD/VSS) face the neck, 1/2 (SDA/SCL) loop round
+  # SHT45: pads 3/4 (VDD/VSS) face the neck, 1/2 (SDA/SCL) loop round; its reference text sits on
+  # the frame below the slot
+  U1: {at: [4.5, 4.5, 0], ref: [0, 3.9]}
   C1: [10.0, 4.5, 90]        # SHT45 100 nF, just past the neck (5.5 mm from the sensor)
-  U2: [18.35, 2.1, 0]        # VEML7700: footprint -Y (window) = front edge, face at y = 0.25
+  # VEML7700: footprint -Y (window) = front edge, face at y = 0.25; reference text left of C2
+  U2: {at: [18.35, 2.1, 0], ref: [-2.85, 3.9]}
   C2: [18.35, 4.0, 180]      # VEML7700 100 nF, under its VDD (right) and GND (left) pads
   J1: [15.0, 9.85, 0]        # Qwiic socket: mating face toward +Y, fitting nails 0.31 mm in
   H1: [4.5, 10.4, 270]       # M2 hole, 2.2 mm (turned so its reference text clears the slot)

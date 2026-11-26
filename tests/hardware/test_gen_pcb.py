@@ -171,3 +171,32 @@ def test_parked_footprints_are_packed_without_overlap(libs):
         for b in boxes[i + 1:]:
             assert (a[2] + PARK_GAP <= b[0] + 1e-9 or b[2] + PARK_GAP <= a[0] + 1e-9
                     or a[3] + PARK_GAP <= b[1] + 1e-9 or b[3] + PARK_GAP <= a[1] + 1e-9)
+
+
+# ---- reference text from layout.yaml, outline edits ----------------------------------------
+
+def _ref(tree, ref):
+    fp = next(f for f in children(tree, "footprint")
+              if next(p[2] for p in children(f, "property") if p[1] == "Reference") == ref)
+    return next(p for p in children(fp, "property") if p[1] == "Reference")
+
+
+def test_reference_text_can_be_placed_or_hidden(libs):
+    layout = {**LAYOUT, "placement": {"U1": {"at": [10, 5, 90], "ref": [3, 1]},
+                                      "R1": {"at": [20, 5], "ref": "hide"}}}
+    tree = parse(_board(libs, layout=layout).text)
+    u1 = _ref(tree, "U1")
+    # 3 mm right, 1 mm down on the board: in the footprint's frame (turned 90) that is (-1, 3);
+    # the text angle is board-absolute and stays upright
+    assert child(u1, "at")[1:3] == ["-1", "3"] and len(child(u1, "at")) == 3
+    assert child(u1, "hide") is None
+    assert child(_ref(tree, "R1"), "hide") == ["hide", "yes"]
+
+
+def test_a_changed_outline_is_reported_when_it_is_replaced(libs):
+    first = _board(libs)
+    assert not _board(libs, first.text).edges_replaced                 # unchanged: quiet
+    edited = first.text.replace("(end 140 70)", "(end 141 70)")         # widened in KiCad
+    assert edited != first.text and _board(libs, edited).edges_replaced
+    wider = {**LAYOUT, "board": {**LAYOUT["board"], "width": 41}}       # or in layout.yaml
+    assert _board(libs, first.text, layout=wider).edges_replaced

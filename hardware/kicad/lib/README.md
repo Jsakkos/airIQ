@@ -73,7 +73,7 @@ in `interface.yaml` and in the firmware is a separate, later task.
 | C160403 | SM03B-SRSS-TB (JST SH 3) | SM03B-SRSS-TB | CONN-SMD_SM03B-SRSS-TB-LF-SN-P | CONN-SMD_SR1.00-WS-3P | main |
 | C2856831 | FPC-05FB-24PH20 (XUNPU) | FPC-05FB-24PH20 | FPC-SMD_24P-P0.50_FPC-05FB-24PH20 | same name | main |
 | C110293 | SKRTLAE010 (Alps) | SKRTLAE010 | KEY-SMD_SKRTLAE010 | KEY-SMD_L4.6-W3.4-H3.4 | main |
-| C135276 | SMNR4030-470MT (47 µH, EPD boost) | SMNR4030-470MT | IND-SMD_L4.0-W4.0_SMNR4020 | IND-SMD_L4.0-W4.0-H2.0 | main |
+| C135276 | SMNR4030-470MT (47 µH, EPD boost) | SMNR4030-470MT | IND-SMD_L4.0-W4.0_SMNR4020 (4030 land pattern) | KiCad stock L_APV_ANR4030, 3.0 mm (fix 20) | main |
 | C20917 | AO3400A (EPD Q1) | AO3400A | SOT-23-3_L2.9-W1.3-P1.90-LS2.4-BR | SOT-23-3P_… | main |
 | C8598 | B5819W SL (EPD D1–D3) | B5819W_C8598 | SOD-123_L2.7-W1.6-LS3.7-RD-1 | SOD-123_… | main |
 | C5221601 | SHT45-AD1B-R2 | SHT45-AD1B-R2 | DFN-4_L1.5-W1.5-P0.8-TL-EP (die pad removed, see fixes) | DFN-4_L1.5-W1.5-P0.8 | tongue |
@@ -190,6 +190,49 @@ Its stock is only 308 (enough for 10 boards plus attrition).
     0.10 mm annular ring, below the board's 0.15 mm minimum (`layout.yaml` rules), so DRC flagged each. Espressif's
     land pattern (datasheet v1.4, Figure 11-1) marks "Via for thermal pad" without dimensions, so they are now the board's
     own via, 0.6 mm on 0.3 mm (`Default` net class). They stay inside the EPAD copper, on GND.
+17. **Courtyards of the main-board parts** (Task 5, before placement; as fix 11): EasyEDA drew them round the body
+    only. Each is now a rectangle round body and pads plus 0.25 mm: WROOM-1 x ±9.75, y −16.00…10.10 (its pads stick
+    out 0.5 mm past the body); USB-C x ±5.17, y −3.18…5.22; SOT-23-6 (TPS562201) ±2.15 × ±1.70; SOT-23-6 (USBLC6)
+    ±1.70 × ±1.94; SOT-23-5 ±2.10 × ±1.70; SOT-23-3 ±1.75 × ±1.70; SOD-123 ±2.55 × ±1.10; MS5611 ±2.75 × ±2.30;
+    SMNR4020 ±3.12 × ±2.25; WPN4020H ±2.60 × ±2.25; SK6812SIDE-A x ±2.55, y −0.86…1.61; FPC x ±8.55, y −2.47…4.13;
+    SM06B x ±5.72, y −2.78…3.32; SM03B x ±3.30, y −2.97…3.19; SKRTLAE010 x ±2.83, y −2.13…2.30.
+18. **SKRTLAE010 copper clear of its guide holes** (Task 5). Alps' land pattern (SKRT series basic information,
+    "Land Dimensions", viewed from the mounting face; the EasyEDA footprint matches it) puts pads 1 and 3
+    0.075 mm and the tabs 4 and 5 0.15 mm from the two ø0.9 mm guide-boss holes. JLCPCB's published minimum
+    from a non-plated hole to copper is **0.2 mm** ("NPTH to Track: 0.2mm", jlcpcb.com/capabilities/pcb-capabilities,
+    read 2026-11-25), so neither a relaxing DRC rule nor the vendor pattern as drawn is buildable as specified.
+    Pads 1 and 3 are now custom pads with their hole-side corner cut by a chord ((±0.375, 0.323)–(±0.12, 0.9) in pad
+    coordinates; 0.05 mm² of 1.35 mm² removed), and the tabs are 0.1 mm shorter on the hole side (0.8 × 1.3 mm at
+    y 1.02). All copper is now ≥ 0.25 mm from the holes, KiCad's default hole clearance: no custom rule. The
+    "prohibited area of copper tracks" between the tabs is a board rule area (`SW1_NO_COPPER`), as footprints here
+    carry no zones.
+19. **USB-C copper clear of its locating pegs** (Task 5). The vendor land pattern put the outer GND pads
+    (A1B12/B1A12) 0.18 mm and the VBUS pads (A4B9/B4A9) 0.22 mm from the ø0.70 mm non-plated peg holes; Task 2 had
+    allowed 0.15 mm with a footprint-scoped DRC rule. JLC's 0.2 mm NPTH-to-copper minimum (fix 18) rules that out,
+    so the four pads are shortened at their inner (peg-side) end, A1B12/B1A12 by 0.07 mm (1.03 mm long) and
+    A4B9/B4A9 by 0.04 mm (1.06 mm); their outer ends, where the contact tails are soldered, stay where the
+    SHOU HAN drawing puts them. All copper is ≥ 0.25 mm from the pegs and the custom rule is gone.
+20. **3D model placement of the main-board parts** (Task 5; the enclosure is built from the board STEP). Measured
+    from the STEP vertices against the pads and silkscreen, then checked in the board's STEP export:
+    - `USB-C-SMD_TYPE-C-6PIN-2MD-073.step` sat half below the board and 1.3 mm behind the mouth line: offset now
+      (0, −1.305, 1.58). The shell is 8.94 × 7.35 × 3.16 mm (SHOU HAN drawing), mouth on the silkscreen front line,
+      legs 1.0 mm below the body.
+    - `LED-SMD_4P-L4.0-W1.6-L.step` (SK6812SIDE-A) was centred on z = 0 and on the pads: offset now (0, −0.56, 1.02),
+      so the 4.0 × 1.6 × 2.0 body sits on the board with its light face on footprint y +1.36 (the silkscreen face).
+    - `FPC-SMD_24P-P0.50_FPC-05FB-24PH20.step` sat 1.27 mm toward the mouth (its tails missed the pads): offset
+      (0, 1.27, 0); the contacts now start on the pads and the mouth is the silkscreen front line (y +3.88).
+    - `CONN-SMD_GH1.25-WS-6P.step` (SM06B, J_SEN66) had its origin on pin 1, as fix 12 found for the SM04B:
+      offset (−3.125, 0, 0). `CONN-SMD_SR1.00-WS-3P.step` (SM03B): offset (−1.0, −0.385, 0), as the SM04B.
+    - `SOD-123_L2.7-W1.6-LS3.7-RD-1.step` sat 0.6 mm below the board: offset (0, 0, 0.6).
+    - L2 `IND-SMD_L4.0-W4.0_SMNR4020`: the SMNR4030-470MT is **3.0 mm** tall (Shun Xiang Nuo SMNR datasheet,
+      dimension table: SMNR4030 A 4.0 ± 0.3, B 4.0 ± 0.3, C 3.0 max; land F 1.1, G 1.9, H 3.7, the same as the
+      4020, so the pads stay). EasyEDA's model was the 2.0 mm 4020 body; the footprint now uses KiCad's stock
+      `Inductor_SMD.3dshapes/L_APV_ANR4030.step` (4.0 × 4.0 × 3.0, a magnetic-resin-shielded 4030 like the SMNR).
+21. **Silkscreen on the main board's edges** (Task 5): parts whose face is a board edge had silkscreen on or past
+    it. Moved to F.Fab: the SK6812SIDE-A outline (its pin-1 dot stays), the FPC and USB-C mouth lines and the
+    SKRTLAE010 actuator outline (their side lines are cut 0.5 mm short of the edge), the WROOM-1's antenna
+    pattern and antenna-end outline (they hang over the board edge), the USB-C pin-1 dot (it sat on a shell leg).
+    The SM06B's two short tab lines are cut back clear of the tab pads.
 
 ## Pad maps checked by hand
 
@@ -229,7 +272,7 @@ Each check compares the footprint's pad numbers and positions (from the `.kicad_
 - Source caveat: LCSC's PDF for C2856831 itself is corrupt (pdf.js: "Invalid or corrupted PDF file"). The check used the identical
   series drawing in the FPC-05FB-6PH20 (C2856827) datasheet, whose dimension table lists FPC-05FB-24PH20.
 
-## Antenna keep-out for Task 5 (ESP32-C6-WROOM-1)
+## Antenna keep-out (ESP32-C6-WROOM-1; applied in Task 5 as the board rule area `ANTENNA_KEEPOUT`)
 
 From Espressif's *ESP32-C6 Hardware Design Guidelines*, "Positioning a Module on a Base Board", figure "Keepout Zone for
 ESP32-C6 Module's Antenna (Antenna feed point on the right)", units mm:
@@ -251,11 +294,10 @@ ESP32-C6 Module's Antenna (Antenna feed point on the right)", units mm:
 - **Side-emitting LED and side-looking VEML7700 directions** were derived from 2-D drawings: SK6812SIDE-A light toward footprint +y,
   VEML7700 window toward footprint −y (re-checked against the vector drawing in Task 6, fix 13). The EasyEDA 3D bodies have no
   visible lens, so the 3D viewer cannot show the window. Check against a physical part if one is at hand before the board is ordered.
-- **SKRTLAE010 actuator direction**: not checked against the drawing. Confirm in 3D at placement.
-- **SKRTLAE010 pads next to its guide holes**: the land pattern puts pads 1 and 3 0.075 mm, and the tabs 4 and 5
-  0.15 mm, from the 0.9 mm non-plated guide holes; KiCad's default hole clearance is 0.25 mm, so DRC reports 4 errors
-  on the main board. Decide at Task 5 against JLC's NPTH-to-copper capability: a footprint-scoped rule (as for the
-  USB-C pegs), smaller pads, or another switch.
+- **SKRTLAE010 actuator direction**: in the 3D view (Task 5) the actuator points out of the footprint's +y side,
+  as the Alps drawing shows (the actuator is on the body face opposite the terminals). Confirm in KiCad.
+- **SKRTLAE010 and USB-C pads trimmed** for JLC's 0.2 mm NPTH-to-copper minimum (fixes 18, 19): a small change to
+  the vendors' land patterns. Confirm you are happy with it (the alternative is another switch without guide bosses).
 - The WROOM-1 3D body is a stand-in (the S3-WROOM-1 body with the same outline). Good enough for the enclosure STEP, not for a photo-real render.
 - Licence: the EasyEDA-derived symbols, footprints and models come from the LCSC/EasyEDA library through easyeda2kicad.
   Their redistribution terms are EasyEDA's, not CC BY-SA. The owner should confirm that is acceptable for a public repository.

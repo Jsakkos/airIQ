@@ -11,13 +11,14 @@ from pathlib import Path
 import pytest
 import yaml
 
+from design import placement_entry
 from sexpr import atom, child, children, parse
 
 REPO = Path(__file__).resolve().parents[2]
 LAYOUT = yaml.safe_load((REPO / "hardware/src/tongue/layout.yaml").read_text(encoding="utf-8"))
 MECH = yaml.safe_load((REPO / "hardware/interface.yaml").read_text(encoding="utf-8"))["mechanical"]["tongue"]
 PCB = REPO / "hardware/kicad/tongue/airq-tongue.kicad_pcb"
-PLACE = LAYOUT["placement"]
+PLACE = {ref: list(placement_entry(v)[:3]) for ref, v in LAYOUT["placement"].items()}  # x, y, rot
 OX, OY = LAYOUT["board"]["origin"]
 SHT45_HALF = 0.75          # SHT45 body: 1.5 x 1.5 mm
 CLEAR = 1.5                # global constraint: no other copper within 1.5 mm of it

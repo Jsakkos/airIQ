@@ -29,6 +29,7 @@ parts:
     symbol: airq:ESP32-C6-WROOM-1-N8
     at: [101.6, 104.14]
     fields: {Role: MCU}
+    fields_at: {Reference: [-12.7, -20.32]}   # above the body's left half, clear of pin 29's GND
     pins:
       GND: GND          # pins 1, 28 and the EPAD (29-37, stacked in the symbol)
       3V3: +3V3

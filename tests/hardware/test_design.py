@@ -143,3 +143,39 @@ def test_interface_problems(tmp_path, iface, expected):
     with pytest.raises(DesignError) as e:
         load_design(src)
     assert any(expected in p for p in e.value.problems), e.value.problems
+
+
+@pytest.mark.parametrize("layout,expected", [
+    ("rules: {min_clearence: 0.2}\n", "rules: unknown key 'min_clearence'"),
+    ("rules: {min_clearance: wide}\n", "rules.min_clearance must be a number"),
+    ("netclasses: {Power: {track_width: 0.4, nets: GND}}\n", "netclasses.Power.nets must be a list"),
+    ("netclasses: {Power: {trackwidth: 0.4}}\n", "netclasses.Power: unknown key 'trackwidth'"),
+    ("netclasses: {Default: {nets: [GND]}}\n", "the Default class takes every other net"),
+    ("drc_severities: {clearance: loud}\n", "drc_severities.clearance must be one of"),
+    ("placement: {R7: [1, 2, 0]}\n", "placement R7: no part R7 in the schematic sheets"),
+    ("placement: {R1: [1, 2, 0, 4]}\n", "placement R1: expected [x, y] or [x, y, rotation]"),
+    ("placement: {R1: {at: [1, 2], ref: left}}\n", "ref must be `hide`, [dx, dy] or [dx, dy, angle]"),
+    ("placement: {R1: {at: [1, 2], rf: hide}}\n", "placement R1: unknown key 'rf'"),
+    ("custom_rules: [a]\n", "`custom_rules` must be text"),
+])
+def test_layout_nested_keys_are_checked(tmp_path, layout, expected):
+    with pytest.raises(DesignError) as e:
+        load_design(_write(tmp_path, layout=layout))
+    assert any(expected in p for p in e.value.problems), e.value.problems
+
+
+def test_placement_entries_and_reference_options():
+    from design import placement_entry
+    assert placement_entry([1, 2]) == (1.0, 2.0, 0.0, None)
+    assert placement_entry({"at": [1, 2, 90], "ref": "hide"}) == (1.0, 2.0, 90.0, "hide")
+    assert placement_entry({"at": [1, 2], "ref": [0.5, -1]}) == (1.0, 2.0, 0.0, (0.5, -1.0, 0.0))
+
+
+def test_field_positions_and_per_pin_stubs_load(tmp_path):
+    sheet = SHEET.replace("    stub: 2.54\n", "    stub: {1: 2.54, F: 5.08}\n    fields_at: {Reference: [0, -5.08]}\n")
+    u1 = load_design(_write(tmp_path, sheet=sheet)).sheets[0].parts[1]
+    assert u1.stub == 0 and u1.pin_stubs == {"1": 2.54, "F": 5.08}
+    assert u1.fields_at == {"Reference": (0.0, -5.08)}
+    with pytest.raises(DesignError) as e:
+        load_design(_write(tmp_path / "bad", sheet=SHEET.replace("stub: 2.54", "stub: {1: -1}")))
+    assert any("stub.1 must be a length" in p for p in e.value.problems), e.value.problems

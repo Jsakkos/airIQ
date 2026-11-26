@@ -45,18 +45,22 @@ parts:
   D1:
     symbol: airq:SK6812SIDE-A_C5378721
     at: [45.72, 139.7]
+    stub: {DOUT: 7.62}    # DOUT label clear of the GND symbol on the pin above
     pins: {DIN: LED_DATA_5V, VDD: +5V, DOUT: LED_CHAIN_1, GND: GND}
   D2:
     symbol: airq:SK6812SIDE-A_C5378721
     at: [101.6, 139.7]
+    stub: {DOUT: 7.62}    # DOUT label clear of the GND symbol on the pin above
     pins: {DIN: LED_CHAIN_1, VDD: +5V, DOUT: LED_CHAIN_2, GND: GND}
   D3:
     symbol: airq:SK6812SIDE-A_C5378721
     at: [157.48, 139.7]
+    stub: {DOUT: 7.62}    # DOUT label clear of the GND symbol on the pin above
     pins: {DIN: LED_CHAIN_2, VDD: +5V, DOUT: LED_CHAIN_3, GND: GND}
   D4:
     symbol: airq:SK6812SIDE-A_C5378721
     at: [213.36, 139.7]
+    stub: {DOUT: 7.62}    # DOUT label clear of the GND symbol on the pin above
     pins: {DIN: LED_CHAIN_3, VDD: +5V, DOUT: LED_DOUT_5V, GND: GND}
   C14:
     symbol: Device:C

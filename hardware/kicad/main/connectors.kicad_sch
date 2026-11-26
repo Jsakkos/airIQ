@@ -440,6 +440,105 @@
 			)
 			(embedded_fonts no)
 		)
+		(symbol "Mechanical:MountingHole"
+			(pin_names
+				(offset 1.016)
+			)
+			(exclude_from_sim no)
+			(in_bom no)
+			(on_board yes)
+			(in_pos_files yes)
+			(duplicate_pin_numbers_are_jumpers no)
+			(property "Reference" "H"
+				(at 0 5.08 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Value" "MountingHole"
+				(at 0 3.175 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Footprint" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "Description" "Mounting Hole without connection"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_keywords" "mounting hole"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(property "ki_fp_filters" "MountingHole*"
+				(at 0 0 0)
+				(show_name no)
+				(do_not_autoplace no)
+				(hide yes)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(symbol "MountingHole_0_1"
+				(circle
+					(center 0 0)
+					(radius 1.27)
+					(stroke
+						(width 1.27)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+			)
+			(embedded_fonts no)
+		)
 		(symbol "airq:SM03B-SRSS-TB"
 			(exclude_from_sim no)
 			(in_bom yes)
@@ -1566,6 +1665,17 @@
 		)
 		(uuid "08787a0a-3373-52ff-901f-abdc1939c193")
 	)
+	(text "J_AUX_UART: 2.54 mm pads, NOT FITTED (DNP)\nROM-UART recovery: hold BUTTON low, pulse EN\n(U0TXD = GPIO16, U0RXD = GPIO17).\nThe same pads take a future mmWave presence sensor."
+		(exclude_from_sim no)
+		(at 129.54 124.46 0)
+		(effects
+			(font
+				(size 1.8 1.8)
+			)
+			(justify left bottom)
+		)
+		(uuid "1fe25104-4c04-5bae-a5e5-94f71821cf22")
+	)
 	(text "Qwiic sockets, JST SH 4-pin side entry (pin order: hardware/interface.yaml)\nJ_QWIIC_TONGUE: cable to the sense tongue (SHT45, VEML7700)\nJ_QWIIC_AUX: spare, e.g. SFA40 formaldehyde (airQ)\nPins 5, 6 = fitting nails"
 		(exclude_from_sim no)
 		(at 129.54 63.5 0)
@@ -1577,9 +1687,9 @@
 		)
 		(uuid "a67daf20-3cf1-5e55-b6cd-5007330767a7")
 	)
-	(text "J_AUX_UART: 2.54 mm pads, NOT FITTED (DNP)\nROM-UART recovery: hold BUTTON low, pulse EN\n(U0TXD = GPIO16, U0RXD = GPIO17).\nThe same pads take a future mmWave presence sensor."
+	(text "H1, H2: M2 mounting holes (2.2 mm, non-plated)"
 		(exclude_from_sim no)
-		(at 129.54 124.46 0)
+		(at 17.78 177.8 0)
 		(effects
 			(font
 				(size 1.8 1.8)
@@ -2059,8 +2169,7 @@
 			)
 		)
 		(property "Role" "J_AUX_UART"
-			(at 157.48 148.59 0)
-			(hide yes)
+			(at 157.48 161.29 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -2423,6 +2532,152 @@
 		)
 	)
 	(symbol
+		(lib_id "Mechanical:MountingHole")
+		(at 25.4 185.42 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "469abde6-53f8-5f55-a942-4561c5e94bdb")
+		(property "Reference" "H1"
+			(at 25.4 180.34 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "MountingHole"
+			(at 25.4 182.245 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "MountingHole:MountingHole_2.2mm_M2"
+			(at 25.4 185.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 25.4 185.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Mounting Hole without connection"
+			(at 25.4 185.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(instances
+			(project "airq-main"
+				(path "/7b9ce1eb-45f5-549f-bfaf-77f7fedd3e55/c6152d89-f2bc-5da5-a6d8-962600baa955"
+					(reference "H1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Mechanical:MountingHole")
+		(at 40.64 185.42 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(uuid "4bc24c43-9cf8-51b3-8951-d3029849bdce")
+		(property "Reference" "H2"
+			(at 40.64 180.34 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "MountingHole"
+			(at 40.64 182.245 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "MountingHole:MountingHole_2.2mm_M2"
+			(at 40.64 185.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 40.64 185.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Mounting Hole without connection"
+			(at 40.64 185.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(instances
+			(project "airq-main"
+				(path "/7b9ce1eb-45f5-549f-bfaf-77f7fedd3e55/c6152d89-f2bc-5da5-a6d8-962600baa955"
+					(reference "H2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:+5V")
 		(at 49.53 146.05 90)
 		(unit 1)
@@ -2746,7 +3001,7 @@
 		(dnp no)
 		(uuid "8dea7b28-edae-5f7b-867f-ea5e0915b739")
 		(property "Reference" "J3"
-			(at 151.13 91.44 0)
+			(at 140.97 77.47 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -2832,8 +3087,7 @@
 			)
 		)
 		(property "Role" "J_QWIIC_TONGUE"
-			(at 142.24 91.44 0)
-			(hide yes)
+			(at 140.97 106.68 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -3123,8 +3377,7 @@
 			)
 		)
 		(property "Role" "J_SEN66"
-			(at 50.8 88.9 0)
-			(hide yes)
+			(at 50.8 102.87 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -3420,8 +3673,7 @@
 			)
 		)
 		(property "Role" "J_LED_EXT"
-			(at 55.88 148.59 0)
-			(hide yes)
+			(at 55.88 163.83 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -3544,7 +3796,7 @@
 		(dnp no)
 		(uuid "ff51de54-8ef4-54dc-a6b0-0e022a208784")
 		(property "Reference" "J4"
-			(at 212.09 91.44 0)
+			(at 201.93 77.47 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -3630,8 +3882,7 @@
 			)
 		)
 		(property "Role" "J_QWIIC_AUX"
-			(at 203.2 91.44 0)
-			(hide yes)
+			(at 201.93 106.68 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects

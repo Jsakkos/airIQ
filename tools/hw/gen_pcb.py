@@ -23,6 +23,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
+from design import placement_entry
 from gen_sch import num, uid
 from kicad_lib import Libraries
 from sexpr import QStr, atom, child, children, dumps, parse
@@ -175,6 +176,26 @@ def footprint_node(project: str, comp: Comp, lib_fp: list, x: float, y: float, r
     return node
 
 
+def place_reference(fp: list, rot: float, option) -> None:
+    """Apply a layout.yaml `ref` option to footprint node `fp` placed at rotation `rot`:
+    "hide", or (dx, dy, angle) = the text centre in board axes from the footprint origin.
+    A footprint child's position is stored in footprint axes (it turns with the footprint),
+    its angle board-absolute, so the board offset is turned back by `rot`."""
+    if option is None:
+        return
+    prop = next(p for p in children(fp, "property") if p[1] == "Reference")
+    if option == "hide":
+        prop[:] = [c for c in prop if not (isinstance(c, list) and c[0] == "hide")]
+        prop.insert(4, ["hide", "yes"])
+        return
+    dx, dy, angle = option
+    a = math.radians(rot)
+    lx, ly = dx * math.cos(a) - dy * math.sin(a), dx * math.sin(a) + dy * math.cos(a)
+    at = child(prop, "at")
+    at[1:] = [num(lx, 6), num(ly, 6), *([num(angle % 360, 6)] if angle % 360 else [])]
+    prop[:] = [c for c in prop if not (isinstance(c, list) and c[0] == "hide")]
+
+
 def _pad(pad: list, comp: Comp, rot: float, key: QStr) -> list:
     out = []
     for c in pad:
@@ -217,16 +238,29 @@ class Board:
     text: str
     unplaced: list[str]      # references without a placement entry
     hand_edges: list[str]    # UUIDs of kept Edge.Cuts items that layout.yaml did not generate
+    # True when the generated outline/cutouts on the existing board differed from layout.yaml
+    # and were replaced: expected after a layout.yaml edit, otherwise a KiCad GUI edit was lost
+    edges_replaced: bool = False
 
 
-def _existing(project: str, existing: str | None) -> tuple[list[list], dict, list[str]]:
-    """Items to keep from the current board, footprint positions by reference, and the UUIDs of
-    kept Edge.Cuts items drawn by hand (the generated ones are recognised by edge_uid)."""
+def edge_geometry(item: list) -> tuple:
+    """Comparable shape of a gr_rect / gr_poly Edge.Cuts item (coordinates to 0.1 um)."""
+    if item[0] == "gr_rect":
+        pts = [child(item, "start"), child(item, "end")]
+    else:
+        pts = children(child(item, "pts") or [], "xy")
+    return item[0], tuple((round(float(p[1]), 4), round(float(p[2]), 4)) for p in pts)
+
+
+def _existing(project: str, existing: str | None) -> tuple[list[list], dict, list[str], dict]:
+    """Items to keep from the current board, footprint positions by reference, the UUIDs of
+    kept Edge.Cuts items drawn by hand (the generated ones are recognised by edge_uid), and the
+    shapes of the generated Edge.Cuts items found (UUID -> edge_geometry)."""
     if not existing:
-        return [], {}, []
+        return [], {}, [], {}
     generated = {edge_uid(project, i) for i in range(MAX_EDGE_ITEMS)}
     tree = parse(existing)
-    kept, pos, hand = [], {}, []
+    kept, pos, hand, old_edges = [], {}, [], {}
     for item in tree[1:]:
         if not isinstance(item, list):
             continue
@@ -238,10 +272,11 @@ def _existing(project: str, existing: str | None) -> tuple[list[list], dict, lis
         elif item[0] in _KEPT:
             if item[0].startswith("gr_") and atom(item, "layer") == "Edge.Cuts":
                 if atom(item, "uuid") in generated:
+                    old_edges[str(atom(item, "uuid"))] = edge_geometry(item)
                     continue  # rebuilt from layout.yaml
                 hand.append(str(atom(item, "uuid")))
             kept.append(item)
-    return kept, pos, hand
+    return kept, pos, hand, old_edges
 
 
 def _poly(points: list, ox: float, oy: float, key: QStr) -> list:
@@ -313,15 +348,18 @@ def generate_board(project: str, title: str, rev: str, company: str, source: str
     ox, oy = (float(v) for v in board.get("origin", (100, 100)))
     edges, (x0, _, x1, y1) = outline_items(project, board)
     placement = layout.get("placement") or {}
-    kept, old_pos, hand_edges = _existing(project, existing)
+    kept, old_pos, hand_edges, old_edges = _existing(project, existing)
+    new_edges = {str(atom(e, "uuid")): edge_geometry(e) for e in edges}
+    edges_replaced = bool(existing) and old_edges != new_edges
     unplaced = []
     fps = []
     park_x = park_y = row_h = 0.0   # packing cursor, relative to (outline right + 10, top)
     for comp in sorted(comps, key=lambda c: _natural(c.ref)):
         lib_fp = libs.footprint(comp.footprint)
+        ref_option = None
         if comp.ref in placement:
-            px, py, *r = placement[comp.ref]
-            x, y, rot = ox + float(px), oy + float(py), float(r[0]) if r else 0.0
+            px, py, rot, ref_option = placement_entry(placement[comp.ref])
+            x, y = ox + px, oy + py
         elif comp.ref in old_pos:
             x, y, rot = old_pos[comp.ref]
             unplaced.append(comp.ref)
@@ -333,7 +371,9 @@ def generate_board(project: str, title: str, rev: str, company: str, source: str
             park_x += bx1 - bx0 + PARK_GAP
             row_h = max(row_h, by1 - by0)
             unplaced.append(comp.ref)
-        fps.append(footprint_node(project, comp, lib_fp, x, y, rot))
+        fp = footprint_node(project, comp, lib_fp, x, y, rot)
+        place_reference(fp, rot, ref_option)
+        fps.append(fp)
     node = ["kicad_pcb", ["version", PCB_VERSION], ["generator", QStr("pcbnew")],
             ["generator_version", QStr("10.0")],
             ["general", ["thickness", num(float(board.get("thickness", 1.6)))],
@@ -345,7 +385,7 @@ def generate_board(project: str, title: str, rev: str, company: str, source: str
              ["aux_axis_origin", num(ox + x0, 6), num(oy + y1, 6)],
              ["grid_origin", num(ox, 6), num(oy, 6)]],
             *fps, *edges, *kept, ["embedded_fonts", "no"]]
-    return Board(dumps(node) + "\n", unplaced, hand_edges)
+    return Board(dumps(node) + "\n", unplaced, hand_edges, edges_replaced)
 
 
 def _natural(ref: str) -> tuple:

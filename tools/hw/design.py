@@ -38,12 +38,16 @@ class PartSrc:
     rot: int = 0
     mirror: str | None = None
     stub: float = 0.0          # wire length between each pin and its label / power symbol
+    # per-pin wire lengths (pin number or name -> mm) when `stub` is given as a mapping
+    pin_stubs: dict[str, float] = field(default_factory=dict)
     value: str | None = None
     footprint: str | None = None
     lcsc: str | None = None
     dnp: bool = False
     fields: dict[str, str] = field(default_factory=dict)
     pins: dict[str, str] | list[str] = field(default_factory=dict)
+    # page offsets (mm, from `at`, Y down) of field texts: {Reference: (dx, dy), Role: ...}
+    fields_at: dict[str, tuple[float, float]] = field(default_factory=dict)
 
 
 @dataclass
@@ -94,9 +98,21 @@ _PROJECT_KEYS = {"project", "title", "company", "rev", "sheets", "power_symbols"
 _SHEET_KEYS = {"title", "paper", "parts", "notes"}
 _NOTE_KEYS = {"text", "at", "size"}
 _PART_KEYS = {"symbol", "at", "rot", "mirror", "stub", "value", "footprint", "lcsc", "dnp",
-              "fields", "pins"}
+              "fields", "fields_at", "pins"}
 _LAYOUT_KEYS = {"board", "rules", "netclasses", "drc_severities", "custom_rules", "placement"}
 _BOARD_KEYS = {"width", "height", "outline", "cutouts", "origin", "thickness"}
+# KiCad 10 board constraints (.kicad_pro board.design_settings.rules): numbers in mm, or booleans
+_RULE_KEYS = {"min_clearance", "min_track_width", "min_via_diameter", "min_through_hole_diameter",
+              "min_via_annular_width", "min_copper_edge_clearance", "min_hole_to_hole",
+              "min_hole_clearance", "min_microvia_diameter", "min_microvia_drill",
+              "min_silk_clearance", "min_text_height", "min_text_thickness", "min_connection",
+              "min_groove_width", "min_resolved_spokes", "solder_mask_to_copper_clearance",
+              "max_error"}
+_RULE_FLAGS = {"allow_blind_buried_vias", "allow_microvias", "use_height_for_length_calcs"}
+_NETCLASS_KEYS = {"clearance", "track_width", "via_diameter", "via_drill", "microvia_diameter",
+                  "microvia_drill", "diff_pair_width", "diff_pair_gap", "diff_pair_via_gap", "nets"}
+_SEVERITIES = {"error", "warning", "ignore"}
+_PLACEMENT_KEYS = {"at", "ref"}
 PAPERS = {"A4": (297.0, 210.0), "A3": (420.0, 297.0)}
 
 
@@ -160,8 +176,17 @@ def _part(ref: str, d, where: str, problems: list[str]) -> PartSrc | None:
         problems.append(f"{where}: part {ref}: dnp must be true or false, got {dnp!r}")
         dnp = False
     stub = d.get("stub", 0)
-    if not isinstance(stub, (int, float)) or isinstance(stub, bool) or stub < 0:
-        problems.append(f"{where}: part {ref}: stub must be a length in mm, got {stub!r}")
+    pin_stubs: dict[str, float] = {}
+    if isinstance(stub, dict):   # per pin: {pin number or name: length}
+        for k, v in stub.items():
+            if not _is_num(v) or v < 0:
+                problems.append(f"{where}: part {ref}: stub.{k} must be a length in mm, got {v!r}")
+            else:
+                pin_stubs[str(k)] = float(v)
+        stub = 0
+    elif not isinstance(stub, (int, float)) or isinstance(stub, bool) or stub < 0:
+        problems.append(f"{where}: part {ref}: stub must be a length in mm (or a mapping pin: "
+                        f"length), got {stub!r}")
         stub = 0
     raw_pins = d.get("pins", {})
     if isinstance(raw_pins, dict):
@@ -175,11 +200,18 @@ def _part(ref: str, d, where: str, problems: list[str]) -> PartSrc | None:
     if not isinstance(fields, dict):
         problems.append(f"{where}: part {ref}: fields must be a mapping")
         fields = {}
+    fields_at = d.get("fields_at") or {}
+    if not isinstance(fields_at, dict):
+        problems.append(f"{where}: part {ref}: fields_at must be a mapping field: [dx, dy]")
+        fields_at = {}
+    fields_at = {str(k): _number_pair(v, f"{where}: part {ref} fields_at.{k}", problems)
+                 for k, v in fields_at.items()}
     opt = {k: (None if d.get(k) is None else str(d[k])) for k in ("value", "footprint", "lcsc")}
     return PartSrc(ref=ref, symbol=d["symbol"],
                    at=_number_pair(d.get("at"), f"{where}: part {ref} at", problems),
-                   rot=rot, mirror=mirror, stub=float(stub), dnp=dnp,
-                   fields={str(k): str(v) for k, v in fields.items()}, pins=pins, **opt)
+                   rot=rot, mirror=mirror, stub=float(stub), pin_stubs=pin_stubs, dnp=dnp,
+                   fields={str(k): str(v) for k, v in fields.items()}, pins=pins,
+                   fields_at=fields_at, **opt)
 
 
 def _polygon(v, where: str, problems: list[str]) -> None:
@@ -205,6 +237,93 @@ def _check_board(board, problems: list[str]) -> None:
         _polygon(board["outline"], "layout.yaml: board outline", problems)
     for i, c in enumerate(board.get("cutouts") or []):
         _polygon(c, f"layout.yaml: board cutout {i + 1}", problems)
+    if "origin" in board:
+        _number_pair(board["origin"], "layout.yaml: board origin", problems)
+    if "thickness" in board and not _is_num(board["thickness"]):
+        problems.append("layout.yaml: board thickness must be a number (mm)")
+
+
+def _is_num(v) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def placement_entry(value) -> tuple[float, float, float, object]:
+    """(x, y, rotation, reference option) of a layout.yaml `placement` value, which is either
+    `[x, y]` / `[x, y, rot]` or a mapping `{at: [x, y, rot], ref: ...}`. The reference option
+    is None (the library's position), "hide", or (dx, dy, angle): the reference text centre
+    `dx, dy` mm from the part's origin in board axes (X right, Y down), upright at `angle`."""
+    at, ref = (value.get("at"), value.get("ref")) if isinstance(value, dict) else (value, None)
+    x, y, *r = at
+    if isinstance(ref, list):
+        ref = (float(ref[0]), float(ref[1]), float(ref[2]) if len(ref) > 2 else 0.0)
+    return float(x), float(y), float(r[0]) if r else 0.0, ref
+
+
+def _check_placement(placement, refs: set[str], problems: list[str]) -> None:
+    if not isinstance(placement, dict):
+        problems.append("layout.yaml: `placement` must be a mapping REF: [x, y, rotation]")
+        return
+    for ref, value in placement.items():
+        where = f"layout.yaml: placement {ref}"
+        if str(ref) not in refs:
+            problems.append(f"{where}: no part {ref} in the schematic sheets")
+        at, opt = value, None
+        if isinstance(value, dict):
+            _unknown(value, _PLACEMENT_KEYS, where, problems)
+            at, opt = value.get("at"), value.get("ref")
+        if not (isinstance(at, list) and len(at) in (2, 3) and all(_is_num(v) for v in at)):
+            problems.append(f"{where}: expected [x, y] or [x, y, rotation] in mm / degrees, "
+                            f"got {at!r}")
+        if opt is not None and opt != "hide" and not (
+                isinstance(opt, list) and len(opt) in (2, 3) and all(_is_num(v) for v in opt)):
+            problems.append(f"{where}: ref must be `hide`, [dx, dy] or [dx, dy, angle], got {opt!r}")
+
+
+def _check_layout(layout: dict, refs: set[str], problems: list[str]) -> None:
+    """Nested layout.yaml keys and value types (a typo would otherwise be silently ignored)."""
+    _unknown(layout, _LAYOUT_KEYS, "layout.yaml", problems)
+    if "board" in layout:
+        _check_board(layout["board"], problems)
+    rules = layout.get("rules") or {}
+    if not isinstance(rules, dict):
+        problems.append("layout.yaml: `rules` must be a mapping")
+        rules = {}
+    _unknown(rules, _RULE_KEYS | _RULE_FLAGS, "layout.yaml: rules", problems)
+    for k, v in rules.items():
+        if k in _RULE_KEYS and not _is_num(v) or k in _RULE_FLAGS and not isinstance(v, bool):
+            problems.append(f"layout.yaml: rules.{k} must be a "
+                            f"{'number (mm)' if k in _RULE_KEYS else 'boolean'}, got {v!r}")
+    classes = layout.get("netclasses") or {}
+    if not isinstance(classes, dict):
+        problems.append("layout.yaml: `netclasses` must be a mapping")
+        classes = {}
+    for name, spec in classes.items():
+        where = f"layout.yaml: netclasses.{name}"
+        if not isinstance(spec, dict):
+            problems.append(f"{where} must be a mapping")
+            continue
+        _unknown(spec, _NETCLASS_KEYS, where, problems)
+        for k, v in spec.items():
+            if k == "nets":
+                if name == "Default":
+                    problems.append(f"{where}: the Default class takes every other net; "
+                                    "it has no `nets`")
+                elif not (isinstance(v, list) and all(isinstance(n, str) for n in v)):
+                    problems.append(f"{where}.nets must be a list of net names or patterns")
+            elif k in _NETCLASS_KEYS and not _is_num(v):
+                problems.append(f"{where}.{k} must be a number (mm), got {v!r}")
+    sev = layout.get("drc_severities") or {}
+    if not isinstance(sev, dict):
+        problems.append("layout.yaml: `drc_severities` must be a mapping")
+        sev = {}
+    for k, v in sev.items():
+        if v not in _SEVERITIES:
+            problems.append(f"layout.yaml: drc_severities.{k} must be one of "
+                            f"{', '.join(sorted(_SEVERITIES))}, got {v!r}")
+    if not isinstance(layout.get("custom_rules") or "", str):
+        problems.append("layout.yaml: `custom_rules` must be text (KiCad rule syntax)")
+    if "placement" in layout:
+        _check_placement(layout["placement"] or {}, refs, problems)
 
 
 def _sheet(name: str, path: Path, problems: list[str]) -> SheetSrc:
@@ -278,9 +397,7 @@ def load_design(src_dir: Path) -> Design:
     libs = proj.get("libraries") or {}
     layout_path = src_dir / "layout.yaml"
     layout = _load_yaml(layout_path, problems) if layout_path.exists() else {}
-    _unknown(layout, _LAYOUT_KEYS, "layout.yaml", problems)
-    if "board" in layout:
-        _check_board(layout["board"], problems)
+    _check_layout(layout, set(refs), problems)
     interface = _interface(src_dir / proj["interface"], problems) if proj.get("interface") else None
     if problems:
         raise DesignError(problems)

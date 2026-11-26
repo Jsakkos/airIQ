@@ -1,3 +1,5 @@
+import math
+
 import pytest
 
 from design import DesignError, PartSrc
@@ -225,3 +227,42 @@ def test_stacked_pins_share_one_marker(make_design, libs):
     sheet = parse(generate_schematics(make_design({"a": [part]}), libs)["a.kicad_sch"])
     gnd = [s for s in children(sheet, "symbol") if str(atom(s, "lib_id")) == "test:GND"]
     assert len(gnd) == 1     # pins 1 and 5 sit on one point: one GND symbol
+
+
+# ---- field positions, the Role field, per-pin stubs ----------------------------------------
+
+def _symbol(sheet, ref):
+    return next(s for s in children(sheet, "symbol")
+                if any(p[1] == "Reference" and p[2] == ref for p in children(s, "property")))
+
+
+def test_fields_can_be_placed_and_role_is_shown(make_design, libs):
+    part = PartSrc("J1", "test:U6", (50.8, 50.8), rot=90, fields={"Role": "J_X"},
+                   fields_at={"Reference": (0, -10.16)}, pins={str(i): f"N{i}" for i in range(1, 7)})
+    sheet = parse(generate_schematics(make_design({"a": [part]}), libs)["a.kicad_sch"])
+    props = {str(p[1]): p for p in children(_symbol(sheet, "J1"), "property")}
+    assert child(props["Reference"], "at")[1:] == ["50.8", "40.64", "90"]   # page-horizontal text
+    assert child(props["Role"], "hide") is None and props["Role"][2] == "J_X"
+    assert child(props["Role"], "at")[3] == "90"
+
+
+def test_a_stub_can_be_given_per_pin(make_design, libs):
+    part = PartSrc("R1", "test:R", (25.4, 50.8), footprint="test:R_TEST", pin_stubs={"2": 5.08},
+                   pins=["A", "B"])
+    sheet = parse(generate_schematics(make_design({"a": [part]}), libs)["a.kicad_sch"])
+    wires = children(sheet, "wire")
+    assert len(wires) == 1                                       # only pin 2 gets a stub wire
+    (a, b) = (child(wires[0], "pts")[1], child(wires[0], "pts")[2])
+    assert math.dist((float(a[1]), float(a[2])), (float(b[1]), float(b[2]))) == pytest.approx(5.08)
+
+
+@pytest.mark.parametrize("part,expected", [
+    (PartSrc("R9", "test:R", (25.4, 25.4), footprint="test:R_TEST", pins=["A", "B"],
+             fields_at={"Colour": (0, 1)}), "fields_at.Colour: the part has no field Colour"),
+    (PartSrc("R9", "test:R", (25.4, 25.4), footprint="test:R_TEST", pins=["A", "B"],
+             pin_stubs={"7": 2.54}), "stub.7: test:R has no pin 7"),
+])
+def test_field_and_stub_keys_are_checked(make_design, libs, part, expected):
+    with pytest.raises(DesignError) as e:
+        resolve_design(make_design({"a": [part]}), libs)
+    assert any(expected in p for p in e.value.problems), e.value.problems
