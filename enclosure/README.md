@@ -16,6 +16,7 @@ Contents:
 - [Using the references in an enclosure design](#using-the-references-in-an-enclosure-design)
 - [Printing the coupons](#printing-the-coupons)
 - [Coupon results](#coupon-results)
+- [airQ layout](#airq-layout)
 - [Sources](#sources)
 - [To confirm](#to-confirm)
 
@@ -31,6 +32,7 @@ print and assembly guide (Task 5). The print-test coupons (Task 2) are below.
 | `src/encbuild.py` | The design registry (`DESIGNS`) and the build: script, `solidcraft-cli run`, save, checks |
 | `src/ref_*.py` | One generator per reference part (`ref_pcb.py` wraps the board STEP files) |
 | `src/coupons.py` | The print-test coupons' generator |
+| `src/airq_layout.py` | The airQ layout study's section arithmetic (pure Python; `tests/enclosure/test_airq_layout.py`) |
 | `coupons.sc` | The coupons design, built from `src/coupons.py` (committed) |
 | `export/` | Printable exports (`coupons.3mf`, `coupons.step`), written by `build.py` (committed) |
 | `reference/*.sc` | The reference designs, built from the generators (committed) |
@@ -314,6 +316,133 @@ is not measured: test it with the first enclosure print.
 | Button flexure B (hard stop) | pending owner print | bottoms at 0.30: ?; feel and force: ? | `flex_stop` 0.30 (gap + 0.20 travel) |
 | Light guide, 1.2 mm divider (shell material and colour) | pending owner print | leak: ? | `divider` 1.2 |
 | Light guide, 2.0 mm divider (shell material and colour) | pending owner print | leak: ?; thickness that stops it: ? | `divider_thick` 2.0 |
+
+## airQ layout
+
+The layout study (ruling R14) that every airQ feature is placed from. The numbers come from
+`src/airq_layout.py`, which is pure Python:
+`uv run --with pyyaml python enclosure/src/airq_layout.py` prints them, and
+`tests/enclosure/test_airq_layout.py` pins the conclusions.
+
+**Status: blocked on the envelope, owner decision needed (2026-11-26).** The main board, the
+SEN66 and the panel do not fit 95 × 55 × 48 mm (±1) in any board pose. The only poses within a
+few millimetres break the air and heat rules. The options are at the end of this section.
+Nothing is modelled until one is chosen.
+
+Coordinates: the enclosure frame (R3), plus s = distance up the front face from its bottom edge
+and t = depth behind the face's outer surface.
+
+**Fixed inputs.**
+
+| # | Item | Value | Source |
+|---|---|---|---|
+| 1 | Envelope | 95 × 55 × 48, front 30° from vertical: the face is 55.4 long, the top 27.3 deep | plan |
+| 2 | Margins | wall 1.8, floor 2.0, zone wall 1.8 with 0.3 air gaps, part-to-wall gaps 0.2 | plan, `src/clearances.py` |
+| 3 | SEN66 | 55.2 (x) × 21.3 (y) × 25.6 (z) on 1 mm foam, so z 3.0 to 28.6; 5 mm behind it for the cable plug or the outlet plenum | R17, `ref_sen66` |
+| 4 | Zone rule | over the SEN66 the board's bottom is at least 28.6 + 0.3 + 1.8 + 0.3 = 31.0 | global constraints |
+| 5 | Panel | 36.7 up the face; its back at t 2.2 (1.0 window lip + 1.2 panel); its top edge at most s 54.4 on a 48 mm face | R16, `ref_epd` |
+| 6 | Main board | 30 deep plus the 6.0 antenna strip past the rear edge: 36.0; parts up to 4.25; LEDs and J7 on the front edge, 2.0 high | `interface.yaml` |
+| 7 | Light guide | 2.0 thick in front of the LED faces and J7, between them and the panel's back | R11, R20 coupon |
+| 8 | USB-C | mouth on the rear edge; the plug's 7 mm overmold (to confirm) must pass through the rear wall | `interface.yaml` |
+
+**Board pose.** For each tilt α (front edge down), the smallest depth D at which the board fits.
+It must sit behind the panel and the light guide, under the top wall, inside the rear wall, and
+above the SEN66 with the zone wall between. The table uses the default margins; walls of 1.6 and
+gaps of 0.2 save 0.4 to 0.7 mm.
+
+| α | Pose | D needed | Lowest board point (SEN66 top 28.6) | USB-C plug | SW1 and the dot | Antenna strip behind the panel |
+|---|---|---|---|---|---|---|
+| 0° | horizontal, above the SEN66 | 63.3 | 31.0, above | through the rear wall, z 34 | push axis 30° off the face normal: dot at s 39.6 | 28 mm |
+| 10° | tilted | 62.2 | 29.5, above | rear, z 39 | 40°: dot at s 36.5 | 25 mm |
+| 15° | tilted | 61.3 | 28.9, above | rear, z 42 | 45°: dot at s 35.0 | 23 mm |
+| 20° | tilted | 60.3 | 28.6, level | through the top wall | 50°: dot at s 33.6 | 21 mm |
+| 30° | tilted | 63.7 | 23.9, below | top | 60°: dot at s 25.3 | 16 mm |
+| 45° | tilted | 62.1 | 17.2, below | top | 75°: no dot can press it | 9 mm |
+| 55° | tilted | 58.8 | 13.8, below | top | 85°: none | 4 mm |
+| 60° | parallel behind the panel | 56.9 | 12.5, below | top | along the face: none | 1.4 mm |
+
+What the table says:
+
+- **At 95 × 55 × 48 no pose fits.** Over the SEN66 the horizontal board's top face is at z 32.6,
+  and its LEDs reach z 34.6. At that height the panel's back is already at y 22.5. With the 2 mm
+  light guide in front of the LEDs, the front edge is at y 25.3 and the antenna end at y 61.3.
+  That is 8.1 mm past the rear wall's inner face, and 6.3 mm outside the case.
+- **Within a few millimetres (D up to 59) only the steep poses fit** (α 55° or more, about
+  parallel to the face). Each of them has four problems:
+  - It breaks the zone rule: the board's lower edge is 15 to 16 mm below the SEN66's top.
+  - It takes the USB-C plug through the top face.
+  - SW1's push axis runs along the face, so the top-right dot would need a linkage of about 25 mm.
+  - It puts the antenna strip 1 to 4 mm behind the e-ink panel (spec §6.8: away from the panel).
+- **Keeping the zone rule and a rear USB-C needs D ≥ 61.3** (tilted 15°) or 63.3 (horizontal).
+
+**Front face**, independent of the pose, from the bottom up:
+
+1. The 10 mm line, at s 11.55.
+2. Two slot rows (1.2 slots, 1.6 bars), s 11.55 to 15.55.
+3. 1.2 of face, then the 1.2 mm LED slot.
+4. 1.2 of face, then the panel pocket (0.2 clearance) and the panel.
+
+| H | Arrangement | Panel s | Top limit | Spare | Intake open area (≥ 154.5) |
+|---|---|---|---|---|---|
+| 48 | LED slot above the slots | 19.35 to 56.05 | 54.39 | −1.66: does not fit | 161.3 |
+| 48 | LED line in the top slot row | 16.95 to 53.65 | 54.39 | 0.74 | 121.0, short (R18) |
+| 50 | LED slot above the slots | 19.35 to 56.05 | 56.70 | 0.65 | 161.3 |
+
+**Options for the owner.**
+
+1. **95 × 63.5 × 50 (recommended).** The board lies horizontal above the SEN66. The case is
+   8.5 mm deeper and 2 mm taller. The front keeps its 30°, and the top grows from 27.3 to 34.6 mm
+   deep. Every rule is met directly:
+   - The dot sits on SW1's push axis, at the right of the screen, 69 % up the face (s 40). SW1's
+     tip is 3.2 mm behind the face's inner surface: this is the direct flexure the coupon tests.
+     The mockup's dot is about 79 % up the face; raising it there costs about 2.2 mm more depth.
+   - The USB-C plug goes straight in through the rear wall, into a well 6.2 mm deep.
+   - The antenna strip is at the top rear, 28 mm behind the panel's plane and 16.5 mm from the
+     SEN66 in x alone.
+   - The zone wall runs over the SEN66 and steps down in front of it to meet the face between the
+     slots and the LED slot. The light guide, the FFC and the adapter, behind the panel, stay in
+     the electronics zone.
+2. **95 × 61.5 × 50, the board tilted 15°.** This is 2 mm less deep. The USB-C plug enters 15°
+   downward through the upper rear, the board sits on tilted standoffs, and the dot is lower (s
+   35, 61 % up the face).
+3. **95 × 57.5 × 50 plus a hood on the rear face** for the antenna strip, about 22 × 8 mm and
+   standing 6 mm out at z 31 to 38. The board lies horizontal with its rear edge at the rear
+   wall, so the USB-C plug enters straight. The footprint grows by 2.5 mm, and the hood is a bump
+   on the back.
+
+Not offered: the parallel pose inside 95 × 57 × 48. It breaks the zone rule, and the spec does
+not allow loosening the air and heat rules.
+
+**Option 1, plan view** (x):
+
+| Part | x |
+|---|---|
+| Panel (tail on the user's left, hatched block from −45.5) | −40.9 to 38.1 |
+| Window centre | +1.65 |
+| Main board | −14.8 to 45.2 |
+| SW1 and the dot (⌀4 dot, 0.7 mm clear of the pocket wall) | 42.2 |
+| LEDs D1 to D4 | −2.2, 2.9, 25.1, 30.2. The 30 mm line under the window, x −13.4 to 16.7, collects them |
+| J7 | 6.3 to 21.8 |
+| USB-C | 1.4 |
+| Antenna strip | 26.2 to 44.2 |
+| SEN66 | −45.5 to 9.7 |
+
+**Option 1, side section** (y to the right, z up, not to scale):
+
+```
+ z
+ 50 |                   +------------------- top wall ------------------+
+    |   dot s 40 ->    /| board z 31.4-33.0, parts to 37.2         ant  | antenna end y 61.5
+ 33 |   panel         / | SW1  LEDs J7 ============== U3 ===========[##]| USB-C mouth y 55.5 (well)
+ 31 |   s 19.4-56.1  /  +---- zone wall z 28.9-30.7, steps down --------+
+    |   guide       /      +----------------------+                     |
+ 15 |   LED slot   /       | SEN66  z 3.0-28.6    |  cable / outlet     | outlet grille, z >= 10
+ 10 |   slots     / intake |        y 21.3 deep   |  plenum             |
+    |   lip      /  plenum +------ foam 1.0 ------+                     |
+  2 |___________/________ base plate, floor 2.0 ________________________|
+  0 +------------------------------------------------------------------------- y
+    0          10        20        30        40        50        60   63.5
+```
 
 ## Sources
 
