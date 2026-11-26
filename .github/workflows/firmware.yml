@@ -1,0 +1,65 @@
+name: firmware
+
+on:
+  push:
+    paths: ["firmware/**", "hardware/interface.yaml", "tests/**", ".github/workflows/firmware.yml"]
+  pull_request:
+    paths: ["firmware/**", "hardware/interface.yaml", "tests/**", ".github/workflows/firmware.yml"]
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build host tests
+        run: |
+          mkdir -p build
+          g++ -std=c++17 -Wall -Wextra -Werror -I firmware/esphome/include firmware/tests/test_airq_logic.cpp -o build/test_airq_logic
+      - name: Run host tests
+        run: build/test_airq_logic
+
+  config-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest pyyaml
+      - run: pytest tests -v
+
+  esphome:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/esphome
+            firmware/esphome/.esphome
+          key: esphome-2026.11.1-${{ hashFiles('firmware/esphome/**/*.yaml') }}
+          restore-keys: esphome-2026.11.1-
+      - run: pip install esphome==2026.11.1
+      - name: Use example secrets with a throwaway API key
+        working-directory: firmware/esphome
+        run: |
+          cp secrets.example.yaml secrets.yaml
+          KEY=$(python -c "import base64,os;print(base64.b64encode(os.urandom(32)).decode())")
+          sed -i "s|^api_key:.*|api_key: \"$KEY\"|" secrets.yaml
+      - name: Validate the HCHO option
+        working-directory: firmware/esphome
+        run: |
+          sed 's|# hcho: !include|hcho: !include|' airq-example.yaml > airq-hcho-ci.yaml
+          grep -q '^  hcho: !include' airq-hcho-ci.yaml
+          esphome config airq-hcho-ci.yaml
+          rm airq-hcho-ci.yaml
+      - name: Validate and compile
+        working-directory: firmware/esphome
+        run: |
+          for f in airq-example.yaml airq-mini-example.yaml; do
+            esphome config "$f"
+            esphome compile "$f"
+          done

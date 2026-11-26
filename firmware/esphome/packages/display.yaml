@@ -1,0 +1,89 @@
+# airQ only: 2.9" 296x128 black-and-white e-ink panel showing two numbers, CO2 (ppm) on the
+# left and PM2.5 (ug/m3) on the right, each with a label and unit, and nothing else.
+#
+# Refresh policy (airq::decide_refresh): redraw only when the shown text changed AND at
+# least 180 s passed since the last refresh (except placeholder "--" -> real numbers, which is shown at once). The component itself makes every 6th refresh a
+# full one (full_update_every: 6); the rest are partial.
+spi:
+  clk_pin: ${pin_epd_clk}
+  mosi_pin: ${pin_epd_mosi}
+
+font:
+  # "40000" at 40 px Inter Bold is ~124 px wide (digits ~0.62 em each), inside the 148 px
+  # half-width with room for the divider. Only the glyphs listed here can be drawn.
+  - file: "gfonts://Inter@bold"
+    id: epd_font_big
+    size: 40
+    glyphs: "0123456789-."
+  - file: "gfonts://Inter"
+    id: epd_font_small
+    size: 18
+    glyphs: "CO₂PM2.5pmµg/³"
+
+globals:
+  - id: epd_last_ms
+    type: uint32_t
+    initial_value: "0"
+  - id: epd_ever
+    type: bool
+    initial_value: "false"
+  - id: epd_partials
+    type: uint8_t
+    initial_value: "0"
+  # The text last decided on; the display lambda draws only from these, so what is drawn
+  # always equals what decide_refresh judged.
+  - id: epd_shown_co2
+    type: std::string
+    initial_value: '"--"'
+  - id: epd_shown_pm
+    type: std::string
+    initial_value: '"--"'
+
+display:
+  - platform: epaper_spi
+    id: epd
+    model: ${epd_model}
+    cs_pin: ${pin_epd_cs}
+    dc_pin: ${pin_epd_dc}
+    reset_pin: ${pin_epd_rst}
+    busy_pin: ${pin_epd_busy}
+    # The 296 px side is horizontal.
+    rotation: 90
+    update_interval: never
+    full_update_every: 6
+    lambda: |-
+      it.fill(COLOR_OFF);
+      it.line(148, 8, 148, 120, COLOR_ON);
+      it.printf(74, 4, id(epd_font_small), COLOR_ON, TextAlign::TOP_CENTER, "CO₂");
+      it.printf(74, 64, id(epd_font_big), COLOR_ON, TextAlign::CENTER, "%s", id(epd_shown_co2).c_str());
+      it.printf(74, 124, id(epd_font_small), COLOR_ON, TextAlign::BOTTOM_CENTER, "ppm");
+      it.printf(222, 4, id(epd_font_small), COLOR_ON, TextAlign::TOP_CENTER, "PM2.5");
+      it.printf(222, 64, id(epd_font_big), COLOR_ON, TextAlign::CENTER, "%s", id(epd_shown_pm).c_str());
+      it.printf(222, 124, id(epd_font_small), COLOR_ON, TextAlign::BOTTOM_CENTER, "µg/m³");
+
+interval:
+  - interval: 10s
+    then:
+      - lambda: |-
+          const std::string co2_s = airq::co2_text(id(co2).state);
+          const std::string pm_s = airq::pm25_text(id(pm_2_5).state);
+          const bool changed = co2_s != id(epd_shown_co2) || pm_s != id(epd_shown_pm);
+          const uint32_t now = millis();
+          // R26: after boot the first paint shows "--"; once real numbers exist, repaint
+          // without waiting out the 180 s floor.
+          const bool shown_ph = airq::has_placeholder(id(epd_shown_co2)) || airq::has_placeholder(id(epd_shown_pm));
+          const bool new_ph = airq::has_placeholder(co2_s) || airq::has_placeholder(pm_s);
+          const airq::Refresh r = airq::decide_refresh(
+              now, id(epd_last_ms), id(epd_ever), changed, id(epd_partials), shown_ph, new_ph);
+          if (r == airq::Refresh::None) return;
+          id(epd_last_ms) = now;
+          id(epd_ever) = true;
+          id(epd_shown_co2) = co2_s;
+          id(epd_shown_pm) = pm_s;
+          if (r == airq::Refresh::Full) {
+            id(epd_partials) = 0;
+            id(epd).request_full_update();  // keeps the panel's own counter in step
+          } else {
+            id(epd_partials) = id(epd_partials) + 1;
+          }
+          id(epd).update();

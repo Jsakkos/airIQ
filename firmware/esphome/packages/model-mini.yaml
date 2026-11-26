@@ -1,0 +1,8 @@
+# airQ mini (no screen).
+packages:
+  pins: !include pins.yaml
+  board: !include board.yaml
+  sensors: !include sensors.yaml
+  light_common: !include light-common.yaml
+  light: !include light-split.yaml
+  button: !include button.yaml

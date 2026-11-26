@@ -1,0 +1,169 @@
+# Sensors. SHT45 is the published room temperature/humidity; the SEN66's own
+# T/RH is diagnostic only (self-heating from the fan and electronics).
+#
+# Every output ends in `timeout: 120s`. esphome's sen6x never publishes NaN on an
+# I2C or read failure (it just returns), so without the filter a loose cable would
+# leave the last value, and the status light and display, frozen (possibly green).
+# The timeout filter's default value is "nan" (components/sensor/__init__.py,
+# TIMEOUT_SCHEMA), published after 120 s without a new reading. 120 s must exceed
+# the ~60 s sen6x startup delay and the forced-recalibration pause.
+sensor:
+  - platform: sht4x
+    address: ${addr_sht45}
+    temperature:
+      id: room_t
+      name: Temperature
+      filters:
+        - timeout: 120s
+    humidity:
+      id: room_rh
+      name: Humidity
+      filters:
+        - timeout: 120s
+    update_interval: 10s
+
+  - platform: bmp581_i2c
+    address: ${addr_bmp585}
+    pressure:
+      id: room_p
+      name: Pressure
+      # bmp581 reports Pa; SEN66 compensation and HA expect hPa.
+      unit_of_measurement: hPa
+      accuracy_decimals: 1
+      filters:
+        - multiply: 0.01
+        - timeout: 120s
+    update_interval: 30s
+
+  - platform: veml7700
+    address: ${addr_veml7700}
+    update_interval: 5s
+    ambient_light:
+      id: room_lux
+      name: Illuminance
+      filters:
+        # 6 samples x 5 s = 30 s sliding window.
+        - sliding_window_moving_average:
+            window_size: 6
+            send_every: 1
+        - timeout: 120s
+
+  - platform: sen6x
+    id: sen
+    type: ${sen6x_model}
+    address: ${addr_sen6x}
+    update_interval: 10s
+    co2:
+      id: co2
+      name: CO2
+      automatic_self_calibration: ${co2_asc}
+      # Compensate CO2 for ambient pressure from the BMP585.
+      ambient_pressure_compensation_source: room_p
+      filters:
+        - timeout: 120s
+    pm_1_0:
+      id: pm_1_0
+      name: PM1.0
+      filters:
+        - timeout: 120s
+    pm_2_5:
+      id: pm_2_5
+      name: PM2.5
+      filters:
+        - timeout: 120s
+    pm_4_0:
+      id: pm_4_0
+      name: PM4.0
+      filters:
+        - timeout: 120s
+    pm_10_0:
+      id: pm_10_0
+      name: PM10
+      filters:
+        - timeout: 120s
+    voc_index:
+      id: voc_index
+      name: VOC Index
+      filters:
+        - timeout: 120s
+    nox_index:
+      id: nox_index
+      name: NOx Index
+      filters:
+        - timeout: 120s
+    temperature:
+      id: sen_t
+      name: SEN66 Temperature
+      entity_category: diagnostic
+      filters:
+        - timeout: 120s
+    humidity:
+      id: sen_rh
+      name: SEN66 Humidity
+      entity_category: diagnostic
+      filters:
+        - timeout: 120s
+    # Compensation block enabled with ESPHome defaults (no offset); tune after
+    # characterising the enclosure's self-heating.
+    temperature_compensation:
+      offset: 0
+      normalized_offset_slope: 0
+      time_constant: 0
+    # Sensirion "Light (IAQM)" acceleration preset.
+    temperature_acceleration:
+      t1: 100
+      t2: 300
+      k: 20
+      p: 20
+
+# ---- CO2 automatic self-calibration (ASC) switch (spec 6.10, R25) ----
+# SEN6XComponent::set_automatic_self_calibration() is only read by the sen6x setup
+# chain, so the switch cannot change it live. Instead: restore the switch, copy its
+# state into the component before sen6x sets up, and restart the unit when the user
+# flips it.
+#   Setup order (higher priority first):
+#     template switch  HARDWARE - 2 = 798  (template_switch.cpp get_setup_priority; its setup() restores state)
+#     on_boot trigger  700                 (core/config.py CONF_ON_BOOT priority; base_automation.h StartupTrigger)
+#     sen6x            DATA = 600          (no get_setup_priority override in components/sen6x; core/component.h)
+#   so priority 700 runs after the restore and before sen6x setup; the value is then
+#   applied in sen6x's setup chain (sen6x.cpp SETUP_STEP_CO2_ASC).
+# The restore itself calls turn_on/turn_off (switch.cpp restore() -> control()), which fires
+# on_turn_on/on_turn_off at priority 798. asc_armed is still false then, so the boot restore
+# does not reboot-loop; it becomes true in on_boot and only later (user) changes restart the unit.
+esphome:
+  on_boot:
+    - priority: 700
+      then:
+        - lambda: |-
+            id(sen).set_automatic_self_calibration(id(co2_asc_sw).state);
+            id(asc_armed) = true;
+
+globals:
+  - id: asc_armed
+    type: bool
+    initial_value: "false"
+
+switch:
+  - platform: template
+    id: co2_asc_sw
+    name: CO2 auto-calibration
+    entity_category: config
+    optimistic: true
+    # Default on first boot follows ${co2_asc} ("true" -> on, "false" -> off).
+    restore_mode: ${'RESTORE_DEFAULT_ON' if (co2_asc | string | lower) == 'true' else 'RESTORE_DEFAULT_OFF'}
+    on_turn_on:
+      - if:
+          condition:
+            lambda: return id(asc_armed);
+          then:
+            - logger.log: "CO2 auto-calibration ON: applies after restart, restarting in 2 s"
+            - delay: 2s
+            - lambda: App.safe_reboot();
+    on_turn_off:
+      - if:
+          condition:
+            lambda: return id(asc_armed);
+          then:
+            - logger.log: "CO2 auto-calibration OFF: applies after restart, restarting in 2 s"
+            - delay: 2s
+            - lambda: App.safe_reboot();

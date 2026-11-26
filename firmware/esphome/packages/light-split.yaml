@@ -1,0 +1,89 @@
+# airQ mini: the light is split in two halves, CO2 left and PM2.5 right.
+# On a SEN62/65/68 (no CO2) the CO2 half stays dark; the PM2.5 half still works.
+# ESPHome substitutions cannot do arithmetic, so the segment bounds are
+# explicit for the default 4 LEDs; override all four with led_count.
+substitutions:
+  led_co2_first: "0"
+  led_co2_last: "1"
+  led_pm_first: "2"
+  led_pm_last: "3"
+
+light:
+  - platform: partition
+    id: co2_light
+    name: CO2 light
+    internal: true
+    default_transition_length: 1s
+    segments:
+      - id: led_strip
+        from: ${led_co2_first}
+        to: ${led_co2_last}
+  - platform: partition
+    id: pm_light
+    name: PM2.5 light
+    internal: true
+    default_transition_length: 1s
+    segments:
+      - id: led_strip
+        from: ${led_pm_first}
+        to: ${led_pm_last}
+
+interval:
+  - interval: 2s
+    then:
+      - lambda: |-
+          const airq::Co2Bands co2_bands{${co2_yellow}, ${co2_orange}, ${co2_red}};
+          const airq::Pm25Bands pm_bands{${pm25_green_max}, ${pm25_yellow_max}, ${pm25_orange_max}, ${pm25_red_max}, ${pm25_purple_max}};
+          id(co2_band_g) = (int) airq::co2_band_hyst(id(co2).state, (airq::Band) id(co2_band_g), co2_bands);
+          id(pm_band_g) = (int) airq::pm25_band_hyst(id(pm_2_5).state, (airq::Band) id(pm_band_g), pm_bands);
+          if (id(light_override_until_ms) != 0 && (int32_t) (millis() - id(light_override_until_ms)) < 0) return;
+          const bool off = id(night_mode).state || !id(status_light).state;
+          const float br = airq::light_brightness(id(room_lux).state, ${light_cap});
+          float *last = id(light_last);
+          auto apply = [&](light::LightState *ls, int slot, airq::Band band) {
+            float *s = last + slot * 5;
+            const airq::Rgb c = airq::band_color(band);
+            const bool on = !off && band != airq::Band::Unknown;
+            if (!on) {
+              if (s[0] != 0.0f) {
+                s[0] = 0.0f;
+                ls->turn_off().set_transition_length(1000).perform();
+              }
+              return;
+            }
+            if (s[0] == 1.0f && s[1] == c.r && s[2] == c.g && s[3] == c.b && std::fabs(s[4] - br) < 0.02f) return;
+            s[0] = 1.0f; s[1] = c.r; s[2] = c.g; s[3] = c.b; s[4] = br;
+            ls->turn_on().set_rgb(c.r, c.g, c.b).set_brightness(br).set_transition_length(1000).perform();
+          };
+          apply(id(co2_light), 0, (airq::Band) id(co2_band_g));
+          apply(id(pm_light), 1, (airq::Band) id(pm_band_g));
+
+script:
+  # Confirmation blink on both halves: white x3 on success, red x3 on failure.
+  - id: light_blink
+    mode: single
+    parameters:
+      ok: bool
+    then:
+      - lambda: id(light_override_until_ms) = millis() + 3500;
+      - repeat:
+          count: 3
+          then:
+            - lambda: |-
+                const float br = airq::light_brightness(id(room_lux).state, ${light_cap});
+                const float g = ok ? 1.0f : 0.0f;
+                id(co2_light).turn_on().set_rgb(1.0f, g, g).set_brightness(br).set_transition_length(0).perform();
+                id(pm_light).turn_on().set_rgb(1.0f, g, g).set_brightness(br).set_transition_length(0).perform();
+            - delay: 300ms
+            - light.turn_off:
+                id: co2_light
+                transition_length: 0s
+            - light.turn_off:
+                id: pm_light
+                transition_length: 0s
+            - delay: 300ms
+      # Hand the lights back to the interval: force a re-apply.
+      - lambda: |-
+          id(light_last)[0] = -1.0f;
+          id(light_last)[5] = -1.0f;
+          id(light_override_until_ms) = 0;

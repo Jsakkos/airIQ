@@ -1,0 +1,20 @@
+# Mirrors hardware/interface.yaml (single source of truth). Keep in sync:
+# tests/test_firmware_config.py::test_pins_mirror_interface enforces it.
+substitutions:
+  pin_i2c_sda: GPIO6
+  pin_i2c_scl: GPIO7
+  pin_epd_clk: GPIO19
+  pin_epd_mosi: GPIO18
+  pin_epd_cs: GPIO20
+  pin_epd_dc: GPIO21
+  pin_epd_rst: GPIO22
+  pin_epd_busy: GPIO23
+  pin_led_data: GPIO2
+  pin_button: GPIO9
+  pin_aux_uart_tx: GPIO16
+  pin_aux_uart_rx: GPIO17
+  addr_sen6x: "0x6B"
+  addr_sht45: "0x44"
+  addr_bmp585: "0x46"
+  addr_veml7700: "0x10"
+  addr_sfa40: "0x5D"

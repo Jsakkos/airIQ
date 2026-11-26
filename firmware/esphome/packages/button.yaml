@@ -1,0 +1,100 @@
+# One mechanical button, press-duration actions (airq::classify_press):
+#   <1 s toggle light (or leave Night mode if it is on), 5-15 s forced CO2 recalibration, >=15 s safe-mode reboot.
+binary_sensor:
+  - platform: gpio
+    id: front_button
+    internal: true
+    pin:
+      number: ${pin_button}
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    on_press:
+      - lambda: id(button_down_ms) = millis();
+    on_release:
+      - lambda: |-
+          switch (airq::classify_press(millis() - id(button_down_ms))) {
+            case airq::Press::ToggleLight:
+              // R27: while Night mode is on the light is dark, so a short press
+              // must visibly do something: leave Night mode and light up.
+              if (id(night_mode).state) {
+                id(night_mode).turn_off();
+                id(status_light).turn_on();
+              } else {
+                id(status_light).toggle();
+              }
+              break;
+            case airq::Press::ForceCo2Calibration: id(co2_frc).execute(); break;
+            case airq::Press::SafeModeReboot: id(safe_mode_btn).press(); break;
+            case airq::Press::None: default: break;
+          }
+
+globals:
+  - id: button_down_ms
+    type: uint32_t
+    initial_value: "0"
+  - id: frc_ok_g
+    type: bool
+    initial_value: "false"
+
+script:
+  # Forced CO2 recalibration to 420 ppm (fresh outdoor air), R14. ESPHome's
+  # sen6x has no FRC action, so the command is sent over the shared I2C bus.
+  # Sequence and timings from Sensirion's driver, Sensirion/embedded-i2c-sen66
+  # (sen66_i2c.c, sen66_perform_forced_co2_recalibration): command 0x6707 + target
+  # word with CRC, wait 500 ms, read one word + CRC; 0xFFFF = failed, otherwise
+  # correction = word - 0x8000. The device must be idle: sen66_stop_measurement
+  # waits 1400 ms. Needs ~3 min of prior measurement in the reference air.
+  - id: co2_frc
+    mode: single
+    then:
+      # Refuse unless the sensor has been measuring >= 3 min (uptime is a proxy:
+      # the sen6x starts measuring at boot). Do not touch the sensor when refused.
+      - if:
+          condition:
+            lambda: |-
+              return !airq::frc_allowed(millis());
+          then:
+            - lambda: |-
+                ESP_LOGW("airq", "FRC refused, needs >= 3 min of measurement after power-on");
+            - script.execute:
+                id: light_blink
+                ok: false
+            - script.stop: co2_frc
+      # Quiesce the sen6x polling chain so it cannot collide with the raw I2C
+      # transfers below, give any in-flight read chain time to finish, then stop.
+      - component.suspend: sen
+      - delay: 2s
+      - lambda: |-
+          ESP_LOGI("airq", "FRC: stopping SEN6x measurement");
+          id(sen).stop_measurement();
+      - delay: 1500ms
+      - lambda: |-
+          const auto cmd = airq::sen6x_frc_command(420);
+          const auto err = id(i2c_bus).write_readv(${addr_sen6x}, cmd.data(), cmd.size(), nullptr, 0);
+          id(frc_ok_g) = (err == esphome::i2c::ERROR_OK);
+          if (!id(frc_ok_g)) ESP_LOGW("airq", "FRC command write failed (%d)", (int) err);
+      - delay: 600ms
+      - lambda: |-
+          if (!id(frc_ok_g)) return;
+          uint8_t resp[3] = {0, 0, 0};
+          const auto err = id(i2c_bus).write_readv(${addr_sen6x}, nullptr, 0, resp, sizeof(resp));
+          int correction = 0;
+          id(frc_ok_g) = (err == esphome::i2c::ERROR_OK) && airq::sen6x_frc_correction(resp, &correction);
+          if (id(frc_ok_g)) ESP_LOGI("airq", "FRC done, correction %d ppm", correction);
+          else ESP_LOGW("airq", "FRC failed (i2c err %d)", (int) err);
+      # Restart on every path (success or failure). start_measurement() silently
+      # no-ops when busy or failed, so call it twice, 1 s apart; the second call
+      # is harmless if the first worked (it returns early while measuring_).
+      - lambda: |-
+          ESP_LOGI("airq", "FRC: restarting SEN6x measurement");
+          id(sen).start_measurement();
+      - delay: 1s
+      - lambda: id(sen).start_measurement();
+      - component.resume: sen
+      - lambda: |-
+          ESP_LOGI("airq", "FRC: SEN6x resumed, result %s", id(frc_ok_g) ? "ok" : "FAILED");
+      - script.execute:
+          id: light_blink
+          ok: !lambda return id(frc_ok_g);

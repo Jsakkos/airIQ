@@ -1,0 +1,45 @@
+# airQ v3 interface contract: single source of truth for GPIOs, I2C addresses
+# and connector pinouts. Consumed by the firmware and the PCB checkers.
+# GPIOs verified against ESP32-C6-MINI-1 datasheet v1.5, Table 3-1.
+
+signals:
+  I2C_SDA: GPIO6
+  I2C_SCL: GPIO7
+  EPD_CLK: GPIO19
+  EPD_MOSI: GPIO18
+  EPD_CS: GPIO20
+  EPD_DC: GPIO21
+  EPD_RST: GPIO22
+  EPD_BUSY: GPIO23
+  LED_DATA: GPIO2
+  BUTTON: GPIO9        # BOOT strapping pin; doubles as the download button
+  AUX_UART_TX: GPIO16  # module TXD0 (U0TXD); note this is also the default UART0 console
+  AUX_UART_RX: GPIO17  # module RXD0 (U0RXD)
+
+i2c_addresses:
+  sen6x: 0x6B
+  sht45: 0x44
+  bmp585: 0x46
+  veml7700: 0x10
+  sfa40: 0x5D  # verified: ESPHome sfa40 component default (i2c_device_schema(0x5D)), esphome 2026.11.1
+
+# Net name on each pin, in pin order. NC = not connected.
+connectors:
+  # Sensirion SEN6x, JST GH 6-pin. Supply is 3.3 V (SEN66 runs on 3.15-3.45 V, spec section 3).
+  # TODO verify pin order against SEN6x datasheet (could not fetch the PDF).
+  J_SEN66: [+3V3, GND, I2C_SDA, I2C_SCL, GND, NC]
+  J_QWIIC_TONGUE: [GND, +3V3, I2C_SDA, I2C_SCL]
+  J_QWIIC_AUX: [GND, +3V3, I2C_SDA, I2C_SCL]
+  J_LED_EXT: [+5V, LED_DOUT_5V, GND]
+  J_AUX_UART: [GND, +3V3, AUX_UART_TX, AUX_UART_RX]
+  # GoodDisplay GDEY029T94, 24-pin 0.5 mm FPC.
+  # TODO verify against the GDEY029T94 specification (could not fetch the PDF);
+  # pins 8-14 follow the BS1/BUSY/RES/DC/CS/SCK/SDI order seen in a third-party listing.
+  J_EPD: [NC, EPD_GDR, EPD_RESE, EPD_VSH2, NC, NC, NC, GND, EPD_BUSY, EPD_RST, EPD_DC, EPD_CS, EPD_CLK, EPD_MOSI, +3V3, +3V3, GND, EPD_VDD, EPD_VPP, EPD_VSH1, EPD_VGH, EPD_VSL, EPD_VGL, EPD_VCOM]
+
+mechanical: {}  # filled by the PCB plan (board outlines, mounting holes)
+
+# GPIOs the design must not use.
+# GPIO12/13 are USB D-/D+. GPIO10/11 are not exposed by the ESP32-C6-MINI-1 module,
+# so they cannot appear in `signals` anyway.
+reserved: [GPIO12, GPIO13]

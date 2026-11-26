@@ -1,0 +1,8 @@
+# Brainstorming companion scratch files (mockup server state)
+.superpowers/
+
+# v3 build artefacts and secrets
+firmware/esphome/secrets.yaml
+firmware/esphome/.esphome/
+build/
+__pycache__/
