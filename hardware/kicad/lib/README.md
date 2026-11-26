@@ -38,11 +38,20 @@ owner was asked to choose. Meanwhile the table uses two Economic-eligible substi
 | MCU | ESP32-C6-WROOM-1-N8, C5366877: symbol `airq:ESP32-C6-WROOM-1-N8`, footprint `airq:WIRELM-SMD_ESP32-C6-WROOM-1` | ESP32-C6-MINI-1-N4, C5736265: stock `RF_Module:ESP32-C6-MINI-1` symbol and footprint (ruling R11; it carries Espressif's keep-out and a STEP model) |
 | Pressure | MS5611-01BA03, C15639: `airq:MS561101BA03-50` / `airq:SENSORS-SMD_MS5611-01BA03` | BMP585, C18184976: `airq:BMP585_C18184976` / `airq:LGA-9_L3.3-W3.3-P1.10-TL`. Kept in this library but not hand-checked; check its pad map if R22 reverts |
 
-To swap back:
+To swap back (each part is one entry in the source: `U3` and `U4` in `hardware/src/main/mcu.yaml`):
 - **MCU:** copy the stock `RF_Module:ESP32-C6-MINI-1` symbol into `airq.kicad_sym` and rename its pins 30 `RXD0` → `IO17` and
-  31 `TXD0` → `IO16`, as was done for the WROOM (fix 7). `check_netlist` recognises MCU pins only by `IO<n>`/`GPIO<n>` names,
-  and every other interface pin of that symbol is already named `IO<n>`. Keep the stock footprint `RF_Module:ESP32-C6-MINI-1`.
-- Then set the footprint and the `LCSC` field, and replace the two parts.csv lines.
+  31 `TXD0` → `IO16`, as was done for the WROOM (fix 7). `check_netlist` and the generator find MCU pins only by `IO<n>`/`GPIO<n>`
+  names, and every other interface pin of that symbol is already named `IO<n>`. Its stacked GND pins are fine (the generator
+  draws one marker for stacked pins that share a net). Keep the stock footprint `RF_Module:ESP32-C6-MINI-1`, but its antenna
+  keep-out zone needs `tools/hw/gen_pcb.py` to support zones inside footprints (hardware/README.md, Limits), or the keep-out
+  drawn on the board instead.
+  In `U3`: change `symbol`, `footprint` and `lcsc`. Its pins are keyed by name (`GND`, `3V3`, `EN`, `IO8`, `IO12`, `IO13`, `NC`)
+  and its GPIO signals come from `interface.yaml` (`Role: MCU`), so they carry over; delete the `IO10`/`IO11` lines (WROOM-only)
+  and add `IO14: NC`.
+- **Pressure sensor:** in `U4`, change `symbol` (`airq:BMP585_C18184976`), and write its pin map: SCX/SDX to `I2C_SCL`/`I2C_SDA`,
+  VDD and VDDIO to `+3V3`, VSSIO/VSS to `GND`, CSB to `+3V3` (I²C), SDO to set the address, INT `NC`, pad 9 per the datasheet.
+  Set its pin types and hand-check its pad map first (table below). Add a 100 nF for VDDIO.
+- Then replace the two parts.csv lines.
 Both substitutes expose the same interface nets: every GPIO in `interface.yaml` exists on the WROOM-1 (datasheet v1.4,
 Table 3-1). The MS5611 answers at I²C 0x77 (CSB low) or 0x76 (CSB high), not the BMP585's 0x46. Changing that address
 in `interface.yaml` and in the firmware is a separate, later task.
@@ -89,7 +98,7 @@ Its stock is only 308 (enough for 10 boards plus attrition).
    a working-directory-relative `.wrl` path). The unreferenced `.wrl` files were deleted.
 2. **ESP32-C6-WROOM-1 EPAD vias**: the footprint had 12 unnumbered plated holes (0.3 mm drill, 0.5 mm pad) in the EPAD
    ("Via for thermal pad" in the datasheet's Figure 11-1). They are now pad `29` (the EPAD/GND pin, like the 9 EPAD sub-pads 29–37),
-   copper only, with no paste and no mask opening. DRC and the netlist now see them as GND.
+   copper only, with no paste and no mask opening. DRC and the netlist now see them as GND. (Copper 0.6 mm since fix 16.)
 3. **ESP32-C6-WROOM-1 3D body**: EasyEDA has no model for C5366877. The footprint uses a copy of KiCad 10's stock
    `RF_Module.3dshapes/ESP32-S3-WROOM-1.step` as a mechanical stand-in, saved as
    `ESP32-S3-WROOM-1_standin-for-ESP32-C6-WROOM-1.step`. Its body measures 18.0 × 25.5 × 3.1 mm (STEP extents),
@@ -135,7 +144,16 @@ Its stock is only 308 (enough for 10 boards plus attrition).
     - `VEML7700-TR` (Task 6), the same way: SDA `bidirectional`, SCL `input`, VDD and GND `power_in`;
     - `SM04B-SRSS-TB` (Task 6): all six pins `passive`, like KiCad's stock connectors.
 
-    The other symbols still have `unspecified` pins; Task 4 sets them the same way as it draws each part.
+    - Task 4, the rest of the main board, following KiCad's stock symbols for the same kind of part:
+      `ESP32-C6-WROOM-1-N8` as `RF_Module:ESP32-C6-MINI-1` (GND pins 1, 28, 29 and 3V3 `power_in`, the stacked
+      EPAD pins 30–37 `passive`, EN `input`, IO pins `bidirectional`, pin 22 NC `no_connect`);
+      `MS561101BA03-50` (VDD, GND `power_in`; PS, CSB, SCLK `input`; SDO `tri_state`; SDI/SDA `bidirectional`);
+      `SK6812SIDE-A_C5378721` (DIN `input`, DOUT `output`, VDD and GND `power_in`);
+      `SN74AHCT1G125DBVR` as `74xGxx:74AHCT1G125` (OE and A `input`, Y `tri_state`, VCC and GND `power_in`);
+      `AO3400A` as `Transistor_FET:AO3400A` (G `input`, S and D `passive`); `B5819W_C8598`, `SMNR4030-470MT`,
+      `SKRTLAE010` (pins 1–3 were `input`), `SM06B-GHS-TB`, `SM03B-SRSS-TB` and `FPC-05FB-24PH20`: all `passive`.
+
+    Every symbol used on a board now has typed pins.
 
 11. **Courtyards of the sense-tongue parts** (Task 6, before their first placement): EasyEDA drew them round
     the body only (the SHT45's was a triangle). They are now closed rectangles covering body and pads plus
@@ -161,6 +179,17 @@ Its stock is only 308 (enough for 10 boards plus attrition).
     sensitive-area centre is 1.95 mm above the seating plane and centred along the 6.8 mm length
     (application note 84323, Fig. 19); the half-sensitivity angle is about ±55°. Seen from the window,
     pin 1 is on the left, as in the datasheet photo.
+
+14. **Reference prefixes** (Task 4): connectors are `J` (were `USB`, `CN`, `FPC` and `U` for the SM03B), the SK6812 `D`
+    (was `LED`), the VEML7700 and the USBLC6 `U` (were `LED` and `D`). The schematic references come from the source
+    anyway; this only changes what KiCad proposes when a part is placed by hand.
+15. **ESP32-C6-WROOM-1 EPAD pins stacked** (Task 4): the 9 EPAD sub-pad pins 29–37 were drawn side by side on the
+    symbol's top edge, which gave 9 crowded GND markers. They now sit on one point (pin 29 visible, 30–37 hidden and
+    `passive`), as KiCad's stock module symbols do. The pad numbers and the footprint are unchanged.
+16. **ESP32-C6-WROOM-1 EPAD thermal vias** (Task 4): pad `29`'s 12 via holes had 0.5 mm copper on a 0.3 mm drill, a
+    0.10 mm annular ring, below the board's 0.15 mm minimum (`layout.yaml` rules), so DRC flagged each. Espressif's
+    land pattern (datasheet v1.4, Figure 11-1) marks "Via for thermal pad" without dimensions, so they are now the board's
+    own via, 0.6 mm on 0.3 mm (`Default` net class). They stay inside the EPAD copper, on GND.
 
 ## Pad maps checked by hand
 
@@ -223,6 +252,10 @@ ESP32-C6 Module's Antenna (Antenna feed point on the right)", units mm:
   VEML7700 window toward footprint −y (re-checked against the vector drawing in Task 6, fix 13). The EasyEDA 3D bodies have no
   visible lens, so the 3D viewer cannot show the window. Check against a physical part if one is at hand before the board is ordered.
 - **SKRTLAE010 actuator direction**: not checked against the drawing. Confirm in 3D at placement.
+- **SKRTLAE010 pads next to its guide holes**: the land pattern puts pads 1 and 3 0.075 mm, and the tabs 4 and 5
+  0.15 mm, from the 0.9 mm non-plated guide holes; KiCad's default hole clearance is 0.25 mm, so DRC reports 4 errors
+  on the main board. Decide at Task 5 against JLC's NPTH-to-copper capability: a footprint-scoped rule (as for the
+  USB-C pegs), smaller pads, or another switch.
 - The WROOM-1 3D body is a stand-in (the S3-WROOM-1 body with the same outline). Good enough for the enclosure STEP, not for a photo-real render.
 - Licence: the EasyEDA-derived symbols, footprints and models come from the LCSC/EasyEDA library through easyeda2kicad.
   Their redistribution terms are EasyEDA's, not CC BY-SA. The owner should confirm that is acceptable for a public repository.

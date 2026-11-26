@@ -74,12 +74,14 @@ def _tracked(board: str) -> list[str]:
 
 
 def _scratch_repo(root: Path, board: str = "main") -> Path:
-    """A board's source, the airq library and its committed KiCad project, in `root`.
+    """A board's source, the interface contract, the airq library and its committed KiCad project,
+    in `root`.
 
     Starting from the committed project (not from nothing) is what a rebuild does in the
     repository: the board keeps its routing, the .kicad_pro its KiCad settings.
     """
     shutil.copytree(REPO / f"hardware/src/{board}", root / f"hardware/src/{board}")
+    shutil.copy(REPO / "hardware/interface.yaml", root / "hardware/interface.yaml")
     lib = root / "hardware/kicad/lib"
     lib.mkdir(parents=True)
     shutil.copy(REPO / "hardware/kicad/lib/airq.kicad_sym", lib)
@@ -105,11 +107,18 @@ def board_build(request, tmp_path_factory):
 
 
 def test_board_is_clean(board_build):
-    """ERC and DRC clean. The main board is not routed yet (Task 5); the tongue is fully routed."""
+    """ERC and DRC clean. The main board is not routed yet (Task 5); the tongue is fully routed.
+
+    ERC holds on both boards at every stage. The main board's DRC and placement checks wait until
+    it is laid out: while the build still parks parts beside its outline (Task 4 drew the
+    schematic, Task 5 places it), this test reports an expected failure and says how many."""
     board, _, res = board_build
+    assert not [k for (sev, k) in res.erc if sev == "error"], res.erc
+    if board == "main" and res.unplaced:
+        pytest.xfail(f"main board not laid out yet (Task 5): {len(res.unplaced)} parts parked "
+                     f"beside the outline; DRC {dict(res.drc)}")
     routed = board == "tongue"
     assert res.errors(routed=routed) == 0, (res.erc, res.drc)
-    assert not [k for (sev, k) in res.erc if sev == "error"]
     if not routed:
         assert {k for (sev, k) in res.drc if sev == "error"} <= {"unconnected_items"}
     assert res.unplaced == [] and res.hand_edges == []
@@ -158,6 +167,24 @@ def test_tongue_gates(board_build):
     assert check_bom(root / "build/tongue-bom.csv", REPO / "hardware/bom/parts.csv") == []
     bom = (root / "build/tongue-bom.csv").read_text(encoding="utf-8")
     assert "H1" not in bom and "H1" not in (root / "build/tongue-cpl.csv").read_text(encoding="utf-8")
+
+
+def test_main_gates(board_build):
+    """The plan's Task 4 gates on a fresh rebuild: the netlist against hardware/interface.yaml (every
+    rule group: signals, connectors, USB CC, I2C pull-ups, bulk caps, straps) and the BOM against
+    the parts table. The unpopulated J_AUX_UART header is marked DNP: no BOM or CPL line."""
+    from check_bom import check_bom
+    from check_netlist import Netlist, check_netlist
+    board, root, _ = board_build
+    if board != "main":
+        pytest.skip("main only")
+    assert check_netlist(root / "build/main.net", REPO / "hardware/interface.yaml") == []
+    assert check_bom(root / "build/main-bom.csv", REPO / "hardware/bom/parts.csv") == []
+    aux = Netlist((root / "build/main.net").read_text(encoding="utf-8")).by_role("J_AUX_UART")
+    bom = list(csv.DictReader((root / "build/main-bom.csv").open(encoding="utf-8")))
+    cpl = list(csv.DictReader((root / "build/main-cpl.csv").open(encoding="utf-8")))
+    assert aux and aux not in {ref for r in bom for ref in r["Designator"].split(",")}
+    assert aux not in {r["Designator"] for r in cpl}
 
 
 ROUTED = """

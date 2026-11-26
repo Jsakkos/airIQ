@@ -11,10 +11,21 @@ connection point and pointing away from the symbol body:
 So one net name means one net across the whole board, and every connection can be read off the
 source. UUIDs are uuid5 of stable names (project, reference, pin), so the output is
 byte-identical for the same input.
+
+Where a part's nets come from (resolve_design):
+- its `pins` in the sheet: keyed by pin number, or by pin name (a name covers every pin that
+  carries it, e.g. `GND: GND` for all of a module's ground pins), or a list for pins 1..n;
+- for a part with a `Role` field, when project.yaml names the interface contract
+  (hardware/interface.yaml): `connectors.<Role>` gives pins 1..n of that connector, and for
+  Role `MCU`, `signals` gives the pin named IO<n>/GPIO<n> of each signal's GPIO. Those pins
+  must not be repeated in the sheet, so pinouts are written once, in interface.yaml.
+Stacked pins (pins of one part on the same point, as KiCad draws a module's ground pins) must
+share a net; they get one marker.
 """
 from __future__ import annotations
 
 import math
+import re
 import uuid
 from dataclasses import dataclass
 
@@ -103,7 +114,78 @@ class Placed:
     power: bool            # a virtual power symbol (PWR_FLAG ...): no footprint, no BOM line
 
 
-def _resolve(sheet: SheetSrc, p: PartSrc, libs: Libraries, problems: list[str]) -> Placed | None:
+_GPIO_PIN = re.compile(r"(?:gp)?io(\d+)", re.IGNORECASE)   # as tools/hw/check_netlist.py
+
+
+def _pin_nets(where: str, p: PartSrc, pins: list[Pin], interface: dict | None,
+              problems: list[str]) -> dict[str, str] | None:
+    """Pin number -> net for part `p`, from its sheet `pins` and, by Role, the interface."""
+    numbers = list(dict.fromkeys(pin.number for pin in pins))
+    by_name: dict[str, list[str]] = {}
+    for pin in pins:
+        if pin.number not in by_name.setdefault(pin.name, []):
+            by_name[pin.name].append(pin.number)
+    nets: dict[str, str] = {}
+    source: dict[str, str] = {}
+
+    def assign(number: str, net: str, what: str) -> None:
+        if number in nets:
+            problems.append(f"{where}: pin {number} gets a net from both {source[number]} and "
+                            f"{what}: give it once")
+            return
+        nets[number], source[number] = net, what
+
+    if isinstance(p.pins, list):
+        if p.pins and numbers != [str(i) for i in range(1, len(numbers) + 1)]:
+            problems.append(f"{where}: pins given as a list, but {p.symbol} pins are not "
+                            f"numbered 1..n ({', '.join(numbers)}): use a mapping")
+            return None
+        for i, net in enumerate(p.pins, 1):
+            if str(i) not in numbers:
+                problems.append(f"{where}: {p.symbol} has no pin {i}")
+                continue
+            assign(str(i), net, "the sheet")
+    else:
+        for key, net in p.pins.items():
+            named = by_name.get(key, [])
+            if key in numbers and named and named != [key]:
+                problems.append(f"{where}: pin key {key} is ambiguous: pin number {key} and the "
+                                f"name of pin(s) {', '.join(named)}; use the pin number")
+                continue
+            targets = [key] if key in numbers else named
+            if not targets:
+                problems.append(f"{where}: {p.symbol} has no pin {key}")
+            for n in targets:
+                assign(n, net, f"the sheet ({key})" if key != n else "the sheet")
+    role = p.fields.get("Role")
+    if role and interface is not None:
+        if role == "MCU":
+            for signal, gpio in interface["signals"].items():
+                n = int(gpio[len("GPIO"):])
+                found = [pin.number for pin in pins
+                         if (m := _GPIO_PIN.fullmatch(pin.name)) and int(m.group(1)) == n]
+                if not found:
+                    problems.append(f"{where}: {p.symbol} has no pin IO{n} for signal {signal} "
+                                    "(interface.yaml signals)")
+                for number in dict.fromkeys(found):
+                    assign(number, signal, f"interface.yaml signals.{signal}")
+        elif role in interface["connectors"]:
+            for i, net in enumerate(interface["connectors"][role], 1):
+                if str(i) not in numbers:
+                    problems.append(f"{where}: {p.symbol} has no pin {i} for connectors.{role} "
+                                    "(interface.yaml)")
+                    continue
+                assign(str(i), net, f"interface.yaml connectors.{role}")
+        else:
+            problems.append(f"{where}: Role {role} is neither MCU nor a connector in "
+                            "interface.yaml")
+    for n in sorted(set(numbers) - set(nets)):
+        problems.append(f"{where}: pin {n} of {p.symbol} has no net (write NC if unused)")
+    return nets
+
+
+def _resolve(sheet: SheetSrc, p: PartSrc, libs: Libraries, interface: dict | None,
+             problems: list[str]) -> Placed | None:
     where = f"{sheet.source.name}: {p.ref}"
     try:
         sym = libs.symbol(p.symbol)
@@ -111,26 +193,23 @@ def _resolve(sheet: SheetSrc, p: PartSrc, libs: Libraries, problems: list[str]) 
     except (KeyError, ValueError, OSError) as e:
         problems.append(f"{where}: {e}")
         return None
-    numbers = list(dict.fromkeys(pin.number for pin in pins))
-    if isinstance(p.pins, list):
-        if numbers != [str(i) for i in range(1, len(numbers) + 1)]:
-            problems.append(f"{where}: pins given as a list, but {p.symbol} pins are not "
-                            f"numbered 1..n ({', '.join(numbers)}): use a mapping")
-            return None
-        nets = {str(i): n for i, n in enumerate(p.pins, 1)}
-    else:
-        nets = dict(p.pins)
-    for n in sorted(set(numbers) - set(nets)):
-        problems.append(f"{where}: pin {n} of {p.symbol} has no net (write NC if unused)")
-    for n in sorted(set(nets) - set(numbers)):
-        problems.append(f"{where}: {p.symbol} has no pin {n}")
+    nets = _pin_nets(where, p, pins, interface, problems)
+    if nets is None:
+        return None
     power = is_power_symbol(sym)
     if power and not p.ref.startswith("#"):
         problems.append(f"{where}: power symbol references must start with '#'")
     if not power and p.ref.startswith("#"):
         problems.append(f"{where}: only power symbols may have a '#' reference")
-    if not power and not (p.footprint or symbol_property(sym, "Footprint")):
-        problems.append(f"{where}: no footprint (set `footprint:`)")
+    if not power:
+        footprint = p.footprint or symbol_property(sym, "Footprint")
+        if not footprint:
+            problems.append(f"{where}: no footprint (set `footprint:`)")
+        else:  # a misspelt footprint is reported here, not as a crash in gen_pcb
+            try:
+                libs.footprint(footprint)
+            except (KeyError, ValueError, OSError) as e:
+                problems.append(f"{where}: {e}")
     return Placed(sheet, p, sym, pins, nets, power)
 
 
@@ -138,25 +217,28 @@ def resolve_design(design: Design, libs: Libraries) -> list[Placed]:
     """All parts with their library symbols; raise DesignError listing every problem."""
     problems: list[str] = []
     placed = [r for s in design.sheets for p in s.parts
-              if (r := _resolve(s, p, libs, problems)) is not None]
+              if (r := _resolve(s, p, libs, design.interface, problems)) is not None]
     for lib_id in design.power_symbols.values():
         try:
             libs.symbol(lib_id)
         except (KeyError, ValueError, OSError) as e:
             problems.append(f"project.yaml power_symbols: {e}")
     for s in design.sheets:
-        seen: dict[tuple[float, float], str] = {}
+        seen: dict[tuple[float, float], tuple[str, str, str | None]] = {}  # point -> who, ref, net
         for pl in (x for x in placed if x.sheet is s):
             for pin in pl.pins:
                 who = f"{pl.src.ref} pin {pin.number}"
+                net = pl.nets.get(pin.number)
                 for end in dict.fromkeys((pin_end(pin, pl.src), label_point(pin, pl.src))):
                     if not (_on_grid(end[0]) and _on_grid(end[1])):
                         problems.append(f"{s.source.name}: {who} ends off the 1.27 mm grid at "
                                         f"{end}: move the part or change its stub")
-                    if end in seen and seen[end] != who:
-                        problems.append(f"{s.source.name}: {who} and {seen[end]} meet at {end}: "
+                    other = seen.get(end)
+                    stacked = other is not None and other[1:] == (pl.src.ref, net)
+                    if other is not None and other[0] != who and not stacked:
+                        problems.append(f"{s.source.name}: {who} and {other[0]} meet at {end}: "
                                         "move one part, they would be connected")
-                    seen[end] = who
+                    seen.setdefault(end, (who, pl.src.ref, net))
     if problems:
         raise DesignError(problems)
     return placed
@@ -299,8 +381,12 @@ def generate_schematics(design: Design, libs: Libraries) -> dict[str, str]:
             ref = pl.src.ref
             lib_ids.add(pl.src.symbol)
             items.append(_symbol(design, path, pl, ref, ref))
+            marked: set[tuple[float, float]] = set()
             for pin in pl.pins:
                 net, end, out = pl.nets[pin.number], pin_end(pin, pl.src), pin_outward(pin, pl.src)
+                if end in marked:
+                    continue  # a stacked pin: the first pin on this point carries the marker
+                marked.add(end)
                 key = f"{ref}/{pin.number}"
                 if net == NC:
                     items.append(["no_connect", ["at", num(end[0]), num(end[1])],

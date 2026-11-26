@@ -10,6 +10,9 @@ company: airQ open hardware (CC BY-SA 4.0)
 rev: 3.0-dev
 output: ../../kicad/tongue         # KiCad project folder, relative to this file
 
+# The interface contract: J1 (Role J_QWIIC_TONGUE) takes its pinout from it (gen_sch.py).
+interface: ../../interface.yaml
+
 # Schematic sheets, in page order; each one is <name>.yaml in this folder.
 sheets: [sense]
 

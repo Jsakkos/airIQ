@@ -1,0 +1,146 @@
+# E-ink sheet: 24-pin 0.5 mm FPC for the GoodDisplay GDEY029T94 (SSD1680) and GoodDisplay's
+# DESPI-C02 driver circuit (gate-voltage boost and charge pump), populated on every board.
+# Each part: `at` is the symbol anchor on the A4 page in mm (Y down, on the 1.27 mm grid);
+# `pins` maps symbol pins to net names (NC = no connection), see hardware/README.md.
+#
+# Values (ruling R23): DESPI-C02 topology with the GDEY029T94 spec section 12 reference values;
+# derivation in .superpowers/sdd/2026-11-25-airq-v3-2-pcb/task-3-research.md section 5.
+#   L 47 uH >= 0.5 A shielded; Q AO3400A (G = GDR, S = RESE, D = SW); RESE 2.2 R to GND;
+#   GDR 1 M to GND; 3 x B5819W (D5: SW -> VGH boost; D6, D7: VGL charge pump);
+#   4.7 uF / 25 V on the SW-node pump cap and the 3.3 V input; 1 uF / 25 V on VSH2, VCI, VDD,
+#   VSH1, VGH, VSL, VGL, VCOM; no cap on pin 4 (NC) or VPP (pin 19, test pin); BS1 (pin 8) = GND.
+# Part swaps from the DESPI part numbers (ruling R28): AO3400A for Si1308EDL, B5819W for MBR0530.
+# The FPC pinout (J7, Role J_EPD) comes from hardware/interface.yaml.
+
+title: "E-ink FPC and DESPI-C02 driver"
+paper: A4
+
+notes:
+  - {text: "Gate-voltage supply, GoodDisplay DESPI-C02 topology with the GDEY029T94 section 12 values (ruling R23)\nBoost: L2 + Q1 switched by the panel's GDR, current sense RESE; D5 -> VGH (about +20 V)\nCharge pump: C20 + D6, D7 -> VGL (about -20 V)", at: [17.78, 50.8], size: 1.8}
+  - {text: "Boost input\n4.7 uF / 25 V", at: [17.78, 66.04], size: 1.5}
+  - {text: "VGL pump", at: [124.46, 83.82], size: 1.5}
+  - {text: "1 uF / 25 V on each panel supply pin (C22 = VCI / VDDIO, pins 15 and 16)", at: [17.78, 137.16], size: 1.8}
+  - {text: "J_EPD: GDEY029T94 FPC, 24 pins, 0.5 mm\nPin order: hardware/interface.yaml\nBS1 (pin 8) = GND: 4-wire SPI\nPins 1, 4, 6, 7 NC; VPP (19) open\nFPC inserted unfolded, display side up:\nFPC pin i = connector pin i (lib README)", at: [182.88, 50.8], size: 1.8}
+
+parts:
+  # -- Panel connector, XUNPU FPC-05FB-24PH20 (pins 1-24: interface.yaml)
+  J7:
+    symbol: airq:FPC-05FB-24PH20
+    at: [254.0, 104.14]
+    fields: {Role: J_EPD}
+    pins: {"25": NC, "26": NC}        # mounting pads
+
+  # -- Boost: 3.3 V -> L2 -> SW, switched by Q1 to RESE -> 2.2 R -> GND
+  C19:                  # boost input
+    symbol: Device:C
+    at: [25.4, 78.74]
+    value: 4.7uF
+    footprint: Capacitor_SMD:C_0805_2012Metric
+    lcsc: C1779
+    pins: [+3V3, GND]
+  L2:
+    symbol: airq:SMNR4030-470MT
+    at: [50.8, 73.66]
+    value: 47uH
+    pins: [+3V3, EPD_SW]
+  Q1:
+    symbol: airq:AO3400A
+    at: [55.88, 101.6]
+    stub: 7.62          # labels clear of the reference and value texts
+    pins: {G: EPD_GDR, S: EPD_RESE, D: EPD_SW}
+  R13:                  # gate pull-down
+    symbol: Device:R
+    at: [25.4, 106.68]
+    value: 1M
+    footprint: Resistor_SMD:R_0603_1608Metric
+    lcsc: C22935
+    pins: [EPD_GDR, GND]
+  R12:                  # current sense (RESE)
+    symbol: Device:R
+    at: [71.12, 116.84]
+    value: 2R2
+    footprint: Resistor_SMD:R_0603_1608Metric
+    lcsc: C22939
+    pins: [EPD_RESE, GND]
+  D5:                   # VGH: SW -> PREVGH
+    symbol: airq:B5819W_C8598
+    at: [99.06, 73.66]
+    mirror: y           # anode (+) on the left
+    pins: {"+": EPD_SW, "-": EPD_VGH}
+
+  # -- VGL charge pump: SW -> C20 -> PUMP; D7 clamps PUMP to GND, D6 pulls VGL below it
+  C20:                  # flying cap
+    symbol: Device:C
+    at: [96.52, 96.52]
+    rot: 90
+    value: 4.7uF
+    footprint: Capacitor_SMD:C_0805_2012Metric
+    lcsc: C1779
+    pins: [EPD_SW, EPD_PUMP]
+  D6:                   # PUMP <- VGL (anode VGL)
+    symbol: airq:B5819W_C8598
+    at: [137.16, 96.52]
+    pins: {"-": EPD_PUMP, "+": EPD_VGL}
+  D7:                   # PUMP -> GND (cathode GND)
+    symbol: airq:B5819W_C8598
+    at: [137.16, 109.22]
+    mirror: y
+    pins: {"+": EPD_PUMP, "-": GND}
+
+  # -- Panel supply capacitors, 1 uF / 25 V (0603, 50 V part)
+  C21:
+    symbol: Device:C
+    at: [25.4, 157.48]
+    value: 1uF
+    footprint: Capacitor_SMD:C_0603_1608Metric
+    lcsc: C15849
+    pins: [EPD_VSH2, GND]
+  C22:                  # VCI / VDDIO (FPC pins 15, 16 = +3V3)
+    symbol: Device:C
+    at: [43.18, 157.48]
+    value: 1uF
+    footprint: Capacitor_SMD:C_0603_1608Metric
+    lcsc: C15849
+    pins: [+3V3, GND]
+  C23:
+    symbol: Device:C
+    at: [60.96, 157.48]
+    value: 1uF
+    footprint: Capacitor_SMD:C_0603_1608Metric
+    lcsc: C15849
+    pins: [EPD_VDD, GND]
+  C24:
+    symbol: Device:C
+    at: [78.74, 157.48]
+    value: 1uF
+    footprint: Capacitor_SMD:C_0603_1608Metric
+    lcsc: C15849
+    pins: [EPD_VSH1, GND]
+  C25:                  # PREVGH
+    symbol: Device:C
+    at: [96.52, 157.48]
+    value: 1uF
+    footprint: Capacitor_SMD:C_0603_1608Metric
+    lcsc: C15849
+    pins: [EPD_VGH, GND]
+  C26:
+    symbol: Device:C
+    at: [114.3, 157.48]
+    value: 1uF
+    footprint: Capacitor_SMD:C_0603_1608Metric
+    lcsc: C15849
+    pins: [EPD_VSL, GND]
+  C27:                  # PREVGL
+    symbol: Device:C
+    at: [132.08, 157.48]
+    value: 1uF
+    footprint: Capacitor_SMD:C_0603_1608Metric
+    lcsc: C15849
+    pins: [EPD_VGL, GND]
+  C28:
+    symbol: Device:C
+    at: [149.86, 157.48]
+    value: 1uF
+    footprint: Capacitor_SMD:C_0603_1608Metric
+    lcsc: C15849
+    pins: [EPD_VCOM, GND]

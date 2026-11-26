@@ -1,7 +1,8 @@
 """Load and check the YAML design source of a board (hardware/src/<board>/), see hardware/README.md.
 
 Files in the source folder:
-    project.yaml   project name, title block, sheet order, power symbols, libraries, ERC rules
+    project.yaml   project name, title block, sheet order, power symbols, libraries, ERC rules,
+                   and the interface contract (`interface:`, normally hardware/interface.yaml)
     <sheet>.yaml   one per schematic sheet: its parts, where they sit on the page, pin -> net
     layout.yaml    board outline, design rules, net classes, DRC rules, footprint placement
 
@@ -18,6 +19,7 @@ import yaml
 
 NC = "NC"
 _NET_RE = re.compile(r"[^\s/{}\[\]\"]+")
+_GPIO_RE = re.compile(r"GPIO(\d+)")
 
 
 class DesignError(ValueError):
@@ -75,6 +77,9 @@ class Design:
     erc_severities: dict[str, str]
     layout: dict
     src_dir: Path
+    # hardware/interface.yaml (`signals`, `connectors`) when project.yaml names it: the generator
+    # then wires the MCU (Role MCU) and every Role-tagged connector from it, see gen_sch.py
+    interface: dict | None = None
 
     def rel(self, path: Path) -> str:
         """`path` relative to the repository root (the source folder is hardware/src/<board>)."""
@@ -85,7 +90,7 @@ class Design:
 
 
 _PROJECT_KEYS = {"project", "title", "company", "rev", "sheets", "power_symbols", "libraries",
-                 "output", "erc_severities"}
+                 "output", "erc_severities", "interface"}
 _SHEET_KEYS = {"title", "paper", "parts", "notes"}
 _NOTE_KEYS = {"text", "at", "size"}
 _PART_KEYS = {"symbol", "at", "rot", "mirror", "stub", "value", "footprint", "lcsc", "dnp",
@@ -150,6 +155,10 @@ def _part(ref: str, d, where: str, problems: list[str]) -> PartSrc | None:
     if mirror not in (None, "x", "y"):
         problems.append(f"{where}: part {ref}: mirror must be x or y, got {mirror!r}")
         mirror = None
+    dnp = d.get("dnp", False)
+    if not isinstance(dnp, bool):  # a quoted "no" would otherwise read as true
+        problems.append(f"{where}: part {ref}: dnp must be true or false, got {dnp!r}")
+        dnp = False
     stub = d.get("stub", 0)
     if not isinstance(stub, (int, float)) or isinstance(stub, bool) or stub < 0:
         problems.append(f"{where}: part {ref}: stub must be a length in mm, got {stub!r}")
@@ -169,7 +178,7 @@ def _part(ref: str, d, where: str, problems: list[str]) -> PartSrc | None:
     opt = {k: (None if d.get(k) is None else str(d[k])) for k in ("value", "footprint", "lcsc")}
     return PartSrc(ref=ref, symbol=d["symbol"],
                    at=_number_pair(d.get("at"), f"{where}: part {ref} at", problems),
-                   rot=rot, mirror=mirror, stub=float(stub), dnp=bool(d.get("dnp", False)),
+                   rot=rot, mirror=mirror, stub=float(stub), dnp=dnp,
                    fields={str(k): str(v) for k, v in fields.items()}, pins=pins, **opt)
 
 
@@ -223,6 +232,30 @@ def _sheet(name: str, path: Path, problems: list[str]) -> SheetSrc:
                     source=path, notes=notes)
 
 
+def _interface(path: Path, problems: list[str]) -> dict:
+    """The parts of the interface contract the generator uses: `signals` (net -> GPIO<n>) and
+    `connectors` (interface key -> net per pin, in pin order)."""
+    data = _load_yaml(path, problems)
+    where = path.name
+    signals = data.get("signals") or {}
+    connectors = data.get("connectors") or {}
+    if not isinstance(signals, dict) or not isinstance(connectors, dict):
+        problems.append(f"{where}: `signals` and `connectors` must be mappings")
+        return {"signals": {}, "connectors": {}}
+    for name, gpio in signals.items():
+        _net(name, f"{where}: signals.{name}", problems)
+        if not (isinstance(gpio, str) and _GPIO_RE.fullmatch(gpio)):
+            problems.append(f"{where}: signals.{name} must be GPIO<n>, got {gpio!r}")
+    for key, nets in connectors.items():
+        if not isinstance(nets, list):
+            problems.append(f"{where}: connectors.{key} must be a list of nets in pin order")
+            continue
+        for i, n in enumerate(nets, 1):
+            _net(n, f"{where}: connectors.{key} pin {i}", problems)
+    return {"signals": {str(k): str(v) for k, v in signals.items()},
+            "connectors": {str(k): list(v) for k, v in connectors.items() if isinstance(v, list)}}
+
+
 def load_design(src_dir: Path) -> Design:
     """Read `src_dir`/project.yaml, its sheets and layout.yaml; raise DesignError on problems."""
     src_dir = Path(src_dir)
@@ -248,6 +281,7 @@ def load_design(src_dir: Path) -> Design:
     _unknown(layout, _LAYOUT_KEYS, "layout.yaml", problems)
     if "board" in layout:
         _check_board(layout["board"], problems)
+    interface = _interface(src_dir / proj["interface"], problems) if proj.get("interface") else None
     if problems:
         raise DesignError(problems)
     return Design(
@@ -258,4 +292,4 @@ def load_design(src_dir: Path) -> Design:
         footprint_libs={k: (src_dir / v).resolve() for k, v in (libs.get("footprints") or {}).items()},
         out_dir=(src_dir / proj["output"]).resolve(),
         erc_severities={str(k): str(v) for k, v in (proj.get("erc_severities") or {}).items()},
-        layout=layout, src_dir=src_dir.resolve())
+        layout=layout, src_dir=src_dir.resolve(), interface=interface)

@@ -1,8 +1,9 @@
 # Sense tongue sheet: SHT45 reference T/RH sensor, VEML7700 ambient-light sensor, Qwiic socket.
 # Each part: `at` is the symbol anchor on the A4 page in mm (Y down, on the 1.27 mm grid);
 # `pins` maps every symbol pin number to a net name (NC = no connection), see hardware/README.md.
-# J1's pin order mirrors connectors.J_QWIIC_TONGUE in hardware/interface.yaml (Qwiic leads are
-# pin 1 to pin 1); check_netlist checks it against hardware/src/tongue/interface.yaml.
+# J1's pins 1-4 come from connectors.J_QWIIC_TONGUE in hardware/interface.yaml through its Role
+# field (Qwiic leads are pin 1 to pin 1, so it matches the main board's socket); check_netlist
+# checks the result against hardware/src/tongue/interface.yaml.
 # I2C addresses (hardware/interface.yaml i2c_addresses): SHT45-AD1B 0x44, VEML7700 0x10, both fixed.
 
 title: "Sense tongue: SHT45, VEML7700, Qwiic socket"
@@ -21,8 +22,8 @@ parts:
     symbol: airq:SM04B-SRSS-TB
     at: [63.5, 96.52]
     rot: 270                    # pins on the right, 1..4 from the top
-    fields: {Role: J_QWIIC_TONGUE}
-    pins: {"1": GND, "2": +3V3, "3": I2C_SDA, "4": I2C_SCL, "5": NC, "6": NC}
+    fields: {Role: J_QWIIC_TONGUE}    # pins 1-4: hardware/interface.yaml
+    pins: {"5": NC, "6": NC}
 
   # -- Reference temperature and humidity: Sensirion SHT45-AD1B-R2
   U1:

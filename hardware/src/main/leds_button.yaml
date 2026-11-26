@@ -1,0 +1,109 @@
+# LEDs and button sheet: 5 V level buffer for the LED data line, four side-emitting addressable
+# RGB LEDs in one chain (2 per half of the mini's split light), and the side-actuated button.
+# Each part: `at` is the symbol anchor on the A4 page in mm (Y down, on the 1.27 mm grid);
+# `pins` maps symbol pins (by number or by pin name) to net names (NC = no connection), see
+# hardware/README.md. Net names are global across the board: one name, one net.
+# Rulings: R16 (4 LEDs, one chain, LED_DOUT_5V to J_LED_EXT), R17 (BUTTON pull-up), R26 (SK6812SIDE-A).
+
+title: "LEDs (5 V, buffered) and button"
+paper: A4
+
+notes:
+  - {text: "LED data level shifter: SN74AHCT1G125 at 5 V (TTL input, VIH 2 V)\nLED_DATA (GPIO2, 3.3 V) -> LED_DATA_5V. OE tied low: always enabled.\n10 k pull-down: buffer input defined while GPIO2 floats (reset, boot)", at: [17.78, 63.5], size: 1.8}
+  - {text: "Button: side-actuated SKRTLAE010, BUTTON (GPIO9, BOOT strap) to GND\n10 k pull-up: GPIO9 reads high at boot unless the button is held\nPins 1, 3 = common (GND), 2 = switched; 4, 5 = mounting tabs", at: [162.56, 63.5], size: 1.8}
+  - {text: "Status LEDs: 4 x SK6812SIDE-A (WS2812 protocol, GRB), one chain on +5V, 2 per mini half\nD1 -> D2 -> D3 -> D4; DOUT of D4 = LED_DOUT_5V -> J_LED_EXT pin 2 (off-board segment)", at: [17.78, 124.46], size: 1.8}
+  - {text: "100 nF at each LED; 10 uF +5V bulk for the LEDs and J_LED_EXT", at: [17.78, 157.48], size: 1.8}
+
+parts:
+  # -- LED data buffer (5 V)
+  U5:
+    symbol: airq:SN74AHCT1G125DBVR
+    at: [55.88, 95.25]
+    stub: 2.54
+    pins:
+      "~{OE}": GND      # active-low output enable: always on
+      A: LED_DATA
+      GND: GND
+      Y: LED_DATA_5V
+      VCC: +5V
+  C13:                  # buffer VCC decoupling
+    symbol: Device:C
+    at: [104.14, 95.25]
+    value: 100nF
+    footprint: Capacitor_SMD:C_0402_1005Metric
+    lcsc: C1525
+    pins: [+5V, GND]
+  R10:                  # LED_DATA pull-down
+    symbol: Device:R
+    at: [20.32, 95.25]
+    value: 10k
+    footprint: Resistor_SMD:R_0402_1005Metric
+    lcsc: C25744
+    pins: [LED_DATA, GND]
+
+  # -- Status LEDs, one chain (light leaves toward footprint +y: front edge, see lib README)
+  D1:
+    symbol: airq:SK6812SIDE-A_C5378721
+    at: [45.72, 139.7]
+    pins: {DIN: LED_DATA_5V, VDD: +5V, DOUT: LED_CHAIN_1, GND: GND}
+  D2:
+    symbol: airq:SK6812SIDE-A_C5378721
+    at: [101.6, 139.7]
+    pins: {DIN: LED_CHAIN_1, VDD: +5V, DOUT: LED_CHAIN_2, GND: GND}
+  D3:
+    symbol: airq:SK6812SIDE-A_C5378721
+    at: [157.48, 139.7]
+    pins: {DIN: LED_CHAIN_2, VDD: +5V, DOUT: LED_CHAIN_3, GND: GND}
+  D4:
+    symbol: airq:SK6812SIDE-A_C5378721
+    at: [213.36, 139.7]
+    pins: {DIN: LED_CHAIN_3, VDD: +5V, DOUT: LED_DOUT_5V, GND: GND}
+  C14:
+    symbol: Device:C
+    at: [45.72, 170.18]
+    value: 100nF
+    footprint: Capacitor_SMD:C_0402_1005Metric
+    lcsc: C1525
+    pins: [+5V, GND]
+  C15:
+    symbol: Device:C
+    at: [60.96, 170.18]
+    value: 100nF
+    footprint: Capacitor_SMD:C_0402_1005Metric
+    lcsc: C1525
+    pins: [+5V, GND]
+  C16:
+    symbol: Device:C
+    at: [76.2, 170.18]
+    value: 100nF
+    footprint: Capacitor_SMD:C_0402_1005Metric
+    lcsc: C1525
+    pins: [+5V, GND]
+  C17:
+    symbol: Device:C
+    at: [91.44, 170.18]
+    value: 100nF
+    footprint: Capacitor_SMD:C_0402_1005Metric
+    lcsc: C1525
+    pins: [+5V, GND]
+  C18:                  # +5V bulk for the LED chain and the off-board segment
+    symbol: Device:C
+    at: [25.4, 170.18]
+    value: 10uF
+    footprint: Capacitor_SMD:C_0805_2012Metric
+    lcsc: C15850
+    pins: [+5V, GND]
+
+  # -- Button (GPIO9 / BOOT)
+  SW1:
+    symbol: airq:SKRTLAE010
+    at: [190.5, 88.9]
+    stub: 7.62          # labels clear of the value text under the body
+    pins: {"1": GND, "2": BUTTON, "3": GND, "4": NC, "5": NC}
+  R11:                  # BUTTON pull-up (strap: GPIO9 high at boot)
+    symbol: Device:R
+    at: [228.6, 92.71]
+    value: 10k
+    footprint: Resistor_SMD:R_0402_1005Metric
+    lcsc: C25744
+    pins: [+3V3, BUTTON]

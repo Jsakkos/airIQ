@@ -8,8 +8,12 @@ company: airQ open hardware (CC BY-SA 4.0)
 rev: 3.0-dev
 output: ../../kicad/main           # KiCad project folder, relative to this file
 
+# The interface contract: the MCU (Role MCU) takes its GPIO signals from it, and each interface
+# connector (Role J_SEN66, J_EPD, ...) its pinout, so neither is typed in the sheets (gen_sch.py).
+interface: ../../interface.yaml
+
 # Schematic sheets, in page order; each one is <name>.yaml in this folder.
-sheets: [power]
+sheets: [power, mcu, connectors, leds_button, epd]
 
 # Nets drawn with a KiCad power symbol instead of a label.
 power_symbols:

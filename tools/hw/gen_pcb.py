@@ -15,10 +15,12 @@ Regeneration contract (hardware/README.md, "Toolchain"):
   they move into layout.yaml). Routing therefore survives a re-run; tracks of a net that a
   schematic change removed show up as DRC errors to fix.
 A footprint without a placement entry keeps its position on the existing board, else it is
-parked beside the outline (reported, so it gets a placement entry).
+parked beside the outline (reported, so it gets a placement entry): parked footprints are packed
+in rows to the right of the outline by their courtyards, so they never overlap each other.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 from gen_sch import num, uid
@@ -271,6 +273,38 @@ def outline_items(project: str, board: dict) -> tuple[list[list], tuple[float, f
     return items, box
 
 
+PARK_GAP = 2.0     # mm between the courtyards of parked footprints
+PARK_ROW = 100.0   # mm: parked footprints start a new row past this width
+
+
+def footprint_bbox(fp: list) -> tuple[float, float, float, float]:
+    """(min x, min y, max x, max y) of a library footprint at rotation 0: its F.CrtYd drawing
+    and its pads (some EasyEDA courtyards follow the body and leave the pads out)."""
+    pts: list[tuple[float, float]] = []
+    for g in fp[2:]:
+        if not (isinstance(g, list) and g[0] in _FP_GRAPHICS and atom(g, "layer") == "F.CrtYd"):
+            continue
+        for tag in ("start", "mid", "end", "center"):
+            c = child(g, tag)
+            if c is not None:
+                pts.append((float(c[1]), float(c[2])))
+        if child(g, "pts") is not None:
+            pts += [(float(xy[1]), float(xy[2])) for xy in children(child(g, "pts"), "xy")]
+        if g[0] == "fp_circle":
+            (cx, cy), (ex, ey) = ((float(child(g, t)[1]), float(child(g, t)[2]))
+                                  for t in ("center", "end"))
+            r = math.hypot(ex - cx, ey - cy)
+            pts += [(cx - r, cy - r), (cx + r, cy + r)]
+    for pad in children(fp, "pad"):
+        at, size = child(pad, "at"), child(pad, "size")
+        r = math.hypot(float(size[1]), float(size[2])) / 2   # any pad rotation
+        pts += [(float(at[1]) - r, float(at[2]) - r), (float(at[1]) + r, float(at[2]) + r)]
+    if not pts:
+        return 0.0, 0.0, 0.0, 0.0
+    xs, ys = [x for x, _ in pts], [y for _, y in pts]
+    return min(xs), min(ys), max(xs), max(ys)
+
+
 def generate_board(project: str, title: str, rev: str, company: str, source: str,
                    comps: list[Comp], layout: dict, libs: Libraries,
                    existing: str | None) -> Board:
@@ -282,8 +316,9 @@ def generate_board(project: str, title: str, rev: str, company: str, source: str
     kept, old_pos, hand_edges = _existing(project, existing)
     unplaced = []
     fps = []
-    parked = 0
+    park_x = park_y = row_h = 0.0   # packing cursor, relative to (outline right + 10, top)
     for comp in sorted(comps, key=lambda c: _natural(c.ref)):
+        lib_fp = libs.footprint(comp.footprint)
         if comp.ref in placement:
             px, py, *r = placement[comp.ref]
             x, y, rot = ox + float(px), oy + float(py), float(r[0]) if r else 0.0
@@ -291,10 +326,14 @@ def generate_board(project: str, title: str, rev: str, company: str, source: str
             x, y, rot = old_pos[comp.ref]
             unplaced.append(comp.ref)
         else:
-            x, y, rot = ox + x1 + 10 + (parked % 5) * 8, oy + (parked // 5) * 8, 0.0
-            parked += 1
+            bx0, by0, bx1, by1 = footprint_bbox(lib_fp)
+            if park_x > 0 and park_x + (bx1 - bx0) > PARK_ROW:
+                park_x, park_y, row_h = 0.0, park_y + row_h + PARK_GAP, 0.0
+            x, y, rot = ox + x1 + 10 + park_x - bx0, oy + park_y - by0, 0.0
+            park_x += bx1 - bx0 + PARK_GAP
+            row_h = max(row_h, by1 - by0)
             unplaced.append(comp.ref)
-        fps.append(footprint_node(project, comp, libs.footprint(comp.footprint), x, y, rot))
+        fps.append(footprint_node(project, comp, lib_fp, x, y, rot))
     node = ["kicad_pcb", ["version", PCB_VERSION], ["generator", QStr("pcbnew")],
             ["generator_version", QStr("10.0")],
             ["general", ["thickness", num(float(board.get("thickness", 1.6)))],

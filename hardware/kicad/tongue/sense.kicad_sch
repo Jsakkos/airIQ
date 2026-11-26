@@ -472,7 +472,7 @@
 			(on_board yes)
 			(in_pos_files yes)
 			(duplicate_pin_numbers_are_jumpers no)
-			(property "Reference" "CN"
+			(property "Reference" "J"
 				(at 0 8.89 0)
 				(show_name no)
 				(do_not_autoplace no)
@@ -698,7 +698,7 @@
 			(on_board yes)
 			(in_pos_files yes)
 			(duplicate_pin_numbers_are_jumpers no)
-			(property "Reference" "LED"
+			(property "Reference" "U"
 				(at 0 8.89 0)
 				(show_name no)
 				(do_not_autoplace no)

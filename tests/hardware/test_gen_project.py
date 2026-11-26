@@ -1,11 +1,19 @@
 import json
+import shutil
 
+from conftest import FIXTURE_LIB
 from design import PartSrc
 from gen_project import DRC_ERRORS, ERC_ERRORS, kicad_dru, kicad_pro, lib_tables
 from gen_sch import resolve_design
+from kicad_lib import Libraries
 
 
-def test_lib_tables_list_used_libraries_only(make_design, libs, tmp_path):
+def test_lib_tables_list_used_libraries_only(make_design, tmp_path):
+    stock = tmp_path / "stock-footprints" / "Resistor_SMD.pretty"   # stands in for KiCad's folder
+    stock.mkdir(parents=True)
+    shutil.copy(FIXTURE_LIB / "test.pretty" / "R_TEST.kicad_mod", stock / "R_0402_1005Metric.kicad_mod")
+    libs = Libraries({"test": FIXTURE_LIB / "test.kicad_sym"}, {"test": FIXTURE_LIB / "test.pretty"},
+                     stock_footprints=stock.parent)
     d = make_design({"a": [PartSrc("R1", "test:R", (25.4, 25.4), footprint="Resistor_SMD:R_0402_1005Metric",
                                    pins=["A", "B"])]})
     d.symbol_libs = {"test": tmp_path / "hardware" / "kicad" / "lib" / "test.kicad_sym"}

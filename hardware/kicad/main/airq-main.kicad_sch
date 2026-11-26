@@ -11,6 +11,39 @@
 		(comment 1 "Generated from hardware/src/main/project.yaml by tools/hw/build.py: edit the source, not this file")
 	)
 	(lib_symbols)
+	(text "MCU, I2C bus, pressure sensor"
+		(exclude_from_sim no)
+		(at 90.17 50.8 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "177fc15d-90b9-559d-b545-b9ec328bd09e")
+	)
+	(text "E-ink FPC and DESPI-C02 driver"
+		(exclude_from_sim no)
+		(at 26.67 101.6 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "56b35d0d-d4f2-5dc1-924a-e237e3604b6a")
+	)
+	(text "Connectors: SEN66, Qwiic, LED, UART"
+		(exclude_from_sim no)
+		(at 153.67 50.8 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "9f756764-d4ff-5300-b43e-c3993063fe08")
+	)
 	(text "Power: USB-C input, ESD, 3.3 V buck"
 		(exclude_from_sim no)
 		(at 26.67 50.8 0)
@@ -21,6 +54,62 @@
 			(justify left)
 		)
 		(uuid "a9c1eab4-00ef-5d70-acc4-77647e1999b4")
+	)
+	(text "LEDs (5 V, buffered) and button"
+		(exclude_from_sim no)
+		(at 217.17 50.8 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "b6240ea5-d331-5248-bf7e-0ed2c9f7dcc8")
+	)
+	(sheet
+		(at 25.4 88.9)
+		(size 45.72 25.4)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "00bb70ee-35ac-5545-921e-cdd92e3af30c")
+		(property "Sheetname" "epd"
+			(at 25.4 88.1884 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "epd.kicad_sch"
+			(at 25.4 114.8846 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "airq-main"
+				(path "/7b9ce1eb-45f5-549f-bfaf-77f7fedd3e55"
+					(page "6")
+				)
+			)
+		)
 	)
 	(sheet
 		(at 25.4 38.1)
@@ -63,6 +152,141 @@
 			(project "airq-main"
 				(path "/7b9ce1eb-45f5-549f-bfaf-77f7fedd3e55"
 					(page "2")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 88.9 38.1)
+		(size 45.72 25.4)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "871ba1c6-2f31-5d37-9b34-cea494286556")
+		(property "Sheetname" "mcu"
+			(at 88.9 37.3884 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "mcu.kicad_sch"
+			(at 88.9 64.0846 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "airq-main"
+				(path "/7b9ce1eb-45f5-549f-bfaf-77f7fedd3e55"
+					(page "3")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 215.9 38.1)
+		(size 45.72 25.4)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "96035818-6b13-5cb8-b988-1f30d7546768")
+		(property "Sheetname" "leds_button"
+			(at 215.9 37.3884 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "leds_button.kicad_sch"
+			(at 215.9 64.0846 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "airq-main"
+				(path "/7b9ce1eb-45f5-549f-bfaf-77f7fedd3e55"
+					(page "5")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 152.4 38.1)
+		(size 45.72 25.4)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "c6152d89-f2bc-5da5-a6d8-962600baa955")
+		(property "Sheetname" "connectors"
+			(at 152.4 37.3884 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "connectors.kicad_sch"
+			(at 152.4 64.0846 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "airq-main"
+				(path "/7b9ce1eb-45f5-549f-bfaf-77f7fedd3e55"
+					(page "4")
 				)
 			)
 		)

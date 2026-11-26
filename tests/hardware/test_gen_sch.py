@@ -122,6 +122,8 @@ def test_instances_link_root_sheet_and_symbol(make_design, libs):
      "pin 2 of test:R has no net"),
     (PartSrc("R9", "test:R", (25.4, 25.4), footprint="test:R_TEST", pins={"1": "A", "2": "B", "3": "C"}),
      "test:R has no pin 3"),
+    (PartSrc("R9", "test:R", (25.4, 25.4), footprint="test:R_TEST", pins=["A", "B", "C"]),
+     "test:R has no pin 3"),
     (PartSrc("R9", "test:R", (25.0, 25.4), footprint="test:R_TEST", pins=["A", "B"]),
      "off the 1.27 mm grid"),
     (PartSrc("R9", "test:R", (25.4, 25.4), pins=["A", "B"]), "no footprint"),
@@ -143,3 +145,83 @@ def test_resolve_reports_pins_that_would_touch(make_design, libs):
     with pytest.raises(DesignError) as e:
         resolve_design(make_design({"a": parts}), libs)
     assert any("R2 pin 1 and R1 pin 2 meet" in p for p in e.value.problems), e.value.problems
+
+
+# ---- pins by name, interface.yaml roles, stacked pins ---------------------------------------
+
+IFACE = {"signals": {"I2C_SDA": "GPIO6", "BUTTON": "GPIO9"},
+         "connectors": {"J_X": ["GND", "SIG", "NC", "VCC", "NC", "B"]}}
+
+
+def _nets(make_design, libs, part, interface=IFACE):
+    d = make_design({"a": [part]})
+    d.interface = interface
+    (pl,) = resolve_design(d, libs)
+    return pl.nets
+
+
+def test_pins_can_be_named_and_a_name_covers_every_pin_with_it(make_design, libs):
+    part = PartSrc("U1", "test:MCU5", (50.8, 50.8),
+                   pins={"GND": "GND", "IO6": "A", "IO9": "B", "EN": "EN", "7": "NC"})
+    assert _nets(make_design, libs, part, None) == {"1": "GND", "5": "GND", "2": "A", "3": "B",
+                                                     "4": "EN", "7": "NC"}
+
+
+def test_mcu_signals_come_from_the_interface(make_design, libs):
+    part = PartSrc("U1", "test:MCU5", (50.8, 50.8), fields={"Role": "MCU"},
+                   pins={"GND": "GND", "EN": "EN", "7": "NC"})
+    nets = _nets(make_design, libs, part)
+    assert nets["2"] == "I2C_SDA" and nets["3"] == "BUTTON"
+
+
+def test_role_connector_pins_come_from_the_interface(make_design, libs):
+    part = PartSrc("J1", "test:U6", (50.8, 50.8), fields={"Role": "J_X"})
+    assert _nets(make_design, libs, part) == {"1": "GND", "2": "SIG", "3": "NC", "4": "VCC",
+                                              "5": "NC", "6": "B"}
+
+
+@pytest.mark.parametrize("part,expected", [
+    (PartSrc("J1", "test:U6", (50.8, 50.8), fields={"Role": "J_X"}, pins={"2": "SIG"}),
+     "pin 2 gets a net from both"),
+    (PartSrc("U1", "test:MCU5", (50.8, 50.8), fields={"Role": "MCU"},
+             pins={"GND": "GND", "EN": "EN", "7": "NC", "IO6": "X"}),
+     "pin 2 gets a net from both"),
+    (PartSrc("U1", "test:MCU5", (50.8, 50.8), fields={"Role": "J_NOPE"},
+             pins={"GND": "GND", "IO6": "A", "IO9": "B", "EN": "EN", "7": "NC"}),
+     "Role J_NOPE is neither MCU nor a connector"),
+    (PartSrc("J1", "test:R", (50.8, 50.8), footprint="test:R_TEST", fields={"Role": "J_X"}),
+     "has no pin 3 for connectors.J_X"),
+    (PartSrc("U1", "test:U6", (50.8, 50.8), fields={"Role": "MCU"},
+             pins={"1": "A", "2": "B", "3": "C", "4": "D", "5": "E", "6": "F"}),
+     "has no pin IO6 for signal I2C_SDA"),
+    (PartSrc("U1", "test:MCU5", (50.8, 50.8),
+             pins={"GND": "GND", "IO6": "A", "IO9": "B", "EN": "EN", "2": "X"}),
+     "pin key 2 is ambiguous"),
+    (PartSrc("U1", "test:MCU5", (50.8, 50.8),
+             pins={"GND": "GND", "1": "GND", "IO6": "A", "IO9": "B", "EN": "EN", "7": "NC"}),
+     "pin 1 gets a net from both"),
+    (PartSrc("U1", "test:MCU5", (50.8, 50.8),
+             pins={"1": "GND", "5": "VCC", "IO6": "A", "IO9": "B", "EN": "EN", "7": "NC"}),
+     "U1 pin 5 and U1 pin 1 meet"),          # stacked pins must share their net
+    (PartSrc("R9", "test:R", (25.4, 25.4), footprint="test:NOPE", pins=["A", "B"]),
+     "footprint 'test:NOPE' not found"),
+])
+def test_role_and_name_problems(make_design, libs, part, expected):
+    with pytest.raises(DesignError) as e:
+        _nets(make_design, libs, part)
+    assert any(expected in p for p in e.value.problems), e.value.problems
+
+
+def test_a_role_without_interface_needs_every_pin_in_the_sheet(make_design, libs):
+    part = PartSrc("J1", "test:U6", (50.8, 50.8), fields={"Role": "J_X"})
+    with pytest.raises(DesignError) as e:
+        _nets(make_design, libs, part, None)
+    assert any("pin 1 of test:U6 has no net" in p for p in e.value.problems), e.value.problems
+
+
+def test_stacked_pins_share_one_marker(make_design, libs):
+    part = PartSrc("U1", "test:MCU5", (50.8, 50.8),
+                   pins={"GND": "GND", "IO6": "A", "IO9": "B", "EN": "EN", "7": "NC"})
+    sheet = parse(generate_schematics(make_design({"a": [part]}), libs)["a.kicad_sch"])
+    gnd = [s for s in children(sheet, "symbol") if str(atom(s, "lib_id")) == "test:GND"]
+    assert len(gnd) == 1     # pins 1 and 5 sit on one point: one GND symbol

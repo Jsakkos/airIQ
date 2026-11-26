@@ -133,7 +133,8 @@ routed or not.
   in place, and DRC reports them.
 - **Placement** lives in `layout.yaml`. A part moved by hand in KiCad must be copied back there, or the
   next rebuild moves it back. A part without a placement entry keeps its board position, or is parked
-  to the right of the outline; the build lists it.
+  to the right of the outline, packed in rows by its courtyard and pads so parked parts never overlap;
+  the build lists it.
 - **Board edges.** The outer outline (a rectangle, or a polygon for notched corners) and internal cutouts
   (milled slots) belong in `layout.yaml`. The generator recognises its own Edge.Cuts items by their UUIDs; any
   other Edge.Cuts item (drawn in KiCad) is never deleted: the build keeps it and lists it, so it can be moved
@@ -149,7 +150,8 @@ routed or not.
 
 `src/<board>/project.yaml`: `project` (KiCad project name), `title`, `company`, `rev`, `output` (the KiCad
 folder), `sheets` (page order; each is `<name>.yaml`), `power_symbols` (net → power symbol, e.g.
-`GND: power:GND`), `libraries` (project symbol/footprint libraries), `erc_severities` (overrides).
+`GND: power:GND`), `libraries` (project symbol/footprint libraries), `erc_severities` (overrides) and
+`interface` (path of the interface contract, `../../interface.yaml`; see "Pins from interface.yaml" below).
 
 `src/<board>/<sheet>.yaml`: `title`, `paper` (A4, A3), `notes` (`{text, at, size}` page text) and `parts`.
 Each part, keyed by its reference:
@@ -162,8 +164,18 @@ Each part, keyed by its reference:
 | `stub` | optional wire length (mm) between each pin and its label, for symbols with short pins |
 | `value`, `footprint`, `lcsc` | override the symbol's Value / Footprint / LCSC fields |
 | `fields` | extra fields, e.g. `{Role: J_SEN66}` (interface.yaml keys) |
-| `dnp` | `true` for parts not fitted (left out of the JLC BOM and CPL) |
-| `pins` | pin number → net name for **every** pin; `NC` for unused pins (no-connect flag). A list is allowed when pins are numbered 1..n |
+| `dnp` | `true` or `false`; `true` for parts not fitted (left out of the JLC BOM and CPL) |
+| `pins` | pin → net name for **every** pin; `NC` for unused pins (no-connect flag). A key is a pin number, or a pin name, which covers every pin with that name (`GND: GND` for all of a module's ground pins). A list is allowed when pins are numbered 1..n. Each pin gets its net once |
+
+**Pins from interface.yaml.** When `project.yaml` names `interface`, a part with a `Role` field takes nets
+from it and the sheet must not repeat them: `Role: MCU` wires each `signals` entry (`I2C_SDA: GPIO6`) to the
+part's pin named `IO6`/`GPIO6`, and a `Role` that is a `connectors` key wires pins 1..n of that part in the
+listed order. So connector pinouts and the GPIO map are written once, in `hardware/interface.yaml`, and
+`check_netlist` checks the result against the same file. The sheet still lists the part's other pins
+(supply, mounting tabs). A `Role` that is neither `MCU` nor a `connectors` key is an error.
+
+**Stacked pins** (pins of one part on the same point, as KiCad draws a module's ground pins, hidden behind
+one visible pin) must share a net; they get one marker.
 
 Drawing style: no wires between parts. Each pin ends in its net's marker, pointing away from the symbol: a
 power symbol for `power_symbols` nets, a global label for a net used on more than one sheet, a local label
@@ -192,8 +204,10 @@ drill/place origin), Y up.
 
 ### Limits (for later tasks)
 
-- Symbols: single unit, no derived (`extends`) symbols. Footprints: on F.Cu, and no zones or groups inside a
-  footprint (KiCad's stock `RF_Module:ESP32-C6-MINI-1` has a keep-out zone: support it if ruling R22 reverts).
+- Symbols: single unit, no derived (`extends`) symbols; stacked pins only with one net. Footprints: on F.Cu,
+  and no zones or groups inside a footprint (KiCad's stock `RF_Module:ESP32-C6-MINI-1` has a keep-out zone:
+  support it if ruling R22 reverts). A footprint that does not exist is reported with the part, before the
+  schematic is written.
 - Footprint edits made in KiCad (moved silkscreen text) are not kept; the footprint is re-made from the library.
 - Edge.Cuts shapes from `layout.yaml` are straight-sided polygons (no arcs): a milled slot gets the router
   bit's radius at its ends anyway.

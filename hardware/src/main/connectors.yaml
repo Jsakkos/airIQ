@@ -1,0 +1,65 @@
+# Connectors sheet: SEN66 (JST GH 6), two Qwiic sockets (JST SH 4), the off-board LED socket
+# (JST SH 3) and the unpopulated aux UART / programming header.
+# Each part: `at` is the symbol anchor on the A4 page in mm (Y down, on the 1.27 mm grid);
+# `pins` maps symbol pins to net names (NC = no connection), see hardware/README.md.
+#
+# Every connector here carries a `Role` field naming its hardware/interface.yaml `connectors`
+# entry. The generator takes pins 1..n of each from interface.yaml, so pin orders are written in
+# one place only; the sheet lists just the mechanical pins (mounting tabs / fitting nails).
+
+title: "Connectors: SEN66, Qwiic, LED, UART"
+paper: A4
+
+notes:
+  - {text: "J_SEN66: Sensirion SEN66, JST GH 6-pin side entry\nPin order: hardware/interface.yaml (SEN6x datasheet Table 16)\nPins 5, 6 NC; 7, 8 = mounting tabs", at: [17.78, 63.5], size: 1.8}
+  - {text: "SEN66 VDD: 10 uF at the connector (R15)", at: [17.78, 109.22], size: 1.8}
+  - {text: "Qwiic sockets, JST SH 4-pin side entry (pin order: hardware/interface.yaml)\nJ_QWIIC_TONGUE: cable to the sense tongue (SHT45, VEML7700)\nJ_QWIIC_AUX: spare, e.g. SFA40 formaldehyde (airQ)\nPins 5, 6 = fitting nails", at: [129.54, 63.5], size: 1.8}
+  - {text: "J_LED_EXT: off-board LED segment, JST SH 3-pin\n+5V, LED_DOUT_5V (DOUT of the last on-board LED), GND\nPins 4, 5 = fitting nails", at: [17.78, 124.46], size: 1.8}
+  - {text: "J_AUX_UART: 2.54 mm pads, NOT FITTED (DNP)\nROM-UART recovery: hold BUTTON low, pulse EN\n(U0TXD = GPIO16, U0RXD = GPIO17).\nThe same pads take a future mmWave presence sensor.", at: [129.54, 124.46], size: 1.8}
+
+parts:
+  # -- Sensirion SEN66, JST GH 6-pin (pins 1-6: interface.yaml)
+  J2:
+    symbol: airq:SM06B-GHS-TB
+    at: [50.8, 88.9]
+    fields: {Role: J_SEN66}
+    pins: {"7": NC, "8": NC}          # mounting tabs
+  C12:                  # SEN66 VDD bulk, >= 10 uF at the connector (ruling R15)
+    symbol: Device:C
+    at: [76.2, 88.9]
+    value: 10uF
+    footprint: Capacitor_SMD:C_0805_2012Metric
+    lcsc: C15850
+    pins: [+3V3, GND]
+
+  # -- Qwiic, JST SH 4-pin side entry (pins 1-4: interface.yaml)
+  J3:
+    symbol: airq:SM04B-SRSS-TB
+    at: [142.24, 91.44]
+    rot: 270                          # pins on the right, 1..4 from the top
+    stub: 5.08                        # markers clear of the rotated reference text
+    fields: {Role: J_QWIIC_TONGUE}
+    pins: {"5": NC, "6": NC}          # fitting nails
+  J4:
+    symbol: airq:SM04B-SRSS-TB
+    at: [203.2, 91.44]
+    rot: 270
+    stub: 5.08
+    fields: {Role: J_QWIIC_AUX}
+    pins: {"5": NC, "6": NC}
+
+  # -- Off-board LED segment, JST SH 3-pin (pins 1-3: interface.yaml)
+  J5:
+    symbol: airq:SM03B-SRSS-TB
+    at: [55.88, 148.59]
+    fields: {Role: J_LED_EXT}
+    pins: {"4": NC, "5": NC}          # fitting nails
+
+  # -- Aux UART / programming header: 1 x 6 2.54 mm pads, not fitted (pins 1-6: interface.yaml)
+  J6:
+    symbol: Connector_Generic:Conn_01x06
+    at: [157.48, 148.59]
+    value: AUX_UART
+    footprint: Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical
+    dnp: true
+    fields: {Role: J_AUX_UART}

@@ -104,3 +104,42 @@ def test_board_shape_problems(tmp_path, board, expected):
     with pytest.raises(DesignError) as e:
         load_design(_write(tmp_path, layout=f"board: {board}\n"))
     assert any(expected in p for p in e.value.problems), e.value.problems
+
+
+def test_dnp_must_be_a_boolean(tmp_path):
+    sheet = SHEET.replace("pins: [SIG, GND]", "dnp: \"no\"\n    pins: [SIG, GND]", 1)
+    with pytest.raises(DesignError) as e:
+        load_design(_write(tmp_path, sheet=sheet))
+    assert any("dnp must be true or false" in p for p in e.value.problems), e.value.problems
+    sheet = SHEET.replace("pins: [SIG, GND]", "dnp: true\n    pins: [SIG, GND]", 1)
+    assert load_design(_write(tmp_path / "ok", sheet=sheet)).sheets[0].parts[0].dnp is True
+
+
+IFACE = """
+signals: {SIG: GPIO6, BTN: GPIO9}
+connectors:
+  J_X: [GND, SIG, NC]
+"""
+
+
+def test_interface_is_loaded_from_the_project(tmp_path):
+    src = _write(tmp_path, project=PROJECT + "interface: ../../interface.yaml\n")
+    (tmp_path / "hardware" / "interface.yaml").write_text(IFACE, encoding="utf-8")
+    d = load_design(src)
+    assert d.interface["connectors"]["J_X"] == ["GND", "SIG", "NC"]
+    assert d.interface["signals"]["BTN"] == "GPIO9"
+    assert load_design(_write(tmp_path / "none")).interface is None   # optional
+
+
+@pytest.mark.parametrize("iface,expected", [
+    ("connectors: {J_X: GND}\n", "connectors.J_X must be a list"),
+    ("connectors: {J_X: [GND, NO]}\n", "is not a string"),
+    ("signals: {SIG: IO6}\n", "signals.SIG must be GPIO<n>"),
+    ("- a\n", "expected a mapping"),
+])
+def test_interface_problems(tmp_path, iface, expected):
+    src = _write(tmp_path, project=PROJECT + "interface: ../../interface.yaml\n")
+    (tmp_path / "hardware" / "interface.yaml").write_text(iface, encoding="utf-8")
+    with pytest.raises(DesignError) as e:
+        load_design(src)
+    assert any(expected in p for p in e.value.problems), e.value.problems

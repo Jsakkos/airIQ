@@ -11,7 +11,7 @@ FIXTURE_LIB = Path(__file__).resolve().parent / "fixtures" / "lib"
 
 @pytest.fixture
 def libs():
-    """The hand-written test library `test` (symbols R, U6, QUAD, GND, VCC, PWR_FLAG)."""
+    """The hand-written test library `test` (symbols R, U6, QUAD, MCU5, GND, VCC, PWR_FLAG)."""
     from kicad_lib import Libraries
     return Libraries({"test": FIXTURE_LIB / "test.kicad_sym"}, {"test": FIXTURE_LIB / "test.pretty"})
 

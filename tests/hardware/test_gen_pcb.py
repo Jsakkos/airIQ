@@ -91,7 +91,8 @@ def test_board_outline_origin_and_placement(libs):
     fps = {next(p[2] for p in children(f, "property") if p[1] == "Reference"): f
            for f in children(tree, "footprint")}
     assert child(fps["U1"], "at") == ["at", "110", "55", "90"]
-    assert b.unplaced == ["R1"] and child(fps["R1"], "at")[1:3] == ["150", "50"]   # parked
+    # parked: R1's courtyard (x -1..1, y -0.6..0.6) starts 10 mm right of the outline, at its top
+    assert b.unplaced == ["R1"] and child(fps["R1"], "at")[1:3] == ["151", "50.6"]
     assert b.hand_edges == [] and b.text == _board(libs).text
 
 
@@ -103,7 +104,7 @@ def test_regeneration_keeps_routing_and_replaces_owned_items(libs):
   (gr_text "note" (at 1 1 0) (layer "F.SilkS") (uuid "t1"))
 )
 """
-    moved = routed.replace('(at 150 50)', '(at 160 60 45)')   # R1, unplaced, moved by hand
+    moved = routed.replace('(at 151 50.6)', '(at 160 60 45)')   # R1, unplaced, moved by hand
     b = _board(libs, moved)
     tree = parse(b.text)
     assert [atom(i, "uuid") for i in children(tree, "segment")] == ["s1"]
@@ -151,3 +152,22 @@ def test_hand_drawn_edge_cuts_are_kept_and_stale_generated_ones_dropped(libs):
     assert [atom(i, "uuid") for i in children(parse(b.text), "gr_line")] == ["slot-1", "silk-1"]
     rect = _board(libs, b.text)                                       # back to the rectangle
     assert [atom(e, "uuid") for e in _edges(rect.text)] == [edge_uid("tp", 0), "slot-1"]
+
+
+def test_parked_footprints_are_packed_without_overlap(libs):
+    """Footprints without a placement entry sit in rows beside the outline, courtyards apart."""
+    from gen_pcb import Comp, PARK_GAP, footprint_bbox
+    assert footprint_bbox(libs.footprint("test:SOT6_TEST")) == (-2.0, -1.8, 2.0, 1.8)
+    comps = [Comp(f"U{i}", "x", "test:SOT6_TEST", f"/a/{i}", "a", "a.kicad_sch") for i in range(1, 31)]
+    tree = parse(generate_board("tp", "Test", "1", "", "src", comps, {"board": LAYOUT["board"]},
+                                libs, None).text)
+    boxes = []
+    for f in children(tree, "footprint"):
+        x, y = float(child(f, "at")[1]), float(child(f, "at")[2])
+        boxes.append((x - 2, y - 1.8, x + 2, y + 1.8))
+    assert min(b[0] for b in boxes) == 150 and min(b[1] for b in boxes) == 50
+    assert len({b[1] for b in boxes}) > 1                                     # wrapped into rows
+    for i, a in enumerate(boxes):
+        for b in boxes[i + 1:]:
+            assert (a[2] + PARK_GAP <= b[0] + 1e-9 or b[2] + PARK_GAP <= a[0] + 1e-9
+                    or a[3] + PARK_GAP <= b[1] + 1e-9 or b[3] + PARK_GAP <= a[1] + 1e-9)

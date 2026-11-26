@@ -2,7 +2,8 @@
 # Coordinates are mm from the board's top-left corner, X right, Y down (KiCad's own axes);
 # KiCad's grid origin is set to that corner. Rotations are degrees counter-clockwise.
 # Task 2 spike: only the power sub-circuit is placed, along the rear (top) edge; Task 5 owns
-# the real placement and routing.
+# the real placement and routing. The parts of the other blocks (Task 4) have no entry yet: the
+# build parks them to the right of the outline, packed so they do not overlap, and lists them.
 
 board:
   width: 60.0
