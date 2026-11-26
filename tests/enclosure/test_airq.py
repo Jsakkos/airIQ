@@ -171,6 +171,8 @@ def test_grilles_r18_and_10_mm_rule():
                V("lsw_z") - V("lsw_d") / 2, V("exh_z0")) >= V("grille_min_z")       # 10 mm rule
     assert V("out_gx1") <= V("tub_x") - 2.0                                          # the grille stays in the plenum
     assert V("exh_z0") > V("zw_z1") + 2.0                                            # the exhaust stays apart (R26)
+    # N7: the intake slots (lip's outer face, y 0) and the outlet slots (rear wall's outer face, y D)
+    assert d["intake_to_outlet_grille"] == V("D") >= 20
 
 
 def test_r26_alternatives_worked():
@@ -207,6 +209,44 @@ def test_shell_lowers_onto_the_base():
     its floor bosses pass the zone wall's notches, clear of the board's footprint, and the rear
     boss stays above and left of the board."""
     assert airq_check.insertion_probe(S) == []
+
+
+def _feature(name):
+    return next(c["params"] for c in S.commands if c["params"].get("name") == name)
+
+
+def test_shell_keeps_clr_remove_off_its_datums():
+    """Review N1: the shell sits on the floor (z) and against the rear wall's front face (y); at
+    the lip it keeps clr_remove: its side walls end clr_remove behind the lip's inner face, its
+    slope stops clr_remove above the lip's top, and the lip is recessed clr_remove round the bosses."""
+    lip = _feature("Lip to the base")
+    y1 = V(lip["corner"][1]) + V(lip["width"])
+    z1 = V(lip["corner"][2]) + V(lip["height"])
+    assert y1 == pytest.approx(V("wall") + V("clr_remove")) and z1 == pytest.approx(V("lip") + V("clr_remove"))
+    crease = _feature("Crease seat")
+    assert V(crease["corner"][2]) + V(crease["height"]) == pytest.approx(V("lip") + V("clr_remove"))
+    rec = _feature("Boss clearance 1")
+    assert V(rec["corner"][1]) == pytest.approx(V("wall") - V("clr_remove"))           # the boss's front is at wall
+    assert V("boss_y") - V("boss_d") / 2 == pytest.approx(V("wall"))
+    assert V(rec["length"]) >= V("boss_d") + 2 * V("clr_remove") - 1e-9
+    # the datums: the side walls end on the rear wall (y) and stand on the floor (z)
+    assert V(_feature("Rear wall seat")["corner"][1]) == pytest.approx(V("D") - V("wall"))
+    assert V(_feature("Floor seat")["height"]) - V("wall") == pytest.approx(V("floor_t"))
+
+
+def test_hcho_window_shows_only_the_rail_and_the_zone_wall():
+    """Review N2: each step of the HCHO window covers its grille slot and stops under the top of
+    what stands behind it (the right rail, which follows the zone wall's underside, then the zone
+    wall's end face), so the window does not open the electronics zone."""
+    vert = V("zone_t") / V("sin_t")                                       # the slant's height through its thickness
+    prev = V("grille_min_z")
+    for i, (y_lo, y_hi, top) in enumerate(airq.window_steps()):
+        slot_y = f"cy0 + 0.6 + {i} * hg_pitch"
+        slot_top = V(f"{airq.C.z_under(slot_y)} - hg_margin")
+        assert V(y_lo) <= V(slot_y) and V(slot_y) + V("slot_w") <= V(y_hi)            # the slot is inside its step
+        assert V(top) > slot_top > prev                                            # the slot is open, the steps rise
+        assert V(top) <= V(airq.C.z_under(y_lo)) + min(vert, V("ledge_t"))            # backed at its lowest corner
+        prev = slot_top
 
 
 def test_screw_heads_leave_a_floor():
@@ -280,6 +320,25 @@ def test_gaskets_touch_what_they_seal(check):
     assert vols[("gasket_out", "sen66_body")] == pytest.approx(ring, rel=0.05)
     assert vols[("gasket_in", "sen66_body")] == pytest.approx(strip, rel=0.05)
     assert vols[("zone_seal", "base_plate")] == pytest.approx(lip, rel=0.05)
+
+
+def test_shell_nudged_meets_the_base_only_on_its_datums(check):
+    """Review N1: the shell nudged 0.05 each way meets the base only when pushed into a datum (back
+    against the rear wall, down onto the floor), and only on that face; forward, sideways and up it
+    meets nothing, so a shell or base printed up to clr_remove off size still goes together."""
+    assert airq_check.nudge_faults(check["nudge"], S) == []
+    met = {p["a"] if p["a"] in airq_check.NUDGES else p["b"] for p in check["nudge"]["interferences"]}
+    assert met == set(airq_check.NUDGE_DATUMS)
+
+
+def test_hcho_window_is_backed(check):
+    """Review N2: behind every step of the HCHO window the rail and the zone wall fill the probe's
+    0.5 mm slab all but the grille slot, and the shell stays clear of the opening."""
+    need = airq_check.window_backing(S)
+    got = airq_check.window_fill(check["window"])
+    assert set(got) == set(need)
+    for k, (fill, shell) in got.items():
+        assert shell == 0 and fill == pytest.approx(need[k], rel=0.01), (k, fill, need[k])
 
 
 def test_rebuilds_over_wall_and_clearances(cli, tmp_path):

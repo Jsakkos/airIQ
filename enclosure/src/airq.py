@@ -313,12 +313,34 @@ def base_cuts(s: Script) -> None:
               ["iwall + 1", "slot_w", f"{C.z_under(y)} - hg_margin - grille_min_z"], operation="cut", targets=["base_plate"])
 
 
+HCHO_SLOTS = 5
+
+
+def window_steps() -> list[tuple[str, str, str]]:
+    """The HCHO window's steps (review N2): (y from, y to, top) per grille slot, expressions. Each
+    step spans its slot and half a bar each side, and stops 0.6 over its slot's top, so behind
+    every point of the window stands the base's right rail or the zone wall's end face (whose
+    underside the rail follows): nothing of the electronics zone above the zone wall shows."""
+    out = []
+    for i in range(HCHO_SLOTS):
+        y_lo = f"cy0 + {i} * hg_pitch"
+        y_hi = "cy1" if i == HCHO_SLOTS - 1 else f"cy0 + {i + 1} * hg_pitch"
+        top = f"{C.z_under(f'cy0 + 0.6 + {i} * hg_pitch')} - hg_margin + 0.6"
+        out.append((y_lo, y_hi, top))
+    return out
+
+
 def hcho_window(s: Script) -> None:
     """The window in the shell's right side wall in front of the HCHO grille (the grille's slots
-    are in the base's right rail behind it). Its lower edge is on the 10 mm line."""
-    top = f"{C.z_under('cy0 + 0.6 + 4 * hg_pitch')} - hg_margin + 0.6"
-    s.box("HCHO window", ["inner_x - 0.5", "cy0", "grille_min_z"], ["wall + 1", "cy1 - cy0", f"{top} - grille_min_z"],
-          operation="cut", targets=["shell"])
+    are in the base's right rail behind it). Its lower edge is on the 10 mm line; its top steps
+    up with the slots (N2), under the zone wall's slanted underside."""
+    steps = window_steps()
+    pts = [("cy0", "grille_min_z"), ("cy1", "grille_min_z")]
+    for y_lo, _, top in reversed(steps):
+        pts += [(pts[-1][0], top), (y_lo, top)]
+    with s.sketch("HCHO window outline", "YZ", offset="inner_x - 0.5") as sk:
+        sk.polyline(pts)
+    s.extrude("HCHO window", "HCHO window outline", "wall + 1", operation="cut", targets=["shell"])
 
 
 def pass_through(s: Script) -> None:

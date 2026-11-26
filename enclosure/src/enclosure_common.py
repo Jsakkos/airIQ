@@ -133,7 +133,7 @@ def add_bosses(s: Script) -> None:
     p("insert_depth", 4.0, "insert hole depth (coupon R20)")
     p("boss_in", 1.0, "front boss centre this far inside the side wall's inner face less its radius: the boss joins the wall")
     p("boss_x", "inner_x - boss_d / 2 + boss_in", "derived: front floor bosses' |x|")
-    p("boss_y", "wall + 3.0", "front floor bosses' y: behind the lip")
+    p("boss_y", "wall + 3.0", "front floor bosses' y: behind the lip (the lip's inner face is recessed clr_remove round them, review N1)")
     p("bp_x0", "boss_x - boss_d / 2 - clr_remove - iwall", "derived: |x| of the boss pocket's inner wall (base)")
     p("bp_y1", "boss_y + boss_d / 2 + clr_remove + iwall", "derived: y of the boss pocket's back wall's rear face; the side rails start here")
     p("rear_boss_len", 6.0, "rear insert boss length along y")
@@ -154,13 +154,18 @@ def shell(s: Script) -> None:
     v = s.v
     s.chamfer("Edge chamfers", [[0, v("y_top"), v("H")]], "edge_chamfer", body="shell")
     s.shell("Shell walls", [[0, v("D") / 2, 0], [0, v("D"), v("H") / 2]], "wall")
-    # R24: the lower front lip belongs to the base; the shell is lowered onto the base along -z
-    s.box("Lip to the base", ["-W / 2 - wall", "-wall", "-wall"], ["W + 2 * wall", "2 * wall", "lip + wall"], operation="cut",
-          targets=["shell"])
-    # the slope's inner corner hangs below the crease behind the lip: trim it, so the shell sits on
-    # the lip's top (a lap at the crease) and clears the zone wall's ledge seal
-    s.box("Crease seat", ["-inner_x", "wall - 0.1", "lip - wall"], ["2 * inner_x", "wall / cos_t - wall + 0.2", "wall"], operation="cut",
-          targets=["shell"])
+    # R24: the lower front lip belongs to the base; the shell is lowered onto the base along -z.
+    # Review N1: the shell's datums are the floor (z, where the screws clamp it) and the rear wall's
+    # front face (y, where the side walls end). Everywhere else it keeps clr_remove from the base:
+    # its side walls end clr_remove behind the lip's inner face, and its slope stops clr_remove
+    # above the lip's top (a 0.2 parting line at the crease, into the electronics zone above the
+    # ledge seal, not into the sensor zone)
+    s.box("Lip to the base", ["-W / 2 - wall", "-wall", "-wall"], ["W + 2 * wall", "2 * wall + clr_remove", "lip + wall + clr_remove"],
+          operation="cut", targets=["shell"])
+    # the slope's inner corner hangs below the crease behind the lip: trim it to the same height, so
+    # it clears the lip's top and the zone wall's ledge seal
+    s.box("Crease seat", ["-inner_x", "wall - 0.1", "lip - wall"], ["2 * inner_x", "wall / cos_t - wall + 0.2 + clr_remove", "wall + clr_remove"],
+          operation="cut", targets=["shell"])
     s.box("Floor seat", ["-W / 2 - wall", "-wall", "-wall"], ["W + 2 * wall", "D + 2 * wall", "floor_t + wall"], operation="cut",
           targets=["shell"])
     s.box("Rear wall seat", ["-W / 2 - wall", "D - wall", "-wall"], ["W + 2 * wall", "2 * wall", "H"], operation="cut",
@@ -248,8 +253,11 @@ def standoff_pilots(s: Script) -> None:
 
 
 def base_screws(s: Script) -> None:
-    """The screw holes for the shell's bosses (cut after every join)."""
+    """The screw holes for the shell's bosses (cut after every join), and the lip's recess in front
+    of each front boss: the boss keeps clr_remove from the lip's inner face (review N1)."""
     for i, sx in enumerate(("-boss_x", "boss_x"), 1):
+        s.box(f"Boss clearance {i}", [f"{sx} - boss_d / 2 - clr_remove", "wall - clr_remove", "floor_t"],
+              ["boss_d + 2 * clr_remove", "clr_remove + 0.01", "boss_h + clr_remove"], operation="cut", targets=["base_plate"])
         s.cylinder(f"Screw hole {i}", [sx, "boss_y", "-head_depth"], "screw_d", "floor_t + 2 * head_depth", operation="cut",
                    targets=["base_plate"])
         s.cylinder(f"Screw head {i}", [sx, "boss_y", "-head_depth"], "head_d", "2 * head_depth", operation="cut",

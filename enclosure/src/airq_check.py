@@ -33,6 +33,7 @@ from pathlib import Path
 
 import airq
 import board_sources as B
+import enclosure_common as C
 import encbuild
 import ref_sfa40
 from sclib import ENCLOSURE
@@ -203,6 +204,43 @@ def sweeps(s) -> list[dict]:
     return b
 
 
+NUDGE = 0.05            # review N1: the shell nudged this far each way (less than clr_remove)
+NUDGES = {"shell_nx_m": (-NUDGE, 0, 0), "shell_nx_p": (NUDGE, 0, 0), "shell_ny_m": (0, -NUDGE, 0),
+          "shell_ny_p": (0, NUDGE, 0), "shell_nz_m": (0, 0, -NUDGE), "shell_nz_p": (0, 0, NUDGE)}
+NUDGE_PARTS = ("base_plate", "zone_wall", "zone_seal")
+# the shell's datums: only these nudges may meet the base, and only on these faces (N1)
+NUDGE_DATUMS = {"shell_ny_p": ("y", "D - wall"), "shell_nz_m": ("z", "floor_t")}
+
+
+def nudges(s) -> list[dict]:
+    """Review N1: copies of the shell moved NUDGE along +-x, +-y, +-z. The shell is seated on two
+    datums, the floor (z) and the rear wall's front face (y); everywhere else it keeps clr_remove
+    from the base, so only the copy pushed into a datum may meet the base, and only on that face."""
+    return [{"command": "solid.move", "params": {"name": n, "bodies": ["shell"], "translate": list(t), "copy": True,
+                                                 "body_name": n}} for n, t in NUDGES.items()]
+
+
+def window_probes(s) -> list[dict]:
+    """Review N2: one probe per step of the HCHO window, through the shell's wall and 0.5 into
+    what stands behind it (the right rail and the zone wall's end). It must not meet the shell
+    (the window is open) and it must meet the rail and the zone wall over its whole section but
+    the grille slot: then nothing of the case's inside shows through the window."""
+    return [_box(f"win_{i}", "tub_x + iwall - 0.5", y_lo, "grille_min_z", "W / 2 + 0.1", y_hi, top)
+            for i, (y_lo, y_hi, top) in enumerate(airq.window_steps())]
+
+
+def window_backing(s) -> dict:
+    """{probe: the volume the rail and the zone wall must fill}: 0.5 x (the step's area less its slot's)."""
+    v = s.v
+    out = {}
+    for i, (y_lo, y_hi, top) in enumerate(airq.window_steps()):
+        area = (v(y_hi) - v(y_lo)) * (v(top) - v("grille_min_z"))
+        y_slot = f"cy0 + 0.6 + {i} * hg_pitch"
+        slot = v("slot_w") * (v(f"{C.z_under(y_slot)} - hg_margin") - v("grille_min_z"))
+        out[f"win_{i}"] = 0.5 * (area - slot)
+    return out
+
+
 def check_bodies(s) -> list[str]:
     names = []
     for c in keepouts(s) + air_probes(s) + sweeps(s):
@@ -241,6 +279,21 @@ def check_script(save: Path = CHECK_SC, budget_s: float = 900) -> dict:
     steps.append({"command": "inspect.interference", "params": {"budget_s": budget_s, "exclude_pairs": exclusions(names)}})
     mark["measure"] = len(steps)
     steps.append({"command": "inspect.measure", "params": {"summary": True}})
+    # N1: the shell nudged each way meets the base only on its datums
+    steps += nudges(s)
+    mark["nudge"] = len(steps)
+    steps.append({"command": "inspect.interference", "params": {
+        "budget_s": 120, "bodies": [*NUDGES, *NUDGE_PARTS],
+        "exclude_pairs": [[a, b] for i, a in enumerate(NUDGES) for b in list(NUDGES)[i + 1:]]}})
+    # N2: what stands behind the HCHO window
+    win = window_probes(s)
+    steps += win
+    names_w = [c["params"]["body_name"] for c in win]
+    mark["window"] = len(steps)
+    steps.append({"command": "inspect.interference", "params": {
+        "budget_s": 120, "bodies": [*names_w, "shell", "base_plate", "zone_wall"],
+        "exclude_pairs": [[a, b] for i, a in enumerate(names_w) for b in names_w[i + 1:]]
+        + [["shell", "base_plate"], ["shell", "zone_wall"], ["base_plate", "zone_wall"]]}})
     steps.append({"command": "parameters.change", "params": {"changes": {"gasket_squeeze": f"{TOUCH_SQUEEZE} mm"}}})
     mark["touch"] = len(steps)
     steps.append({"command": "inspect.interference", "params": {"budget_s": 120, "bodies": sorted({b for p in TOUCHES for b in p})}})
@@ -265,7 +318,39 @@ def run(cli: str | None = None) -> dict:
         raise RuntimeError(f"check run failed: {res if isinstance(res, dict) else proc.stderr or proc.stdout}")
     m = sc["mark"]
     return {"inserted": res[:6], "interference": res[m["interference"]], "measure": res[m["measure"]],
-            "touch": res[m["touch"]]}
+            "touch": res[m["touch"]], "nudge": res[m["nudge"]], "window": res[m["window"]]}
+
+
+def nudge_faults(nudge: dict, s=None) -> list[str]:
+    """N1: the nudged shells' contacts that are not on a datum face (none when the shell has its
+    clearances): a nudge other than into a datum that meets anything, or a datum nudge that
+    meets the base anywhere but on that face."""
+    s = s or airq.build()
+    out = []
+    for p in nudge["interferences"]:
+        a, b = (p["a"], p["b"]) if p["a"] in NUDGES else (p["b"], p["a"])
+        lo, hi = p["bbox"]["min"], p["bbox"]["max"]
+        datum = NUDGE_DATUMS.get(a)
+        if datum is None or b != "base_plate":
+            out.append(f"{a} meets {b} at {[round(c, 2) for c in lo]}..{[round(c, 2) for c in hi]}")
+            continue
+        k = "xyz".index(datum[0])
+        face = s.v(datum[1])
+        step = NUDGES[a][k]                       # the overlap lies between the face and the face + step
+        f0, f1 = sorted((face, face + step))
+        if not (f0 - 1e-3 <= lo[k] and hi[k] <= f1 + 1e-3):
+            out.append(f"{a} meets the base off its datum: {datum[0]} {lo[k]:.3f}..{hi[k]:.3f}")
+    return out
+
+
+def window_fill(window: dict) -> dict:
+    """{probe: (volume the rail and the zone wall fill, volume the shell overlaps)} (N2)."""
+    out = {}
+    for p in window["interferences"]:
+        a, b = (p["a"], p["b"]) if p["a"].startswith("win_") else (p["b"], p["a"])
+        fill, shell = out.get(a, (0.0, 0.0))
+        out[a] = (fill + p["volume_mm3"], shell) if b != "shell" else (fill, shell + p["volume_mm3"])
+    return out
 
 
 def sections(measure: dict) -> dict:
@@ -367,7 +452,9 @@ def distances(s=None) -> dict:
         "outlet_grille_open_mm2": v("out_n") * v("slot_w") * (v("out_gz1") - v("out_gz0")),
         "outlet_grille_lower_edge_z": v("out_gz0"),
         "intake_open_mm2": intake_open(s),
-        "intake_to_outlet_grille": v("D") - v("wall"),       # lip's outer face to the rear wall's: different faces
+        # the intake slots open in the lip's outer face (y 0), the outlet slots in the rear wall's outer
+        # face (y D), over overlapping x and z ranges: the openings are D apart, outer face to outer face (N7)
+        "intake_to_outlet_grille": v("D"),
     }
 
 
@@ -424,3 +511,9 @@ if __name__ == "__main__":
         print("sections:", {k: round(x, 1) for k, x in sections(r["measure"]).items()})
         print("outlet branches (section, serves):", {k: (round(a, 1), round(b, 1)) for k, (a, b) in branches(airq.build(), sections(r["measure"])).items()})
         print("touch at squeeze", TOUCH_SQUEEZE, ":", {f"{a}|{b}": round(x, 3) for (a, b), x in touch_volumes(r["touch"]).items()})
+        print("nudge (N1):", [(p["a"], p["b"], round(p["volume_mm3"], 3), [round(c, 3) for c in p["bbox"]["min"]],
+                               [round(c, 3) for c in p["bbox"]["max"]]) for p in r["nudge"]["interferences"]],
+              "faults:", nudge_faults(r["nudge"]) or "none")
+        need = window_backing(airq.build())
+        print("window (N2) fill / need / shell:", {k: (round(f, 2), round(need[k], 2), round(sh, 3))
+                                                   for k, (f, sh) in window_fill(r["window"]).items()})
