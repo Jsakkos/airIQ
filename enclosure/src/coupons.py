@@ -14,8 +14,9 @@ coupon prints without supports in the orientation given here):
                                        SKRTLAE010) at a board's front edge: A has the actuator stub, B
                                        has none so it can be pushed to its hard stop.
   coupon_lg_body, coupon_lg_bar_lit,   A 3 x 2 mm clear light-guide bar in an opaque body with an
-  coupon_lg_bar_dark                   SK6812SIDE pocket and a divider, plus a second, unlit bar behind
-                                       the divider to judge leakage. Body opaque, bars clear.
+  coupon_lg_bar_dark,                  SK6812SIDE pocket, with an unlit bar behind a 1.2 mm divider on one
+  coupon_lg_bar_dark_2                 side and another behind a 2.0 mm divider on the other, to judge
+                                       leakage. Body in the shell material, bars clear.
 
 Every feature that stands for a tested value carries the value as a debossed label that follows
 its parameter (`sketch.text` with a text expression). Sources: the plan (Task 2), ruling R20
@@ -23,6 +24,7 @@ its parameter (`sketch.text` with a text expression). Sources: the plan (Task 2)
 """
 from __future__ import annotations
 
+import clearances
 from sclib import Script, mechanical
 
 DESIGN = "coupons"
@@ -32,7 +34,7 @@ EXPORTS = ["export/coupons.3mf", "export/coupons.step"]
 
 CLR = [1, 2, 3, 4, 5]               # the five clearance steps clr_t1 .. clr_t5
 BODIES = ["coupon_clr_pegs", "coupon_clr_holes", "coupon_grille", "coupon_insert",
-          "coupon_flexure", "coupon_lg_body", "coupon_lg_bar_lit", "coupon_lg_bar_dark"]
+          "coupon_flexure", "coupon_lg_body", "coupon_lg_bar_lit", "coupon_lg_bar_dark", "coupon_lg_bar_dark_2"]
 
 
 def at(origin, expr):
@@ -54,25 +56,21 @@ def build() -> Script:
     board = mechanical("main")
 
     # --- the fits under test ---------------------------------------------------------------
-    p("clr_align", 0.15, "plan default (Task 2 results override): per-side gap for an aligned, located part (R20)", favorite=True)
-    p("clr_remove", 0.20, "plan default (Task 2 results override): per-side gap for a part that lifts off (R20)", favorite=True)
-    p("clr_snap", 0.25, "plan default (Task 2 results override): per-side gap for a snap or latch fit (R20)", favorite=True)
+    clearances.add_params(s)       # clr_align, clr_remove, clr_snap, slot_w, wall, flex_t, flex_len, flex_gap
     for i, v in zip(CLR, (0.10, 0.15, 0.20, 0.25, 0.30)):
         p(f"clr_t{i}", v, f"tested per-side clearance {i} of 5 (R20: hole = peg + 2 x clr); labelled on the coupon")
-    p("slot_w", 1.2, "plan default (Task 2 results override): grille slot width", favorite=True)
     p("slot_w_narrow", 1.0, "tested grille slot width, narrower than slot_w (R20)")
     p("slot_w_wide", 1.5, "tested grille slot width, wider than slot_w (R20)")
-    p("wall", 1.8, "plan: wall thickness (default 1.8 mm, at least 1.6); the grille coupon's plate", favorite=True)
 
     # --- layout and shared sizes ------------------------------------------------------------
     p("bed_gap", 6.0, "gap between coupons on the bed (model only)")
     p("cut_over", 0.5, "cutting tools start this far outside a face so cuts are clean (model only)")
-    p("text_h", 2.5, "capital height of the debossed labels (model only)")
+    p("text_h", 5.0, "capital height of the debossed labels: the built-in font's strokes are about 0.09 x this, 0.45 mm, above a 0.4 mm nozzle (model only)")
     p("text_depth", 0.4, "label deboss depth (the plan's debossed lettering is 0.4 mm deep)")
 
     # --- fit coupon: round peg / hole and rectangular tab / slot ----------------------------
     p("fit_t", 3.0, "plate thickness of the peg and hole plates (model only)")
-    p("fit_pitch", 12.0, "pitch between the five fits (model only)")
+    p("fit_pitch", 14.0, "pitch between the five fits (model only)")
     p("fit_margin", 3.0, "plate margin beyond the outer fits, plus half a pitch (model only)")
     p("fit_w", "5 * fit_pitch + 2 * fit_margin", "plate width: five fits in a row")
     p("fit_lbl_y", 2.0, "label baseline above the plate's front edge (model only)")
@@ -86,16 +84,16 @@ def build() -> Script:
     p("tab_h", 5.0, "rectangular tab height above the plate (model only)")
 
     # --- grille coupon -----------------------------------------------------------------------
-    p("gr_col", 12.5, "width of one column of three slots (model only)")
+    p("gr_col", 14.0, "width of one column of three slots (model only)")
     p("gr_w", "3 * gr_col", "plate width: three columns, one per slot width")
-    p("gr_d", 40.0, "plate depth (model only)")
+    p("gr_d", 44.0, "plate depth (model only)")
     p("slot_pitch", 3.0, "pitch of the three straight slots in a column (model only)")
     p("louvre_pitch", 4.0, "pitch of the three louvre slots in a column: wider, so the slats between stay at least 1.3 mm thick (model only)")
     p("slot_len", 10.0, "slot length (model only)")
-    p("gr_row_s", 7.0, "front edge of the straight slots (model only)")
-    p("gr_row_l", 22.0, "front edge of the louvre slots (model only)")
+    p("gr_row_s", 9.0, "front edge of the straight slots (model only)")
+    p("gr_row_l", 24.0, "front edge of the louvre slots (model only)")
     p("gr_lbl_lo", 2.0, "baseline of the straight slots' labels (model only)")
-    p("gr_lbl_hi", 35.0, "baseline of the louvre slots' labels, which start with L (model only)")
+    p("gr_lbl_hi", 37.0, "baseline of the louvre slots' labels, which start with L (model only)")
 
     # --- insert boss coupon ------------------------------------------------------------------
     p("insert_od", 6.0, "boss outer diameter (R20)")
@@ -107,9 +105,15 @@ def build() -> Script:
     p("ib_t", 2.0, "plate thickness: the plan's 2.0 mm floor")
     p("ib_pitch", 10.0, "boss pitch (model only)")
     p("ib_w", "3 * ib_pitch", "plate width: three bosses")
-    p("ib_d", 15.0, "plate depth (model only)")
-    p("ib_y", 9.0, "boss centre from the plate's front edge (model only)")
+    p("ib_d", 17.0, "plate depth (model only)")
+    p("ib_y", 11.0, "boss centre from the plate's front edge (model only)")
     p("ib_lbl_y", 2.0, "label baseline (model only)")
+
+    # label numbers (unitless): the debossed labels show these, so a label follows its value
+    for i in CLR:
+        p(f"lbl_clr{i}", f"clr_t{i} / 1 mm * 100", f"label of clr_t{i}: the clearance in hundredths of a mm (0.15 mm reads 15)", unit="")
+    for w in ("slot_w_narrow", "slot_w", "slot_w_wide", "insert_hole_a", "insert_hole_b", "insert_hole_c"):
+        p(f"lbl_{w}", f"{w} / 1 mm * 10", f"label of {w}: the size in tenths of a mm (1.2 mm reads 12, 3.1 mm reads 31)", unit="")
 
     # --- button flexure coupon ---------------------------------------------------------------
     p("board_t", board["thickness"], "PCB thickness, interface.yaml mechanical.main.thickness: the stand-in's board stub")
@@ -122,9 +126,6 @@ def build() -> Script:
     p("sw_tip", round(btn["actuator_tip_y"] - board["outline"][1], 4),
       "actuator tip beyond the board's front edge at rest, interface.yaml mechanical.main.button.actuator_tip_y minus the outline's front edge (0.24 mm)")
     p("sw_travel", 0.20, "SW1 actuator travel, interface.yaml mechanical.main.button comment (0.2 mm; 1.6 N operating force)")
-    p("flex_t", 1.0, "flexure beam thickness in the push direction: the stiffness to tune from the coupon (a cantilever of 1.0 x 4.9 x 12 mm in PETG is about 0.3 N at full stroke)")
-    p("flex_len", 12.0, "flexure beam length (the cantilever from the anchor to the pad)")
-    p("flex_gap", 0.10, "gap between the pad and the actuator tip at rest: tune from the coupon")
     p("flex_stop", "flex_gap + sw_travel", "pad travel to the hard stop: it ends where the actuator is fully pressed, so the switch is never over-pressed")
     p("flex_h", "board_t + sw_h", "flexure height: pad, beam, anchor and stop stand from the bed to the top of the switch body")
     p("flex_y0", "sw_tip + flex_gap", "pad inner face from the board edge at rest")
@@ -135,7 +136,7 @@ def build() -> Script:
     p("flex_stop_y", "flex_y0 - flex_stop", "stop face from the board edge: the pad's inner face reaches it after flex_stop")
     p("flex_anchor_w", 4.0, "width of the anchor block both beams spring from (model only)")
     p("flex_anchor_front", 1.0, "anchor block extent beyond the beams' outer face (model only)")
-    p("flex_plate_d", 8.0, "board stub depth behind its front edge (model only)")
+    p("flex_plate_d", 10.0, "board stub depth behind its front edge (model only)")
     p("flex_margin", 1.0, "board stub margin beyond the pad and its lug (model only)")
 
     # --- light-guide coupon ------------------------------------------------------------------
@@ -145,13 +146,15 @@ def build() -> Script:
     p("lg_led_w", 4.0, "SK6812SIDE body and light face width, R20 / interface.yaml mechanical.main.leds (4.0 x 2.0 face)")
     p("lg_led_d", 1.6, "SK6812SIDE body depth from its light face, R20 (body 4.0 x 1.6 x 2.0)")
     p("lg_led_h", 2.0, "SK6812SIDE body and light face height, R20")
+    p("divider_thick", 2.0, "second, thicker opaque divider (the other side of the LED pocket): if 1.2 mm leaks, this tells how much wall stops it")
     p("divider", 1.2, "opaque divider and wall thickness, at least 1.2 mm (plan: opaque wall between a light guide and anything it must not light)")
     p("lg_floor", 1.2, "opaque floor under the pocket and the slots (model only)")
     p("lg_pocket_w", "lg_led_w + 2 * clr_align", "LED pocket width: the LED plus the aligned clearance per side")
     p("lg_pocket_d", "lg_led_d + 2 * clr_align", "LED pocket depth: the LED plus the aligned clearance per side")
     p("lg_slot_w", "lg_bar_w + 2 * clr_align", "bar slot width: the bar plus the aligned clearance per side")
     p("lg_l", "divider + lg_pocket_d + lg_bar_len", "opaque body length")
-    p("lg_w", "divider + lg_pocket_w + divider + lg_slot_w + divider", "opaque body width: pocket and lit slot, the divider, the dark slot")
+    p("lg_pocket_y", "divider + lg_slot_w + divider_thick", "LED pocket front edge from the body front: outer wall, thick-divider dark slot, thick divider")
+    p("lg_w", "lg_pocket_y + lg_pocket_w + divider + lg_slot_w + divider", "opaque body width: outer wall, dark slot, thick divider, pocket, thin divider, dark slot, outer wall")
     p("lg_h", "lg_floor + lg_led_h", "opaque body height")
 
     # --- placement on the bed (model only) --------------------------------------------------
@@ -201,9 +204,9 @@ def fit_coupons(s: Script):
               [f"tab_w + 2 * {c}", f"tab_t + 2 * {c}", "fit_t + 2 * cut_over"],
               operation="cut", targets=[holes])
     deboss(s, "Peg labels", "fit_t", pegs,
-           [(f"number(clr_t{i}, 2)", True, (cx(i), "fit_lbl_y")) for i in CLR])
+           [(f"number(lbl_clr{i}, 0)", True, (cx(i), "fit_lbl_y")) for i in CLR])
     deboss(s, "Hole labels", "fit_t", holes,
-           [(f"number(clr_t{i}, 2)", True, (cx(i), at(oy, "fit_lbl_y"))) for i in CLR])
+           [(f"number(lbl_clr{i}, 0)", True, (cx(i), at(oy, "fit_lbl_y"))) for i in CLR])
 
 
 def grille_coupon(s: Script):
@@ -233,8 +236,8 @@ def grille_coupon(s: Script):
                              (f"{xl} + wall + cut_over", "-(wall + cut_over)")])
     s.extrude("Louvre slots", "Louvre slots sketch", "slot_len", operation="cut", targets=[body])
     deboss(s, "Grille labels", "wall", body,
-           [(f"number({w}, 1)", True, (xc(j), "gr_lbl_lo")) for j, w in enumerate(widths)]
-           + [(f"'L' + number({w}, 1)", True, (xc(j), "gr_lbl_hi")) for j, w in enumerate(widths)])
+           [(f"number(lbl_{w}, 0)", True, (xc(j), "gr_lbl_lo")) for j, w in enumerate(widths)]
+           + [(f"'L' + number(lbl_{w}, 0)", True, (xc(j), "gr_lbl_hi")) for j, w in enumerate(widths)])
 
 
 def insert_coupon(s: Script):
@@ -250,7 +253,7 @@ def insert_coupon(s: Script):
         s.cylinder(f"Insert hole {j + 1}", [xc(j), at(oy, "ib_y"), "ib_t + insert_h - insert_depth"],
                    h, "insert_depth + cut_over", operation="cut", targets=[body])
     deboss(s, "Insert labels", "ib_t", body,
-           [(f"number({h}, 1)", True, (xc(j), at(oy, "ib_lbl_y"))) for j, h in enumerate(holes)])
+           [(f"number(lbl_{h}, 0)", True, (xc(j), at(oy, "ib_lbl_y"))) for j, h in enumerate(holes)])
 
 
 def flexure_coupon(s: Script):
@@ -292,15 +295,19 @@ def light_guide_coupon(s: Script):
     a dark one), and two clear bars lying beside it as they print."""
     body, ox, oy = "coupon_lg_body", "lay_col2_x", "lay_lg_y"
     s.box("Light-guide body", [ox, oy, 0], ["lg_l", "lg_w", "lg_h"], body=body)
-    s.box("LED pocket", [at(ox, "divider"), at(oy, "divider"), "lg_floor"],
+    s.box("LED pocket", [at(ox, "divider"), at(oy, "lg_pocket_y"), "lg_floor"],
           ["lg_pocket_d", "lg_pocket_w", "lg_led_h + cut_over"], operation="cut", targets=[body])
-    s.box("Lit slot", [at(ox, "divider + lg_pocket_d"), at(oy, "divider + lg_pocket_w / 2 - lg_slot_w / 2"), "lg_floor"],
+    s.box("Lit slot", [at(ox, "divider + lg_pocket_d"), at(oy, "lg_pocket_y + lg_pocket_w / 2 - lg_slot_w / 2"), "lg_floor"],
           ["lg_bar_len + cut_over", "lg_slot_w", "lg_bar_h + cut_over"], operation="cut", targets=[body])
-    s.box("Dark slot", [at(ox, "divider + lg_pocket_d"), at(oy, "divider + lg_pocket_w + divider"), "lg_floor"],
+    s.box("Dark slot", [at(ox, "divider + lg_pocket_d"), at(oy, "lg_pocket_y + lg_pocket_w + divider"), "lg_floor"],
+          ["lg_bar_len + cut_over", "lg_slot_w", "lg_bar_h + cut_over"], operation="cut", targets=[body])
+    s.box("Dark slot thick divider", [at(ox, "divider + lg_pocket_d"), at(oy, "divider"), "lg_floor"],
           ["lg_bar_len + cut_over", "lg_slot_w", "lg_bar_h + cut_over"], operation="cut", targets=[body])
     s.box("Lit bar", [ox, "lay_lgbar_y", 0], ["lg_bar_len", "lg_bar_w", "lg_bar_h"], body="coupon_lg_bar_lit")
     s.box("Dark bar", [ox, "lay_lgbar_y + lg_bar_w + bed_gap", 0], ["lg_bar_len", "lg_bar_w", "lg_bar_h"],
           body="coupon_lg_bar_dark")
+    s.box("Dark bar thick divider", [ox, "lay_lgbar_y + 2 * (lg_bar_w + bed_gap)", 0],
+          ["lg_bar_len", "lg_bar_w", "lg_bar_h"], body="coupon_lg_bar_dark_2")
 
 
 def expected_bboxes(s: Script | None = None) -> dict[str, tuple]:
@@ -326,4 +333,6 @@ def expected_bboxes(s: Script | None = None) -> dict[str, tuple]:
         "coupon_lg_bar_lit": ((px, lgy, 0), (px + v("lg_bar_len"), lgy + v("lg_bar_w"), v("lg_bar_h"))),
         "coupon_lg_bar_dark": ((px, lgy + v("lg_bar_w") + v("bed_gap"), 0),
                                (px + v("lg_bar_len"), lgy + 2 * v("lg_bar_w") + v("bed_gap"), v("lg_bar_h"))),
+        "coupon_lg_bar_dark_2": ((px, lgy + 2 * (v("lg_bar_w") + v("bed_gap")), 0),
+                                 (px + v("lg_bar_len"), lgy + 3 * v("lg_bar_w") + 2 * v("bed_gap"), v("lg_bar_h"))),
     }

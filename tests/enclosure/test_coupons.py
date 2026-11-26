@@ -13,6 +13,7 @@ from itertools import combinations
 
 import pytest
 
+import clearances
 import coupons
 import encbuild
 from sclib import ENCLOSURE, evaluate, interface, names_in
@@ -23,7 +24,7 @@ TOL = 0.01
 THREE_MF = ENCLOSURE / "export" / "coupons.3mf"
 STEP = ENCLOSURE / "export" / "coupons.step"
 BODIES = ["coupon_clr_pegs", "coupon_clr_holes", "coupon_grille", "coupon_insert",
-          "coupon_flexure", "coupon_lg_body", "coupon_lg_bar_lit", "coupon_lg_bar_dark"]
+          "coupon_flexure", "coupon_lg_body", "coupon_lg_bar_lit", "coupon_lg_bar_dark", "coupon_lg_bar_dark_2"]
 
 
 def feature(name):
@@ -158,13 +159,16 @@ def test_light_guide_pocket_divider_and_bars():
     assert val(lit["corner"][0]) == pytest.approx(val(pocket["corner"][0]) + val(pocket["length"]))
     # 1.2 mm of opaque material between the pocket and the dark slot, and behind and beside the pocket
     assert val(dark["corner"][1]) - (val(pocket["corner"][1]) + val(pocket["width"])) == pytest.approx(1.2)
-    assert val(dark["corner"][0]) == val(lit["corner"][0])
+    thick = feature("Dark slot thick divider")
+    assert val(pocket["corner"][1]) - (val(thick["corner"][1]) + val(thick["width"])) == pytest.approx(V("divider_thick"))
+    assert V("divider_thick") == 2.0 and V("divider_thick") > V("divider")
+    assert val(dark["corner"][0]) == val(lit["corner"][0]) == val(thick["corner"][0])
     assert val(pocket["corner"][0]) - V("lay_col2_x") == pytest.approx(1.2)
-    assert val(pocket["corner"][1]) - V("lay_lg_y") == pytest.approx(1.2)
-    assert V("lg_w") == pytest.approx(1.2 + 4.3 + 1.2 + 3.3 + 1.2)
+    assert val(thick["corner"][1]) - V("lay_lg_y") == pytest.approx(1.2)                # outer wall
+    assert V("lg_w") == pytest.approx(1.2 + 3.3 + 2.0 + 4.3 + 1.2 + 3.3 + 1.2)
     assert V("lg_h") == V("lg_floor") + V("lg_led_h")
     # the bars lie beside the body (print position), each 3 wide, 2 high: they drop into the slots
-    for bar in ("Lit bar", "Dark bar"):
+    for bar in ("Lit bar", "Dark bar", "Dark bar thick divider"):
         f = feature(bar)
         assert (val(f["width"]), val(f["height"])) == (3.0, 2.0)
         assert val(f["width"]) < val(lit["width"]) and val(f["height"]) <= V("lg_led_h")
@@ -178,15 +182,37 @@ def test_every_tested_value_is_labelled():
     expr = [c["text_expression"] for c in labels if "text_expression" in c]
     assert len(labels) == 5 + 5 + 6 + 3 + 2
     for clr in range(1, 6):
-        assert expr.count(f"number(clr_t{clr}, 2)") == 2                       # on the peg and the hole plate
+        assert expr.count(f"number(lbl_clr{clr}, 0)") == 2                       # on the peg and the hole plate
     for w in ("slot_w_narrow", "slot_w", "slot_w_wide"):
-        assert f"number({w}, 1)" in expr and f"'L' + number({w}, 1)" in expr     # straight, louvre
+        assert f"number(lbl_{w}, 0)" in expr and f"'L' + number(lbl_{w}, 0)" in expr     # straight, louvre
     for h in ("insert_hole_a", "insert_hole_b", "insert_hole_c"):
-        assert f"number({h}, 1)" in expr
+        assert f"number(lbl_{h}, 0)" in expr
     # every parameter a label names exists, so the label follows the value
     for e in expr:
         assert (names_in(e) - {"number", "L"}) <= set(S.params)
     assert {c["text"] for c in labels if "text" in c} == {"A", "B"}
+
+
+def test_labels_are_readable_and_fit_their_cells():
+    assert V("text_h") >= 5.0
+    assert V("text_h") * 0.09 >= 0.4                    # the built-in font's strokes reach a 0.4 mm nozzle
+    assert V("lbl_clr3") == pytest.approx(20) and V("lbl_slot_w") == pytest.approx(12)
+    assert V("lbl_insert_hole_c") == pytest.approx(33)
+    # a three-character label (about 0.65 x the height per glyph) fits its column
+    assert 3 * 0.65 * V("text_h") < min(V("gr_col"), V("fit_pitch"), V("ib_pitch")) + 0.1
+    # and clears the features above it
+    assert V("fit_lbl_y") + V("text_h") < V("fit_round_y") - (V("peg_d") + 2 * V("clr_t5")) / 2
+    assert V("gr_lbl_lo") + V("text_h") <= V("gr_row_s")
+    assert V("gr_row_l") + V("slot_len") < V("gr_lbl_hi") and V("gr_lbl_hi") + V("text_h") < V("gr_d")
+    assert V("ib_lbl_y") + V("text_h") < V("ib_y") - V("insert_od") / 2
+    assert -V("flex_plate_d") + 1 + V("text_h") < -V("sw_d")
+
+
+def test_shared_defaults_live_in_clearances_py():
+    for name, value in (("clr_align", clearances.CLR_ALIGN), ("clr_remove", clearances.CLR_REMOVE),
+                        ("clr_snap", clearances.CLR_SNAP), ("slot_w", clearances.SLOT_W), ("wall", clearances.WALL),
+                        ("flex_t", clearances.FLEX_T), ("flex_len", clearances.FLEX_LEN), ("flex_gap", clearances.FLEX_GAP)):
+        assert V(name) == value and S.params[name].comment.endswith("clearances.py")
 
 
 def rects():
@@ -202,7 +228,7 @@ def test_coupons_are_laid_out_flat_on_the_bed_and_apart():
         gap = max(blo[0] - ahi[0], alo[0] - bhi[0], blo[1] - ahi[1], alo[1] - bhi[1])
         assert gap >= V("bed_gap") - 1e-6, f"{na} and {nb} are {gap:.2f} mm apart"
     sheet = [max(h[i] for _, h in rects().values()) for i in (0, 1)]
-    assert sheet[0] < 130 and sheet[1] < 110                                  # fits any printer's bed
+    assert sheet[0] < 150 and sheet[1] < 130                                  # fits any printer's bed
 
 
 def test_flexure_stands_on_the_bed_without_overhangs_and_anchors_both_beams():
@@ -250,7 +276,8 @@ def test_committed_step_holds_every_body():
 def test_committed_design_has_the_documented_bodies():
     with zipfile.ZipFile(ENCLOSURE / "coupons.sc") as z:
         d = json.loads(z.read("document.json"))
-    assert [p["name"] for p in d["params"]][:4] == ["clr_align", "clr_remove", "clr_snap", "clr_t1"]
+    assert [p["name"] for p in d["params"]][:3] == ["clr_align", "clr_remove", "clr_snap"]
+    assert "clr_t1" in [p["name"] for p in d["params"]]
     assert not re.search(r"Sketch\d+", json.dumps([f["name"] for f in d["features"]]))
 
 

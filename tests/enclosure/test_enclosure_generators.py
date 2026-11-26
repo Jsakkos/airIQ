@@ -111,7 +111,8 @@ def test_every_body_is_named(name):
         "sfa40-breakout": ["sfa40_board", "sfa40_sensor", "sfa40_opening", "sfa40_qwiic_j1", "sfa40_qwiic_j2"],
         "fpc-adapter": ["fpc_adapter_pcb", "fpc_adapter_zif_tail", "fpc_adapter_zif_ffc"],
         "coupons": ["coupon_clr_pegs", "coupon_clr_holes", "coupon_grille", "coupon_insert",
-                    "coupon_flexure", "coupon_lg_body", "coupon_lg_bar_lit", "coupon_lg_bar_dark"],
+                    "coupon_flexure", "coupon_lg_body", "coupon_lg_bar_lit", "coupon_lg_bar_dark",
+                    "coupon_lg_bar_dark_2"],
     }[name]
     assert SCRIPTS[name].bodies == expected
 

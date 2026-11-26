@@ -211,10 +211,15 @@ The component is named after the design (`ref_sen66`, …).
 
 Print these before any enclosure. Their results set the clearance defaults the enclosures use
 (`clr_align`, `clr_remove`, `clr_snap`, `slot_w`, `flex_*`), so the coupons are built to test the
-fits the enclosures need (ruling R20). `export/coupons.3mf` holds every coupon as its own part (8
-parts); `export/coupons.step` holds the same bodies. They are laid out flat on one 109.5 x 96.2 mm
+fits the enclosures need (ruling R20). `export/coupons.3mf` holds every coupon as its own part (9
+parts); `export/coupons.step` holds the same bodies. They are laid out flat on one 124 x 116.5 mm
 sheet, spaced 6 mm apart, so print them together or drag them apart in the slicer. Solid, they come
-to about 17 cm3 (about 21 g of PETG), less with infill.
+to about 19.5 cm3 (about 25 g of PETG), less with infill.
+
+The defaults live in one place, `src/clearances.py` (`CLR_ALIGN`, `CLR_REMOVE`, `CLR_SNAP`,
+`SLOT_W`, `WALL`, `FLEX_T`, `FLEX_LEN`, `FLEX_GAP`, and `add_params(script)`, which adds them as
+commented parameters). The coupons import it, and so should the enclosure generators (Tasks 3-5),
+so the results change the numbers once.
 
 **Material and settings.**
 
@@ -223,42 +228,80 @@ to about 17 cm3 (about 21 g of PETG), less with infill.
   for the enclosures. Change nothing between the coupons and the enclosures, or the results do not
   carry over. A 0.4 mm nozzle and 0.2 mm layers are assumed.
 - No supports, no brim, no raft. Every coupon prints without supports in the orientation below.
-- Colour: the shell's colour (warm white) for everything except the two clear bars.
+- Colour: the enclosure's own matte warm-white material for everything except the three clear bars.
+  The light-guide test must use the real wall material and colour: the walls of the enclosures are
+  that material, so a black coupon would say nothing about them.
 
 | Part (3MF object) | Size (mm) | Orientation | Material |
 |---|---|---|---|
-| `coupon_clr_pegs` | 66 x 28 x 8 | as laid out: plate on the bed, pegs and tabs up | shell material |
-| `coupon_clr_holes` | 66 x 28 x 3 | as laid out: plate on the bed, labels up | shell material |
-| `coupon_grille` | 37.5 x 40 x 1.8 | **face down** on the textured PEI (the plate is flat on the bed; labels on top) | shell material |
-| `coupon_insert` | 30 x 15 x 7 | as laid out: plate on the bed, bosses up | shell material |
-| `coupon_flexure` | 44 x 11.3 x 4.9 | as laid out: standing on the bed, beams vertical. Print the beams with perimeters only (no infill reaches a 1 mm wall) | shell material |
-| `coupon_lg_body` | 19.1 x 11.2 x 3.2 | as laid out: slots and pocket open upward | **opaque**: the shell's colour |
-| `coupon_lg_bar_lit`, `coupon_lg_bar_dark` | 16 x 3 x 2 each | as laid out: lying on the 3 mm face | **clear or natural PETG** |
+| `coupon_clr_pegs` | 76 x 28 x 8 | as laid out: plate on the bed, pegs and tabs up | shell material |
+| `coupon_clr_holes` | 76 x 28 x 3 | as laid out: plate on the bed, labels up | shell material |
+| `coupon_grille` | 42 x 44 x 1.8 | **face down** on the textured PEI: the plate lies flat on the bed and the labels, on the top face, read normally from above (no mirroring) | shell material |
+| `coupon_insert` | 30 x 17 x 7 | as laid out: plate on the bed, bosses up, holes opening upward (see "Insert orientation") | shell material |
+| `coupon_flexure` | 44 x 13.3 x 4.9 | as laid out: standing on the bed, beams vertical. Print the beams with perimeters only (no infill reaches a 1 mm wall) | shell material |
+| `coupon_lg_body` | 19.1 x 16.5 x 3.2 | as laid out: slots and pocket open upward | **the shell's warm-white material** |
+| `coupon_lg_bar_lit`, `coupon_lg_bar_dark`, `coupon_lg_bar_dark_2` | 16 x 3 x 2 each | as laid out: lying on the 3 mm face | **clear or natural PETG** |
 
-For a two-material or AMS print, assign the two bars to the clear filament and everything else to
-the shell filament. On a single-material printer, print the two bars on their own (a second job in
+For a two-material or AMS print, assign the three bars to the clear filament and everything else to
+the shell filament. On a single-material printer, print the bars on their own (a second job in
 clear PETG) and the rest in the shell material. The bars lie beside the body as they print: after
-printing, drop one bar in each slot.
+printing, drop the lit bar in the middle slot and one dark bar in each outer slot.
 
-**What each coupon tests, and what to report.** The debossed number on each feature is its value in
-mm. On the fit plates it is the per-side clearance, so a hole or slot is the peg or tab plus twice
-that number.
+**Reading the labels.** The labels are debossed 0.4 mm deep in a 5 mm capital height, which keeps
+the strokes at the nozzle's width, and carry no units. They are a convenience: the order below is
+the key, so the coupons stay usable if a label fills in.
+
+| Coupon | Label | Order |
+|---|---|---|
+| Clearance plates | clearance per side in hundredths of a mm: 10 = 0.10 mm | left to right: 0.10, 0.15, 0.20, 0.25, 0.30. Back row (far from the labels): rectangular tabs and slots. Row nearest the labels: round pegs and holes. A hole or slot is the peg or tab plus twice the clearance |
+| Grille | slot width in tenths of a mm: 10 = 1.0 mm; **L** = louvre | left to right: 1.0, 1.2, 1.5 mm. Front row (labels under the slots): straight slots. Back row (labels above): 45-degree louvres. Three slots per width |
+| Insert bosses | hole diameter in tenths of a mm: 31 = 3.1 mm | left to right: 3.1, 3.2, 3.3 mm |
+| Flexure | A, B | A (left) has the SW1 stand-in; B (right) is free |
+| Light guide | none | slots, front to back: dark bar behind the 2.0 mm divider, lit bar, dark bar behind the 1.2 mm divider. Bars 1, 2, 3 in the 3MF are `coupon_lg_bar_lit`, `coupon_lg_bar_dark` (1.2 mm side), `coupon_lg_bar_dark_2` (2.0 mm side) |
+
+"Front" is the edge at y = 0 (the bottom of the picture in a top view).
+
+**What each coupon tests, and what to report.**
 
 | Coupon | What to do | Report |
 |---|---|---|
-| Clearance (pegs and holes, tabs and slots) | Push peg *n* into hole *n* and tab *n* into slot *n*, for each of 0.10, 0.15, 0.20, 0.25, 0.30. Round fits and rectangular fits are separate tests | For each fit type and each clearance: does not enter / enters only with force or a tool / enters by hand and holds without play / slides in and out freely / rattles. Name the tightest clearance that assembles by hand and the tightest that slides freely and releases without scraping, for each type. These pick `clr_align` (located part), `clr_remove` (part that lifts off) and `clr_snap` (latch) |
+| Clearance (pegs and holes, tabs and slots) | Push peg *n* into hole *n* and tab *n* into slot *n*, for each of 0.10, 0.15, 0.20, 0.25, 0.30. Round fits and rectangular fits are separate tests | For each fit type and each clearance: does not enter / enters only with force or a tool / enters by hand and holds without play / slides in and out freely / rattles. Then the rule below |
 | Grille (3 slots at 1.0, 1.2, 1.5 mm; the back row are 45-degree louvres labelled L) | Look through the slots against a light, and probe each with a 1 mm feeler or a drill bit | Which widths print clean and open (no strings, no bridging, no closed slot), for straight and for louvre slots, and whether the louvres' overhang flank droops. Picks `slot_w` |
-| Insert boss (M2 heat-set insert holes 3.1, 3.2, 3.3 mm, 4.0 deep; **sizes to confirm** with your inserts) | Heat in an M2 insert in each boss from its top (the enclosures enter it from underneath) with the iron you will use. Then turn an M2 screw in and out and try to pull the insert out | Which hole holds: insert seats flush, does not spin under a screwdriver, does not pull out by hand, and the boss neither cracks nor bulges. Note the insert length and brand |
+| Insert boss (M2 heat-set insert holes 3.1, 3.2, 3.3 mm, 4.0 deep; **sizes to confirm** with your inserts) | Heat in an M2 insert in each boss from its top with the iron you will use. Then turn an M2 screw in and out and try to pull the insert out | Which hole holds: insert seats flush, does not spin under a screwdriver, does not pull out by hand, and the boss neither cracks nor bulges. Note the insert length and brand |
 | Button flexure (A with a stand-in for SW1, B without) | Press the pad's outer face (the face away from the board stub) with a fingertip, toward the stub. A: the pad closes up on the stand-in's actuator stub after 0.10 mm. B: the pad moves freely until the lug on its stop side meets the stop block, after 0.30 mm | Whether the pad returns fully after 50 presses and stays uncracked, whether it bottoms on the hard stop (B) and cannot press the stub any further (A), the feel and rough force, and the rest gap you can see at A. The stand-in is rigid, so the switch's own click cannot be felt: if you have a spare SKRTLAE010, hold it against the stub's position to judge the click (optional). Picks `flex_t`, `flex_gap` and the `flex_*` family |
-| Light guide (3 x 2 mm clear bar, SK6812SIDE pocket, 1.2 mm opaque divider, a second bar past the divider) | Drop one bar in each slot, put an SK6812SIDE (or a phone torch held against the pocket) at the pocket end, and look at both bars in a dim room | Whether the lit bar glows evenly and the dark bar stays dark (light leaking past the divider, through the floor or through the top), with the shell colour and material you printed the body in. If it leaks, reprint the body in black and say so |
+| Light guide (3 x 2 mm clear bar, SK6812SIDE pocket, opaque dividers of 1.2 mm on one side of the pocket and 2.0 mm on the other) | Drop the bars in, put an SK6812SIDE (or a phone torch held against the pocket) at the pocket end, and look at all three bars in a dim room | Whether the lit bar glows evenly, and whether each dark bar stays dark (light leaking past its divider, through the floor or through the top). If the 1.2 mm side leaks, say whether the 2.0 mm side stops it, and **the wall thickness that does**: Tasks 3-4 then use that thickness, or a dark liner, for the light-guide walls. Do not reprint in black: the enclosure walls are the warm-white material |
+
+**Which orientation each result applies to.** Every fit plate, the grille and the insert plate print
+flat, with their holes and slots along z (vertical). Round holes with their axis along z are the
+most accurate holes a printer makes. The results for the round hole therefore apply to features
+printed that way (base-plate bosses and pins). The shell prints face down on its tilted front, so
+its holes and bosses are inclined to the bed, and holes along an inclined axis print slightly
+smaller and rougher. The coupons do not test that: treat the `clr_*` and insert results as the
+best case, check the first shell print (Task 5 Step 2), and widen the shell's holes if it needs it.
+
+**Insert orientation.** The enclosures enter the heat-set inserts from underneath, into bosses
+that stand on the shell's inner face. The coupon bosses stand on a plate with the hole opening
+upward, which is the printing orientation of a base-plate boss. It says which hole diameter holds
+the insert in a vertical hole. It does not say what an inclined shell boss needs: the result
+applies to vertical bosses only, and the shell's bosses are confirmed by the first shell print.
 
 ## Coupon results
 
 **Pending owner print.** Nothing below has been measured. The plan's defaults stay in force until
 the owner prints the coupons and reports: `clr_align` 0.15, `clr_remove` 0.20, `clr_snap` 0.25,
-`slot_w` 1.2, `flex_*` as in `src/coupons.py`. When results arrive (Task 2 Step 3), fill the table
-and change the defaults in `src/coupons.py` (and in the enclosure generators that read them),
-rebuild and commit with `feat(enclosure): print-test coupons and results`.
+`slot_w` 1.2, `flex_*` as in `src/clearances.py`. When results arrive (Task 2 Step 3), fill the
+table and change the defaults in `src/clearances.py`, rebuild and commit with
+`feat(enclosure): print-test coupons and results`.
+
+**Rule for the three clearances.** Taken from the owner's answers, per fit type (round, rectangular),
+using the larger of the two types:
+
+- `clr_align` = the tightest clearance that assembles by hand and holds without play (a located part).
+- `clr_remove` = the tightest clearance that slides in and out freely without scraping (a part that lifts off).
+- `clr_snap` = `clr_remove` + 0.05 mm, until snap geometry is tested.
+
+No snap or latch geometry is on the coupons, so `clr_snap` rests on a plain fit plus that margin. It
+is not measured: test it with the first enclosure print.
 
 | Test | Result | Decision | Default until then |
 |---|---|---|---|
@@ -266,10 +309,11 @@ rebuild and commit with `feat(enclosure): print-test coupons and results`.
 | Rectangular tab and slot, 0.10 / 0.15 / 0.20 / 0.25 / 0.30 | pending owner print | tightest by hand: ?; tightest free: ? | as above |
 | Grille slots 1.0 / 1.2 / 1.5, straight | pending owner print | clean widths: ? | `slot_w` 1.2 |
 | Grille 45-degree louvres 1.0 / 1.2 / 1.5 | pending owner print | clean widths: ?; flank droop: ? | `slot_w` 1.2 |
-| M2 heat-set insert hole 3.1 / 3.2 / 3.3, 4.0 deep | pending owner print | holding hole: ? (insert: ?) | to confirm with the owner's inserts (R20) |
+| M2 heat-set insert hole 3.1 / 3.2 / 3.3, 4.0 deep (vertical bosses only) | pending owner print | holding hole: ? (insert: ?) | to confirm with the owner's inserts (R20) |
 | Button flexure A (SW1 stand-in) | pending owner print | returns / cracks: ?; rest gap: ? | `flex_t` 1.0, `flex_gap` 0.10 |
 | Button flexure B (hard stop) | pending owner print | bottoms at 0.30: ?; feel and force: ? | `flex_stop` 0.30 (gap + 0.20 travel) |
-| Light guide, divider 1.2 | pending owner print | leak past the divider: ? | `divider` 1.2 |
+| Light guide, 1.2 mm divider (shell material and colour) | pending owner print | leak: ? | `divider` 1.2 |
+| Light guide, 2.0 mm divider (shell material and colour) | pending owner print | leak: ?; thickness that stops it: ? | `divider_thick` 2.0 |
 
 ## Sources
 
