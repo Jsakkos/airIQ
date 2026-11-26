@@ -115,7 +115,7 @@ def test_every_body_is_named(name):
                     "coupon_flexure", "coupon_lg_body", "coupon_lg_bar_lit", "coupon_lg_bar_dark",
                     "coupon_lg_bar_dark_2"],
         "airq": ["shell", "base_plate", "zone_wall", "zone_seal", "sen66_foam", "gasket_out", "gasket_in", "sen66_pad", "hcho_lid",
-                 "grommet_zone", "grommet_j4", "grommet_tongue"],
+                 "grommet_zone_a", "grommet_zone_b", "grommet_j4_a", "grommet_j4_b", "grommet_tongue_a", "grommet_tongue_b"],
     }[name]
     assert SCRIPTS[name].bodies == expected
 

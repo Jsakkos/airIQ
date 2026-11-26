@@ -45,7 +45,10 @@ REFS = ("ref_sen66", "ref_epd", "ref_fpc_adapter", "ref_sfa40", "ref_tongue", "r
 SHELL_BORNE = ("ref_epd", "ref_fpc_adapter")     # the panel and the adapter are in the shell and come down with it
 SWEEP_DZ = (1, 2, 4, 8, 16, 32)                  # the shell's raised copies (mm along +z)
 TOUCH_SQUEEZE = 0.05                             # the gaskets overlap their seats by this much when they touch at 0
-TOUCHES = (("gasket_out", "sen66_body"), ("gasket_in", "sen66_body"), ("zone_seal", "base_plate"), ("sen66_pad", "sen66_body"))
+TOUCHES = (("gasket_out", "sen66_body"), ("gasket_in", "sen66_body"), ("zone_seal", "base_plate"), ("sen66_pad", "sen66_body"),
+           ("grommet_zone_a", "zone_wall"), ("grommet_zone_b", "zone_wall"), ("grommet_zone_a", "base_plate"),
+           ("grommet_zone_b", "base_plate"), ("grommet_j4_a", "base_plate"), ("grommet_j4_b", "base_plate"),
+           ("grommet_j4_b", "hcho_lid"), ("grommet_tongue_a", "hcho_lid"), ("grommet_tongue_b", "hcho_lid"))
 # every squeeze and preload: 0 in the check (R9: faces touch), TOUCH_SQUEEZE in the touch run
 SQUEEZES = ("gasket_squeeze", "wiper_squeeze", "pad_squeeze", "ring_preload")
 
@@ -108,16 +111,18 @@ def keepouts(s) -> list[dict]:
     connector faces with the cable's bend in front."""
     t = lambda tt, z: f"({tt} + ({z} - lip) * sin_t) / cos_t"     # noqa: E731  y at depth tt behind the slope, height z
     mid = "sen_top - sen_up / 2"
+    run0, run1 = "pt_yh - cable_gh_d / 2", "pt_yh + cable_gh_d / 2"      # the cables' line through the drawer
+    j0, j1 = "j4n_yc - cable_qw_d / 2 - 0.3", "j4n_yc + cable_qw_d / 2 + 0.3"   # the J4 cable's line along the front
     b = []
     # SEN66 plug on its connector face (front), the cable's bend down, the run left, the riser
     b.append(_box("ko_sen66_plug", "plug_x0", "sen_y0 - 6.0", f"{mid} - 2.5", "plug_x1", "sen_y0", f"{mid} + 2.5"))
     b.append(_box("ko_sen66_bend", "plug_x0", "sen_y0 - 6.94", "floor_t", "plug_x1", "sen_y0 - 6.0", f"{mid} + 0.7"))
-    b.append(_box("ko_sen66_bend_low", "plug_x0", "pt_y0 + 0.1", "floor_t", "plug_x1", "sen_y0 - 6.94", "ledge_z0 + 0.2"))
-    b.append(_box("ko_cable_run", "pt_x0", "pt_y0 + 0.1", "floor_t", "plug_x0", "pt_y0 + 2.6", "floor_t + 3.0"))
-    b.append(_box("ko_cable_riser", "pt_x0", "pt_y0 + 0.1", "floor_t + 3.0", "pt_x1", "pt_y0 + 2.6", "pt_z0"))
-    # through the zone wall's grommet, up the strip behind the folded tail, over the zone wall to J2 and J4
-    b.append(_cyl("ko_cable_gh", ["pt_x0 + 1.7", "pt_y0 + 1.6", "pt_z0"], "cable_gh_d", "pt_z1 - pt_z0"))
-    b.append(_cyl("ko_cable_qwiic", ["pt_x1 - 1.5", "pt_y1 - 1.3", "pt_z0"], "cable_qw_d", "pt_z1 - pt_z0"))
+    b.append(_box("ko_sen66_bend_low", "plug_x0", run0, "floor_t", "plug_x1", "sen_y0 - 6.94", "ledge_z0 + 0.2"))
+    b.append(_box("ko_cable_run", "pt_x0", run0, "floor_t", "plug_x0", run1, "floor_t + 3.0"))
+    b.append(_box("ko_cable_riser", "pt_x0", run0, "floor_t + 3.0", "qw_x + cable_qw_d / 2", run1, "pt_z0"))
+    # through the zone wall's drawer, up the strip behind the folded tail, over the zone wall to J2 and J4
+    b.append(_cyl("ko_cable_gh", ["gh_x", "pt_yh", "pt_z0"], "cable_gh_d", "pt_z1 - pt_z0"))
+    b.append(_cyl("ko_cable_qwiic", ["qw_x", "pt_yh", "pt_z0"], "cable_qw_d", "pt_z1 - pt_z0"))
     b.append({"command": "sketch.create", "params": {"name": "ko_strip_profile", "plane": "YZ", "offset": "pt_x0"}})
     b.append({"command": "sketch.line", "params": {"closed": True, "points": [
         [t("4.2", "pt_z1"), "pt_z1"], [t("6.9", "pt_z1"), "pt_z1"], [t("6.9", "zw_z1 + 0.5"), "zw_z1 + 0.5"],
@@ -125,30 +130,56 @@ def keepouts(s) -> list[dict]:
         [t("4.2", "zw_z1 + 2.6"), "zw_z1 + 2.6"]]}})
     b += [{"command": "sketch.solve", "params": {}}, {"command": "sketch.finish", "params": {}}]
     b.append({"command": "solid.extrude", "params": {"name": "ko_strip", "body_name": "ko_strip", "sketch": "ko_strip_profile",
-                                                     "distance": "pt_x1 - pt_x0", "operation": "new"}})
+                                                     "distance": "strip_x1 - pt_x0", "operation": "new"}})
     bx = "board_x0"
     fy = "board_y0 + board_d"
-    b.append(_box("ko_route", "pt_x1", t("6.9", "zw_z1 + 2.6") + " + 0.2", "zw_z1 + 0.5",
+    b.append(_box("ko_route", "strip_x1", t("6.9", "zw_z1 + 2.6") + " + 0.2", "zw_z1 + 0.5",
                   f"{bx} + {J2[0][0]} - 5.0", f"{fy} - {J4[0][1]}", "zw_z1 + 2.6"))
     b.append(_box("ko_j2_plug", f"{bx} + {J2[0][0]} - 5.0", f"{fy} - {J2[1][1]}", "board_z0 + board_t",
                   f"{bx} + {J2[0][0]}", f"{fy} - {J2[0][1]}", f"board_z0 + board_t + {B.connector_h('j_sen66')}"))
     b.append(_box("ko_j4_plug", f"{bx} + {J4[0][0]} - 5.0", f"{fy} - {J4[1][1]}", "board_z0 + board_t",
                   f"{bx} + {J4[0][0]}", f"{fy} - {J4[0][1]}", f"board_z0 + board_t + {B.connector_h('j_qwiic_aux')}"))
     # SFA40: J2 (front) plug and its cable to grommet_j4, then left in front of the SEN66 to the riser
+    wx0, wx1 = "sen_x1 + clr_align", "sen_x1 + clr_align + iwall"
     b.append(_box("ko_sfa_front", SFA_QW[0], "wall + shelf_w + 0.1", "floor_t", SFA_QW[1], "sfa_y0", "lid_z0 - shelf_w - 0.1"))
-    b.append(_box("ko_sfa_turn", "sen_x1 + clr_align + iwall + 0.3", "wall + 0.8", "floor_t", SFA_QW[0], "wall + 4.4", "floor_t + 3.8"))
-    b.append(_cyl("ko_j4_grommet", ["sen_x1 + clr_align - 0.3", "wall + 2.6", "floor_t + 2.0"], "cable_qw_d", "iwall + 0.6", axis="X"))
-    b.append(_box("ko_j4_run", "-bp_x0 + 0.2", "wall + 0.8", "floor_t", "sen_x1 + clr_align - 0.3", "wall + 4.4", "floor_t + 3.8"))
-    b.append(_box("ko_j4_turn", "-bp_x0 + 0.2", "wall + 4.4", "floor_t", "pt_x1", "pt_y0 + 0.1", "floor_t + 3.0"))
+    b.append(_box("ko_sfa_turn", f"{wx1} + j4_fl + 0.1", j0, "floor_t", SFA_QW[0], j1, "floor_t + 3.8"))
+    b.append(_cyl("ko_j4_grommet", [f"{wx0} - j4_fl", "j4n_yc", "j4n_zc"], "cable_qw_d", "iwall + 2 * j4_fl", axis="X"))
+    b.append(_box("ko_j4_run", "-bp_x0 + 0.2", j0, "floor_t", f"{wx0} - j4_fl - 0.1", j1, "floor_t + 3.8"))
+    b.append(_box("ko_j4_turn", "-bp_x0 + 0.2", j1, "floor_t", "qw_x + cable_qw_d / 2", run0, "floor_t + 3.0"))
     # SFA40: J1 (rear) plug, up through grommet_tongue, to the tongue's Qwiic plug
-    b.append(_box("ko_sfa_rear", SFA_QW[0], "sfa_y0 + sfa_w", "floor_t", SFA_QW[1], "hy1", "lid_z0 - 0.3"))
-    b.append(_cyl("ko_lid_cable", ["sfa_x0 + sfa_w / 2", "hy1 - 2.1", "lid_z0 - 0.3"], "cable_qw_d", "lid_t + 0.6"))
+    b.append(_box("ko_sfa_rear", SFA_QW[0], "sfa_y0 + sfa_w", "floor_t", SFA_QW[1], "hy1", "lid_z0 - 0.5"))
+    b.append(_cyl("ko_lid_cable", ["lh_x", "lh_y0 + lid_hole_w / 2", "lid_z0 - 0.5"], "cable_qw_d", "lid_t + tg_fl_t + 0.5"))
     tq_x = f"tongue_x1 - {TQ['center_x']}"
     b.append(_box("ko_tongue_plug", f"{tq_x} - 3.0", f"tongue_y0 + {TQ['mating_face_y']}", "tongue_z0 + tongue_t",
                   f"{tq_x} + 3.0", f"tongue_y0 + {TQ['mating_face_y']} + 4.5", f"tongue_z0 + tongue_t + {TQH}"))
-    b.append(_box("ko_tongue_cable", f"{tq_x} - 3.0", f"tongue_y0 + {TQ['mating_face_y']} + 4.5", "lid_z0 + lid_t + 0.3",
-                  "sfa_x0 + sfa_w / 2 + 2.5", "hy1 - 0.6", f"tongue_z0 + tongue_t + {TQH}"))
+    b.append(_box("ko_tongue_cable", f"{tq_x} - 3.0", f"tongue_y0 + {TQ['mating_face_y']} + 4.5", "lid_z0 + lid_t + tg_fl_t + 0.1",
+                  "lh_x + 2.5", "hy1 - 0.6", f"tongue_z0 + tongue_t + {TQH}"))
     return b
+
+
+# I2: every closed opening a plug must pass, as (probe, the part with the opening, plug width,
+# plug thickness, the opening's centre and the axis the plug moves along). The open-edge openings
+# (the zone wall's drawer, the HCHO pocket's J4 notch) take their cables from the side: no plug
+# passes them, OPEN_EDGES below.
+PLUG_PASSES = (
+    ("plug_lid", "hcho_lid", "qw_plug_w", "qw_plug_t", ("lh_x", "lh_y0 + lid_hole_w / 2"), "Z"),
+)
+OPEN_EDGES = (   # (probe, part, its region: x0, y0, z0, x1, y1, z1) from the cable's place out past the part's edge
+    ("edge_drawer", "zone_wall", ("-inner_x - 1", "pt_y0", "ledge_z0", "qw_x", "pt_y1", "zw_z1 + 1")),
+    ("edge_j4", "base_plate", ("sen_x1 + clr_align - 0.5", "j4n_y0", "j4n_zc", "sen_x1 + clr_align + iwall + 0.5", "j4n_y0 + j4n_w", "lid_z0 + 0.5")),
+)
+
+
+def plug_probes(s) -> list[dict]:
+    """I2: each plug's section (its width along x, its thickness along y), swept along the axis it
+    moves through its opening, from below the part to above it; and each open edge's free way
+    out (the cable's place to past the part's edge). None of them may meet its part."""
+    out = []
+    for name, _, w, th, (cx, cy), _axis in PLUG_PASSES:
+        out.append(_box(name, f"{cx} - {w} / 2", f"{cy} - {th} / 2", "lid_z0 - 2", f"{cx} + {w} / 2", f"{cy} + {th} / 2", "lid_z0 + lid_t + 2"))
+    for name, _, (x0, y0, z0, x1, y1, z1) in OPEN_EDGES:
+        out.append(_box(name, x0, y0, z0, x1, y1, z1))
+    return out
 
 
 AIR = {   # probe -> (path, R25 minimum, the probe's face that is the section: "x", "y" or "z")
@@ -326,6 +357,17 @@ def check_script(save: Path = CHECK_SC, budget_s: float = 900) -> dict:
         "budget_s": 120, "bodies": [*names_w, "shell", "base_plate", "zone_wall"],
         "exclude_pairs": [[a, b] for i, a in enumerate(names_w) for b in names_w[i + 1:]]
         + [["shell", "base_plate"], ["shell", "zone_wall"], ["base_plate", "zone_wall"]]}})
+    # I2: each plug through its opening, each open edge's way out
+    plugs = plug_probes(s)
+    steps += plugs
+    mark["plugs"] = len(steps)
+    pairs = [(n, part) for n, part, *_ in PLUG_PASSES] + [(n, part) for n, part, _ in OPEN_EDGES]
+    names_p = [n for n, _ in pairs]
+    steps.append({"command": "inspect.interference", "params": {
+        "budget_s": 120, "bodies": [*names_p, *sorted({part for _, part in pairs})],
+        "exclude_pairs": [[a, b] for i, a in enumerate(names_p) for b in names_p[i + 1:]]
+        + [[n, part] for n in names_p for _, part in pairs if (n, part) not in pairs]
+        + [["hcho_lid", "zone_wall"], ["hcho_lid", "base_plate"], ["zone_wall", "base_plate"]]}})
     # I3(b): the SEN66 at the ends of its depth tolerance, its port face on the ring: the front of
     # the deepest module clears the cradle and the zone wall, and the pad (free) still presses the
     # shallowest one
@@ -361,7 +403,8 @@ def run(cli: str | None = None) -> dict:
         raise RuntimeError(f"check run failed: {res if isinstance(res, dict) else proc.stderr or proc.stdout}")
     m = sc["mark"]
     return {"inserted": res[:6], "interference": res[m["interference"]], "measure": res[m["measure"]],
-            "touch": res[m["touch"]], "nudge": res[m["nudge"]], "window": res[m["window"]], "extremes": res[m["extremes"]]}
+            "touch": res[m["touch"]], "nudge": res[m["nudge"]], "window": res[m["window"]], "extremes": res[m["extremes"]],
+            "plugs": res[m["plugs"]]}
 
 
 def nudge_faults(nudge: dict, s=None) -> list[str]:
@@ -589,6 +632,8 @@ if __name__ == "__main__":
         print("nudge (N1):", [(p["a"], p["b"], round(p["volume_mm3"], 3), [round(c, 3) for c in p["bbox"]["min"]],
                                [round(c, 3) for c in p["bbox"]["max"]]) for p in r["nudge"]["interferences"]],
               "faults:", nudge_faults(r["nudge"]) or "none")
+        print("plugs and open edges (I2):", [(p["a"], p["b"], round(p["volume_mm3"], 3)) for p in r["plugs"]["interferences"]] or "clear",
+              "checked", r["plugs"]["checked"])
         print("extremes (I3b) overlap depth along y:", {f"{a}|{b}": round(x, 3) for (a, b), x in extreme_reach(r["extremes"]).items()})
         need = window_backing(airq.build())
         print("window (N2) fill / need / shell:", {k: (round(f, 2), round(need[k], 2), round(sh, 3))

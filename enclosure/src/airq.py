@@ -227,8 +227,9 @@ def build() -> Script:
     C.base_screws(s)
     C.base_side_clearance(s)
     base_cuts(s)
+    cable_params(s)
     C.zone_wall(s)
-    pass_through(s)
+    zone_drawer(s)
     C.zone_seal(s)
     s.box("SEN66 foam", ["sen_x0", "sen_y0", "floor_t"], ["sen_l", "sen_d", "foam"], body="sen66_foam")
     gaskets(s)
@@ -374,19 +375,54 @@ def hcho_window(s: Script) -> None:
     s.extrude("HCHO window", "HCHO window outline", "wall + 1", operation="cut", targets=["shell"])
 
 
-def pass_through(s: Script) -> None:
-    """The cable pass-through in the zone wall's slant at the left (I2): the SEN66 cable (J2) and
-    the SFA40's Qwiic cable (J4) go up through grommet_zone, left of the adapter and behind the
-    folded tail, to the board's left edge."""
+def zt(y: str, t: str) -> str:
+    """z of the point at depth y with depth t behind the slope's outer surface (an expression)."""
+    return f"lip + (({y}) * cos_t - ({t})) / sin_t"
+
+
+def cable_params(s: Script) -> None:
+    """The cables and plug envelopes the routes use (I2), to confirm against the cables bought.
+    A plug is taken no larger than the receptacle body it enters (interface.yaml)."""
     p = s.param
-    p("pt_x0", "-tub_x + 0.3", "pass-through left end (inside the left rail)")
-    p("pt_x1", "pt_x0 + 6.3", "pass-through right end (left of the adapter)")
-    p("pt_y0", f"{C.yb('ledge_z0')} + 0.1", "pass-through front, behind the ledge")
-    p("pt_y1", "pt_y0 + 4.4", "pass-through rear")
-    p("pt_z0", "ledge_z0 - 0.3", "grommet's lower face")
-    p("pt_z1", "ledge_z1 + 10.5", "grommet's upper face: the slot passes the whole slant between pt_y0 and pt_y1")
-    s.box("Pass-through", ["pt_x0", "pt_y0", "pt_z0"], ["pt_x1 - pt_x0", "pt_y1 - pt_y0", "pt_z1 - pt_z0"],
-          operation="cut", targets=["zone_wall"])
+    j4, j2 = B.MAIN["j_qwiic_aux"]["body"], B.MAIN["j_sen66"]["body"]
+    p("cable_gh_d", 3.0, "SEN66 cable (JST GH, 6 wires) bundle diameter; to confirm")
+    p("cable_qw_d", 2.4, "Qwiic cable diameter; to confirm")
+    p("qw_plug_w", j4[1][1] - j4[0][1], "Qwiic plug (JST SH 4) width envelope: J4's body width (interface.yaml); to confirm")
+    p("qw_plug_t", max(B.connector_h("j_qwiic_aux"), B.connector_h("qwiic", board="tongue")),
+      "Qwiic plug thickness envelope: the taller Qwiic body (interface.yaml comments); to confirm")
+    p("gh_plug_w", j2[1][1] - j2[0][1], "SEN66 plug (JST GH 6) width envelope: J2's body width (interface.yaml); to confirm")
+    p("gh_plug_t", B.connector_h("j_sen66"), "SEN66 plug thickness envelope: J2's body height (interface.yaml); to confirm")
+
+
+def zone_drawer(s: Script) -> None:
+    """The cable pass-through in the zone wall's slant at the left (I2), for the SEN66 cable (J2)
+    and the SFA40's Qwiic cable (J4): a notch open to the zone wall's left end, so the cables are
+    laid in from the side with both plugs on, and no plug passes it. Its two y faces carry grooves
+    (along x) for the ribs of the split grommet, which slides in from the left over the left rail
+    and is held there by the shell's side wall (with clr_remove)."""
+    p = s.param
+    p("groove_d", 0.6, "drawer grooves' depth into the notch's faces (along y)")
+    p("groove_w", 0.8, "drawer grooves' width across the zone wall (along t), centred in its thickness")
+    p("pt_x0", "-tub_x + 0.3", "cables' riser left end (inside the left rail)")
+    p("gh_x", "pt_x0 + cable_gh_d / 2", "SEN66 cable through the drawer: x")
+    p("qw_x", "gh_x + cable_gh_d / 2 + 0.8 + cable_qw_d / 2", "J4 Qwiic cable through the drawer: x")
+    p("pt_x1", "qw_x + cable_qw_d / 2 + 0.8", "drawer notch's closed end (right)")
+    p("strip_x1", "adapter_x - ad_l / 2 - clr_align", "cables' strip behind the folded tail: right end, left of the adapter")
+    p("pt_y0", f"{C.yb('ledge_z0')} + groove_d", "drawer notch's front face: its groove stays in the slant, behind the ledge")
+    p("pt_y1", "pt_y0 + cable_gh_d + 1.6", "drawer notch's rear face: 0.8 of TPU round the SEN66 cable")
+    p("pt_yh", "(pt_y0 + pt_y1) / 2", "derived: the cables' line, the grommet's split")
+    p("pt_z0", f"{zt('pt_yh - cable_gh_d / 2', 'zw_tf + zone_t')} - 1.0", "cables' riser top, under the grommet")
+    p("pt_z1", "ledge_z1 + 10.5", "cables' strip bottom, over the grommet")
+    tf, tb = "zw_tf", "zw_tf + zone_t"
+    x0 = "-inner_x + clr_remove - 1"
+    s.box("Drawer notch", [x0, "pt_y0", f"{zt('pt_y0', tb)} - 0.5"], [f"pt_x1 - ({x0})", "pt_y1 - pt_y0",
+          f"{zt('pt_y1', tf)} - ({zt('pt_y0', tb)}) + 1"], operation="cut", targets=["zone_wall"])
+    tm0, tm1 = "zw_tf + zone_t / 2 - groove_w / 2", "zw_tf + zone_t / 2 + groove_w / 2"
+    for name, ya, yb in (("front", "pt_y0 - groove_d", "pt_y0"), ("rear", "pt_y1", "pt_y1 + groove_d")):
+        pts = [(ya, zt(ya, tm0)), (yb, zt(yb, tm0)), (yb, zt(yb, tm1)), (ya, zt(ya, tm1))]
+        with s.sketch(f"Drawer groove {name} profile", "YZ", offset=x0) as sk:
+            sk.polyline(pts)
+        s.extrude(f"Drawer groove {name}", f"Drawer groove {name} profile", f"pt_x1 - ({x0})", operation="cut", targets=["zone_wall"])
 
 
 def gaskets(s: Script) -> None:
@@ -423,32 +459,84 @@ def hcho_lid(s: Script) -> None:
                    operation="join", targets=["hcho_lid"])
     s.cylinder("Tongue pin", ["tongue_x1 - tongue_hole_x", "tongue_y0 + tongue_hole_y", "lid_z0 + lid_t - 0.5"],
                "tongue_hole_d - 2 * clr_align", "tongue_t + 1.5", operation="join", targets=["hcho_lid"])
-    s.param("lid_hole_l", 5.0, "lid cable hole length along x (grommet_tongue's size)")
-    s.param("lid_hole_w", 3.0, "lid cable hole width along y")
-    s.box("Lid cable hole", ["sfa_x0 + sfa_w / 2 - lid_hole_l / 2", "hy1 - lid_hole_w - 0.6", "lid_z0 - 0.5"], ["lid_hole_l", "lid_hole_w", "lid_t + 1"],
+    # I2: the hole passes the Qwiic plug of the SFA40's cable to the tongue (the lid goes on over it)
+    s.param("lid_hole_l", "qw_plug_w + 2 * clr_remove", "lid cable hole along x: passes the Qwiic plug's width")
+    s.param("lid_hole_w", "qw_plug_t + 2 * clr_remove", "lid cable hole along y: passes the Qwiic plug's thickness")
+    s.param("lh_x", "sfa_x0 + sfa_w / 2", "lid cable hole centre x, over the SFA40's rear Qwiic (J1)")
+    s.param("lh_y0", "hy1 - lid_hole_w - 0.6", "lid cable hole front edge (0.6 in front of the pocket's rear wall)")
+    s.box("Lid cable hole", ["lh_x - lid_hole_l / 2", "lh_y0", "lid_z0 - 0.5"], ["lid_hole_l", "lid_hole_w", "lid_t + 1"],
           operation="cut", targets=["hcho_lid"])
 
 
 def grommets(s: Script) -> None:
-    """TPU grommets where the cables pass a sealed wall (I2): `grommet_zone` in the zone wall's
-    pass-through (SEN66 cable and the SFA40's Qwiic cable to J4), `grommet_j4` in the HCHO
-    pocket's left wall, `grommet_tongue` in the lid (the SFA40's Qwiic to the tongue). Each fills
-    its opening; its holes take the cables (to confirm against the cables bought)."""
+    """TPU 95A grommets where the cables pass a sealed wall (I2, N4). Each is split in two along
+    its cables, so it goes round cables with both plugs on; each is sized at contact plus
+    gasket_squeeze on the faces it seals, and is held in place:
+    - grommet_zone_a/_b in the zone wall's drawer (front and rear halves): ribs in the notch's
+      grooves hold them across the wall; they bear on the left rail's top and the notch's end; the
+      shell's side wall stops them sliding out (clr_remove);
+    - grommet_j4_a/_b in the HCHO pocket's left wall (lower and upper halves): a notch open at
+      the wall's top, so the SFA40's cable to J4 is laid in from above (no plug passes); the halves
+      straddle the wall with flanges, the floor under them, the lid over them;
+    - grommet_tongue_a/_b in the lid (left and right halves): the hole passes the Qwiic plug of
+      the SFA40's cable to the tongue (the lid goes on over it); a flange on the lid and a barb
+      under it hold each half."""
     p = s.param
-    p("cable_gh_d", 3.0, "SEN66 cable (JST GH, 6 wires) bundle diameter; to confirm")
-    p("cable_qw_d", 2.4, "Qwiic cable diameter; to confirm")
-    s.box("Zone grommet", ["pt_x0", "pt_y0", "pt_z0"], ["pt_x1 - pt_x0", "pt_y1 - pt_y0", "pt_z1 - pt_z0"], body="grommet_zone")
-    s.cylinder("Zone grommet hole GH", ["pt_x0 + 1.7", "pt_y0 + 1.6", "pt_z0 - 1"], "cable_gh_d", "pt_z1 - pt_z0 + 2",
-               operation="cut", targets=["grommet_zone"])
-    s.cylinder("Zone grommet hole Qwiic", ["pt_x1 - 1.5", "pt_y1 - 1.3", "pt_z0 - 1"], "cable_qw_d",
-               "pt_z1 - pt_z0 + 2", operation="cut", targets=["grommet_zone"])
-    p("grommet_s", 4.0, "J4 grommet's square opening in the HCHO pocket's left wall")
-    s.box("J4 grommet cut", ["sen_x1 + clr_align - 0.3", "wall + 0.6", "floor_t"], ["iwall + 0.6", "grommet_s", "grommet_s"],
+    sq = "gasket_squeeze"
+    c = "clr_align"
+    # zone wall drawer: (y, t) profiles, extruded along x from the zone wall's left end
+    tf, tb = "zw_tf", f"zw_tf + zone_t + {sq}"
+    rw0, rw1 = f"zw_tf + zone_t / 2 - groove_w / 2 + {c}", f"zw_tf + zone_t / 2 + groove_w / 2 - {c}"
+    x0 = "-inner_x + clr_remove"
+    for half, yf, yr, sgn in (("a", "pt_y0", "pt_yh", "-"), ("b", "pt_y1", "pt_yh", "+")):
+        face = f"{yf} {sgn} {sq}"
+        rib = f"{yf} {sgn} (groove_d - {c})"
+        prof = [(yr, tf), (face, tf), (face, rw0), (rib, rw0), (rib, rw1), (face, rw1), (face, tb), (yr, tb)]
+        with s.sketch(f"Zone grommet {half} profile", "YZ", offset=x0) as sk:
+            sk.polyline([(y, zt(y, tt)) for y, tt in prof])
+        s.extrude(f"Zone grommet {half}", f"Zone grommet {half} profile", f"pt_x1 + {sq} - ({x0})", body=f"grommet_zone_{half}")
+    for name, x, d in (("GH", "gh_x", "cable_gh_d"), ("Qwiic", "qw_x", "cable_qw_d")):
+        s.cylinder(f"Zone grommet hole {name}", [x, "pt_yh", "pt_z0"], d, "pt_z1 - pt_z0", operation="cut",
+                   targets=["grommet_zone_a", "grommet_zone_b"])
+    # J4: the HCHO pocket's left wall, a notch open at its top
+    p("j4n_y0", "wall + 1.6", "J4 notch's front face in the HCHO pocket's left wall (its flanges clear the lid's front rib)")
+    p("j4n_w", "cable_qw_d + 1.6", "J4 notch's width: 0.8 of TPU round the cable")
+    p("j4n_yc", "j4n_y0 + j4n_w / 2", "derived: J4 cable's y through the wall")
+    p("j4n_zc", "floor_t + 0.8 + cable_qw_d / 2", "derived: J4 cable's z through the wall, the grommet's split")
+    p("j4_fl", 0.8, "J4 grommet's flanges on each face of the wall")
+    wx0, wx1 = "sen_x1 + clr_align", "sen_x1 + clr_align + iwall"
+    s.box("J4 notch", [f"{wx0} - 0.5", "j4n_y0", "floor_t"], ["iwall + 1", "j4n_w", "lid_z0 - floor_t + 0.5"],
           operation="cut", targets=["base_plate"])
-    s.box("J4 grommet", ["sen_x1 + clr_align - 0.3", "wall + 0.6", "floor_t"], ["iwall + 0.6", "grommet_s", "grommet_s"], body="grommet_j4")
-    s.cylinder("J4 grommet hole", ["sen_x1 + clr_align - 1", "wall + 2.6", "floor_t + 2.0"], "cable_qw_d", "iwall + 2",
-               axis="X", operation="cut", targets=["grommet_j4"])
-    s.box("Tongue grommet", ["sfa_x0 + sfa_w / 2 - lid_hole_l / 2", "hy1 - lid_hole_w - 0.6", "lid_z0 - 0.3"], ["lid_hole_l", "lid_hole_w", "lid_t + 0.6"],
-          body="grommet_tongue")
-    s.cylinder("Tongue grommet hole", ["sfa_x0 + sfa_w / 2", "hy1 - 2.1", "lid_z0 - 1"], "cable_qw_d", "lid_t + 2",
-               operation="cut", targets=["grommet_tongue"])
+    for half, z0, z1, zc0, zc1 in (("a", "floor_t", "j4n_zc", f"floor_t - {sq}", "j4n_zc"),
+                                   ("b", "j4n_zc", "lid_z0", "j4n_zc", f"lid_z0 + {sq}")):
+        body = f"grommet_j4_{half}"
+        s.box(f"J4 grommet {half}", [wx0, f"j4n_y0 - {sq}", zc0], ["iwall", f"j4n_w + 2 * {sq}", f"{zc1} - ({zc0})"], body=body)
+        for side, xs in (("out", f"{wx0} - j4_fl"), ("in", wx1)):
+            s.box(f"J4 grommet {half} flange {side}", [xs, "j4n_y0 - j4_fl", z0], ["j4_fl", "j4n_w + 2 * j4_fl", f"{z1} - {z0}"],
+                  operation="join", targets=[body])
+    s.cylinder("J4 grommet hole", [f"{wx0} - j4_fl - 1", "j4n_yc", "j4n_zc"], "cable_qw_d", "iwall + 2 * j4_fl + 2", axis="X",
+               operation="cut", targets=["grommet_j4_a", "grommet_j4_b"])
+    # tongue: the lid's hole, split at its centre
+    p("tg_fl", 0.8, "tongue grommet's flange over the lid, past the hole")
+    p("tg_fl_t", 0.6, "tongue grommet's flange thickness")
+    p("tg_barb", 0.5, "tongue grommet's barb under the lid, past the hole's ends")
+    p("tg_barb_t", 0.4, "tongue grommet's barb thickness, over the SFA40's Qwiic plug (0.4 + 0.09 above it)")
+    top = "lid_z0 + lid_t"
+    for half, xa, sgn in (("a", "lh_x - lid_hole_l / 2", "-"), ("b", "lh_x + lid_hole_l / 2", "+")):
+        body = f"grommet_tongue_{half}"
+
+        def span(xo, xa=xa, sgn=sgn):
+            return (xo, "lh_x") if sgn == "-" else ("lh_x", xo)
+        lo, hi = span(f"{xa} {sgn} {sq}")
+        s.box(f"Tongue grommet {half}", [lo, f"lh_y0 - {sq}", "lid_z0"], [f"({hi}) - ({lo})", f"lid_hole_w + 2 * {sq}", "lid_t"], body=body)
+        lo, hi = span(f"{xa} {sgn} tg_fl")
+        s.box(f"Tongue grommet {half} flange", [lo, "lh_y0 - tg_fl", top], [f"({hi}) - ({lo})", "lid_hole_w + 2 * tg_fl", "tg_fl_t"],
+              operation="join", targets=[body])
+        lo, hi = (f"{xa} - tg_barb", f"{xa} + 0.6") if sgn == "-" else (f"{xa} - 0.6", f"{xa} + tg_barb")
+        s.box(f"Tongue grommet {half} barb", [lo, "lh_y0", "lid_z0 - tg_barb_t"], [f"({hi}) - ({lo})", "lid_hole_w", "tg_barb_t"],
+              operation="join", targets=[body])
+        lo, hi = (xa, f"{xa} + 0.6") if sgn == "-" else (f"{xa} - 0.6", xa)
+        s.box(f"Tongue grommet {half} neck", [lo, "lh_y0", "lid_z0 - tg_barb_t"], [f"({hi}) - ({lo})", "lid_hole_w", "tg_barb_t + lid_t / 2"],
+              operation="join", targets=[body])
+    s.cylinder("Tongue grommet hole", ["lh_x", "lh_y0 + lid_hole_w / 2", "lid_z0 - 1"], "cable_qw_d", "lid_t + tg_fl_t + 2",
+               operation="cut", targets=["grommet_tongue_a", "grommet_tongue_b"])

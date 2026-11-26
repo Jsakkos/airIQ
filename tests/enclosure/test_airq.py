@@ -29,9 +29,10 @@ from sclib import ENCLOSURE, REPO, interface
 
 S = airq.build()
 V = S.v
+GROMMETS = ["grommet_zone_a", "grommet_zone_b", "grommet_j4_a", "grommet_j4_b", "grommet_tongue_a", "grommet_tongue_b"]
 BODIES = ["shell", "base_plate", "zone_wall", "zone_seal", "sen66_foam", "gasket_out", "gasket_in", "sen66_pad", "hcho_lid",
-          "grommet_zone", "grommet_j4", "grommet_tongue"]
-TPU = ["gasket_out", "gasket_in", "zone_seal", "grommet_zone", "grommet_j4", "grommet_tongue"]
+          *GROMMETS]
+TPU = ["gasket_out", "gasket_in", "zone_seal", *GROMMETS]
 # positions Task 3b needs (task-3-scope, M6), fixed here as parameters
 FACE = ["panel_x0", "panel_s0", "bezel", "window_xc", "pocket_x0", "pocket_x1", "led_f0", "led_h_slot", "led_len", "led_z",
         "guide_t", "adapter_x", "adapter_s", "adapter_t", "ffc_len", "j7_x0", "j7_x1", "sw_x", "sw_z", "dot_f", "dot_d",
@@ -249,6 +250,45 @@ def test_hcho_window_shows_only_the_rail_and_the_zone_wall():
         prev = slot_top
 
 
+def test_cables_install_with_their_plugs_on():
+    """Review I2: every cable crossing a sealed wall goes in with both plugs on.
+    - The lid's hole passes the Qwiic plug (its section, the receptacle's, + clr_remove a side):
+      the lid goes on over the SFA40's cable to the tongue.
+    - The zone wall's drawer and the HCHO pocket's J4 notch are open to an edge (the zone wall's
+      left end, the wall's top), so their cables are laid in from the side: no plug passes them
+      (the GH plug, up to 10.75 x 4.25, passes no closed opening at all).
+    - Every grommet is two halves split along its cables, so it closes round them."""
+    assert V("lid_hole_l") >= V("qw_plug_w") + 2 * V("clr_remove") - 1e-9
+    assert V("lid_hole_w") >= V("qw_plug_t") + 2 * V("clr_remove") - 1e-9
+    assert (V("qw_plug_w"), V("qw_plug_t")) == (6.0, 2.95)                          # the check design's own envelopes
+    notch = _feature("Drawer notch")
+    assert V(notch["corner"][0]) < V("-inner_x + clr_remove")                     # through the zone wall's left end
+    assert V(notch["corner"][0]) + V(notch["length"]) == pytest.approx(V("pt_x1"))
+    j4 = _feature("J4 notch")
+    assert V(j4["corner"][2]) + V(j4["height"]) > V("lid_z0")                     # through the wall's top
+    assert V("j4n_w") >= V("cable_qw_d") + 1.6 - 1e-9
+    assert [n for n, *_ in airq_check.PLUG_PASSES] == ["plug_lid"]
+    for a, b in (("grommet_zone_a", "grommet_zone_b"), ("grommet_j4_a", "grommet_j4_b"), ("grommet_tongue_a", "grommet_tongue_b")):
+        assert a in S.bodies and b in S.bodies
+
+
+def test_grommets_squeeze_and_are_held():
+    """Review N4: each grommet is sized at contact plus gasket_squeeze on the faces it seals (the
+    check's touch run proves the contacts) and is held: the drawer halves' ribs sit in the notch's
+    grooves (clr_align round them, inside the zone wall's thickness), the J4 halves straddle the
+    wall with flanges under the lid, the lid halves have a flange over the lid and a barb under it
+    clear of the SFA40's plug."""
+    assert V("groove_d") > V("clr_align") and V("groove_w") - 2 * V("clr_align") >= 0.45
+    assert V("groove_w") < V("zone_t") - 0.8                                           # the zone wall keeps 0.5 a side
+    assert V("pt_y0") - V("groove_d") >= V(airq.C.yb("ledge_z0")) - 1e-9              # the front groove stays in the slant
+    assert V("j4_fl") > 0 and V("tg_fl") > 0 and V("tg_barb") > 0
+    sfa_top = V("floor_t") + V("sfa_bt") + airq_check._SFA("qwiic_h")                 # the SFA40's Qwiic plugs' top
+    assert V("lid_z0") - V("tg_barb_t") > sfa_top                                       # the barbs pass over the rear plug
+    pairs = {frozenset(p) for p in airq_check.TOUCHES}
+    for g in GROMMETS:
+        assert any(g in p for p in pairs), g
+
+
 def test_screw_heads_leave_a_floor():
     assert V("floor_t") - V("head_depth") >= 1.6                                   # M5: >= 1.6 under the head
 
@@ -353,6 +393,23 @@ def test_sen66_at_its_depth_extremes(check):
     assert set(reach) == {("ext_max_plinth", "sen66_pad"), ("ext_min_plinth", "sen66_pad")}, reach
     assert reach[("ext_max_plinth", "sen66_pad")] == pytest.approx(V("pad_t - pad_gap + sen_d_tol"), abs=0.01)
     assert reach[("ext_min_plinth", "sen66_pad")] == pytest.approx(V("pad_t - pad_gap - sen_d_tol"), abs=0.01)
+
+
+def test_plugs_pass_their_openings(check):
+    """Review I2 on the geometry: the Qwiic plug's section swept through the lid's hole meets
+    nothing of the lid, and the open edges' ways out meet nothing of their parts."""
+    plugs = check["plugs"]
+    assert plugs["count"] == 0, [(p["a"], p["b"]) for p in plugs["interferences"]]
+    assert plugs["checked"] == len(airq_check.PLUG_PASSES) + len(airq_check.OPEN_EDGES) + 3
+
+
+def test_grommets_touch_what_they_seal(check):
+    """Review N4: at squeeze 0 the grommets' faces touch their openings (interference 0); at a
+    small squeeze each overlaps the part it seals, so there was no gap."""
+    vols = airq_check.touch_volumes(check["touch"])
+    for a, b in airq_check.TOUCHES:
+        if a.startswith("grommet_"):
+            assert vols[(a, b)] > 0, (a, b)
 
 
 def test_shell_nudged_meets_the_base_only_on_its_datums(check):
