@@ -35,7 +35,8 @@ print and assembly guide (Task 5). The print-test coupons (Task 2) are below.
 | `src/coupons.py` | The print-test coupons' generator |
 | `src/enclosure_common.py` | Shared construction for both enclosures (shell, base plate, zone wall, cradle, gaskets, standoffs, tongue mount) |
 | `src/airq.py` | The airQ enclosure's generator: `airq.sc` |
-| `src/airq_check.py` | The airQ check design (every reference placed), interference and distances |
+| `src/airq_check.py` | The airQ check design: every reference placed, cable keep-outs, air-path probes, the shell's sweep; interference, sections, gasket contact, distances |
+| `src/board_sources.py` | Board positions read from their sources (R27): `interface.yaml` values and comment sizes, and `layout.yaml` placements with footprint courtyards (U2, U4) |
 | `airq.sc` | The airQ enclosure design (committed) |
 | `src/layout_study.py` | The layout studies' section arithmetic for both models (pure Python; `tests/enclosure/test_layout_study.py`) |
 | `coupons.sc` | The coupons design, built from `src/coupons.py` (committed) |
@@ -570,73 +571,168 @@ depth (airQ 55, mini 50) with a horizontal board.
 ## airQ enclosure
 
 `airq.sc`, built from `src/airq.py` with the shared construction in `src/enclosure_common.py`
-(Task 4 reuses it with the mini's values). Task 3a builds the body and the internals; Task 3b
-adds the face features.
+(Task 4 reuses it with the mini's values). Board positions come from `src/board_sources.py`
+(R27). Task 3a builds the body and the internals; Task 3b adds the face features.
 
 **Layout (R22).** The envelope is 95 × 55 × 51 with a 15 mm vertical lower lip. The study's lip
 row needed 95 × 55 × 50.1. Rounding the lip to 15 still fits D 55, which needs 54.62. The face
 needs 1 mm more than the study gave, for the zone wall's ledge between the intake slots and the
-LED slot, so H is 51.
-- The board lies horizontal above the standing SEN66, with the zone wall between.
-- The SEN66's port face faces the front, with its inlet end on the user's left. The square inlet
-  is then high and the round inlet low.
-- The intake plenum is in front of the inlets and under the zone wall's ledge, across the lip.
-- The outlet blows into its ring and runs in a layer in front of the module. It then turns back
-  along the module's right end into the rear plenum behind the outlet grille.
-- The SFA40's sealed pocket is at the rear left, with its own grille in the rear wall.
-- The tongue lies behind the lip in the intake air.
+LED slot, so H is 51. The board lies horizontal above the standing SEN66, with the zone wall
+between.
+
+**SEN66 pose: ports to the rear (fix round 1, judgement call).** The module stands (R17: long
+axis along x, port face vertical) with its port face to the REAR and its inlet end on the user's
+right (square inlet high, round inlet low), against the left rail: x −43.7 … 11.5, y 18.4 … 39.7,
+z 3.0 … 28.6.
+- **Why.** With the ports forward (3a's first pose) the outlet must run along the module's front
+  in the sensor zone, which lies under the zone wall's slant. From the ledge back to the port face
+  that space is 211 mm² in section, and 305 mm² even with the strip under the ledge
+  (`layout_study.front_layer`). The outlet needs 330.1 (R25). The module cannot move back: H1's
+  standoff stands behind it.
+- **Outlet.** It blows straight back through `gasket_out`, a TPU ring (bore ⌀21.0, 346 mm²) seated
+  1 mm deep in the plenum plate. Behind the plate is the outlet plenum, 8.9 mm deep and as wide as
+  the space between the rails, and the outlet grille in the lower rear wall. The plate is the
+  baffle in front of the grille.
+- **Inlets.** The sensor zone is the intake plenum, and the intake slots in the lower front lip
+  are its only opening. The inlets draw from it through the 3.0 mm gap between the port face and
+  the plate (80.7 mm²). `gasket_in`, a TPU strip on the port face between the inlets and the ring,
+  runs from its groove in the floor to the zone wall and separates the port groups.
+- **Antenna (R12).** 16.7 mm from the SEN66.
+
+**The sealed sensor zone (I2, I3).** `base_plate` is the whole footprint and the sensor zone's
+tub, in one print: floor, front lip, rear wall, the side rails under the zone wall's profile, the
+boss pockets, the plenum plate and its rib on the rear wall, the cradle, the HCHO pocket and its
+chimney, and the standoffs with collars.
+- **Zone wall.** It rests on the tub's rim: laps on the rails, the boss pockets, the plate, the rib
+  and the standoff collars. At the front the intake slots leave no room for a lap, so `zone_seal`
+  (TPU) seals the ledge against the lip.
+- **Base to shell.** The joint is lapped: the shell's side walls stand on the floor and end against
+  the full-width rear wall, and the shell sits on the lip's top at the crease.
+- **Bosses.** The front boss pockets keep the shell's floor bosses out of the sensor zone.
+
+**HCHO pocket (R26).** The SFA40 lies flat at the front right (x 13.4 … 38.8, y 9.8 … 35.2),
+opening up, on four pins through its holes.
+- **Lid.** `hcho_lid` closes the pocket, with laps on its walls, the lip rib and three shelves.
+  Four posts on the lid hold the board down, and the tongue lies on the lid.
+- **Grille.** A chimney in front of H2 takes the air to the HCHO grille: five slots in the right
+  rail, behind a window in the shell's right side wall, from the 10 mm line up (67.8 mm² open,
+  ≥ 54.7).
+- **Rear wall.** It stays whole for the outlet grille.
+
+The alternatives, with numbers:
+
+| Alternative | Outlet grille open, 40 % / 50 % (mm²) | Meets 660.1 | Why not |
+|---|---|---|---|
+| 3a as built: SFA40 standing at the rear left, its grille in the rear wall | 408 / 522 | no | the pocket and its plug room take the rear wall's left 34 mm |
+| Narrower pocket, the plug leaving upward | 454 / 567 | no | 25.4 of board + 5 of plug > 26.9 from the floor to the zone wall: it does not fit |
+| Higher open fraction (1.2 slots, 1.2 bars) | 522 (with the 3a pocket) | no | not enough alone |
+| Upper-rear exhaust kept separate | adds nothing | no | the rear wall above the zone wall is the electronics zone's exhaust; joining it would open the outlet path to the case air |
+| SFA40 along the right side wall, low side grille (ports forward) | 658 / 817 | – | H2's standoff stands where the board would; with the ports forward the outlet path has at most 305 mm² (R25) |
+| **Chosen: ports to the rear; SFA40 flat at the front right under the tongue, its grille in the right side** | – / **664.3** (32 slots) | **yes** | 40 % over the plenum's 83.8 mm would give 581, so the grille is 50 % open |
+
+`layout_study.hcho_alternatives` computes the table, counting whole slots.
+
+**Tongue (M4).** It lies on the HCHO lid, turned 180°, 4.6 mm behind the lip (x 12.8 … 34.8,
+y 6.4 … 19.4, z 8.6).
+- **Air.** The intake slots in front of it feed a 4.6 mm channel. The channel's side exits
+  (2 × 24.0 mm²) pass more than those slots' open area (35.3 mm²).
+- **Distances.** It is 20.9 mm from U3 and 29.5 mm from U2 (≥ 20).
+- **Light sensor.** Its VEML7700 sets the light-sensor window (x 16.4, z 12.1).
+
+**Cables (I2).** Keep-outs in the check design hold the plugs and the routes.
+- **SEN66 → J2.** The cable leaves the connector on the module's connector face (front) and goes
+  down, then left along the floor in front of the module. It rises through `grommet_zone` in the
+  zone wall's slant at the left, left of the adapter and behind the folded tail, and runs over the
+  zone wall to J2.
+- **Tongue and SFA40 → J4.** J3 cannot take a plug in the airQ: the panel and the light guide
+  stand 1.4 mm into the plug's path at the board's front edge (owner item). The tongue therefore
+  chains through the SFA40's two Qwiic ports, on the same I2C nets (`interface.yaml`
+  J_QWIIC_TONGUE = J_QWIIC_AUX):
+  - SFA40 J1 → tongue, through `grommet_tongue` in the lid;
+  - SFA40 J2 → `grommet_j4` in the pocket's left wall → along the floor → `grommet_zone` → J4.
 
 **Print split (R24) and assembly (I1).**
-- `shell` holds the 30° face, the top and both sides. It prints face down on textured PEI.
-- `base_plate` is a U of the floor, the vertical front lip carrying the intake slots, and the
-  rear wall, with the two board standoffs joined to it. It prints floor down: the lip, the rear
-  wall, the posts and the grilles stand vertical and need no supports.
-- The shell goes on last, lowered onto the base along −z, after the zone wall, the SEN66, the
-  tongue and the board.
-- Fastening, three M2 screws into heat-set inserts in the shell:
-  - two front floor bosses, screwed from underneath (heads under the felt feet). They pass the
-    zone wall through notches in its ledge on the way down, clear of the board's footprint.
-  - one rear boss under the top wall at the rear left, screwed through the base's rear wall. It
-    is 69 mm from the antenna. The rear face may show a fastener; the front and sides do not.
-- `airq_check.insertion_probe` checks this path (`test_shell_lowers_onto_the_base`).
-- The screw counterbores leave 1.6 mm of floor under the heads.
+- **Shell.** `shell` holds the 30° face, the top and both sides. It prints face down on textured
+  PEI.
+- **Base.** `base_plate` prints floor down, so every wall, post, rib and grille slot stands
+  vertical.
+- **Others.** `zone_wall` and `hcho_lid` print flat. The TPU parts (`gasket_out`, `gasket_in`,
+  `zone_seal` and the grommets) print in TPU 95A, sized at contact plus `gasket_squeeze` (0.3).
+- **Order:**
+  1. inserts;
+  2. base;
+  3. SFA40 with its two cables, the grommets and the lid;
+  4. tongue and its cable;
+  5. SEN66 with its gaskets and cable;
+  6. cables through `grommet_zone`;
+  7. zone wall, with `zone_seal`;
+  8. board, then the cables into J2 and J4;
+  9. light guides;
+  10. shell, lowered along −z;
+  11. feet.
+- **Fastening:** three M2 screws into heat-set inserts in the shell.
+  - Two front floor bosses take screws from underneath, the heads under the felt feet. On the way
+    down the bosses pass the zone wall's notches, and they end up standing in the boss pockets.
+  - One rear boss under the top wall at the rear left takes a screw through the rear wall (R29).
+  - The counterbores leave 1.6 mm of floor under the heads.
+- **Way on.** The check design sweeps the shell's bosses from their place up past the top, and
+  copies the whole shell raised 1, 2, 4, 8, 16 and 32 mm. None of them meets the base, the zone
+  wall, the board, the SEN66, the tongue, the SFA40 or the cable keep-outs. The panel and the
+  adapter ride in the shell, so they are left out of that pairing.
+
+**USB-C support (M7).** H1, 7.7 mm from J1's centre, is joined to the plenum plate, which spans
+the base between the rails from the floor to the zone wall. So H1 stands free for only 2.1 mm
+under the board. The plug's push goes J1 → board → H1's screw → H1 → plate → floor and rails.
 
 **Bodies** (volume in mm³; size and minimum corner in mm):
 
 | Body | Volume | Size | Min corner | What, material |
 |---|---|---|---|---|
-| `shell` | – | 95.00 × 55.00 × 51.00 | −47.5, 0, 0 | 30° face, top and sides (R24); three M2 insert bosses; the panel pocket. Shell material |
-| `base_plate` | – | 95.00 × 55.00 × 49.00 | −47.5, 0, 0 | floor, front lip and rear wall (a U, R24), screw counterbores, standoffs H1 (the USB-C support) and H2, the HCHO grille |
-| `zone_wall` | 9348 | 91.00 × 51.00 × 16.90 | −45.5, 2.0, 13.8 | ledge behind the lip, slanted part behind the panel, horizontal part over the SEN66 |
-| `sen66_foam` | 1176 | 55.20 × 21.30 × 1.00 | −45.5, 20.0, 2.0 | the 1 mm foam under the SEN66 |
-| `sen66_cradle` | 236 | 36.85 × 1.60 × 4.00 | −45.5, 41.45, 2.0 | rear rail (stops short of the H1 standoff) |
-| `sen66_end_stop` | 148 | 1.60 × 23.05 × 4.00 | 9.85, 20.0, 2.0 | right-end stop |
-| `gasket_out` | 212 | 24.00 × 2.00 × 24.00 | −15.1, 18.0, 3.8 | outlet ring on the port face. TPU 95A |
-| `gasket_in` | 179 | 26.70 × 3.20 × 2.80 | −45.5, 16.8, 26.1 | seal along the SEN66's top front edge, under the zone wall. TPU 95A |
-| `tongue_mount` | 1085 | 22.00 × 7.00 × 9.60 | −41.0, 8.2, 2.0 | pedestal and locating pin for the tongue |
-| `hcho_pocket` | 1787 | 32.10 × 6.60 × 26.90 | −45.5, 46.4, 2.0 | SFA40 pocket walls |
-| `outlet_duct` | 2308 | 64.30 × 7.80 × 26.90 | −18.8, 12.2, 2.0 | outlet layer's front and left walls |
-| `baffle` | 1537 | 26.65 × 6.90 × 26.90 | −13.4, 41.3, 2.0 | wall in front of the outlet grille, and the cable bay's side |
+| `shell` | 17666 | 95.00 × 55.00 × 49.00 | −47.5, 0, 2.0 | 30° face, top and sides (R24); three M2 insert bosses; the panel pocket; the HCHO window. Shell material |
+| `base_plate` | 30370 | 95.00 × 55.00 × 49.00 | −47.5, 0, 0 | the tub: floor, lip, rear wall, side rails, boss pockets, plenum plate and rib (the plan's `baffle` and outlet duct), cradle (`sen66_cradle`), HCHO pocket and chimney (`hcho_pocket`), SFA40 pins, standoffs H1 and H2 with collars, the HCHO grille, screw counterbores |
+| `zone_wall` | 9096 | 91.00 × 50.00 × 16.90 | −45.5, 3.0, 13.8 | ledge behind the lip, slanted part behind the panel, horizontal part over the SEN66 and the plenum; the cable pass-through |
+| `zone_seal` | 140 | 77.80 × 1.50 × 1.20 | −38.9, 1.5, 13.8 | the ledge's seal against the lip. TPU 95A |
+| `sen66_foam` | 1176 | 55.20 × 21.30 × 1.00 | −43.7, 18.44, 2.0 | the 1 mm foam under the SEN66 |
+| `gasket_out` | 456 | 24.00 × 4.30 × 24.00 | −42.9, 39.44, 3.8 | outlet ring, from the port face to its seat in the plate. TPU 95A |
+| `gasket_in` | 192 | 1.60 × 4.30 × 27.90 | −1.3, 39.44, 1.0 | strip between the inlets and the ring. TPU 95A |
+| `hcho_lid` | 1486 | 27.90 × 37.74 × 7.59 | 11.65, 2.0, 3.6 | the HCHO pocket's lid, with the SFA40's hold-downs and the tongue's pin (the plan's `tongue_mount`) |
+| `grommet_zone` | 194 | 6.30 × 4.40 × 12.00 | −43.6, 9.8, 13.5 | SEN66 and Qwiic cables through the zone wall. TPU 95A |
+| `grommet_j4` | 25 | 2.20 × 4.00 × 4.00 | 11.35, 2.4, 2.0 | Qwiic cable out of the HCHO pocket. TPU 95A |
+| `grommet_tongue` | 19 | 5.00 × 3.00 × 1.80 | 23.6, 34.54, 7.09 | Qwiic cable through the lid to the tongue. TPU 95A |
+
+The sizes include `gasket_squeeze` 0.3; the check design sets it to 0.
 
 **Parameters Task 3b and Task 4 use.** The plan's names are `W`, `D`, `H`, `tilt_deg`, `wall`,
-`grille_min_z`, `slot_w`, `clr_align`, `clr_remove`, `clr_snap`, plus `lip`. The plan's `floor`
-is named `floor_t`, because SolidCraft reserves `floor` (a function). The positions 3b needs:
-- panel: `panel_x0`, `panel_s0`, `bezel`, `window_xc`;
+`grille_min_z`, `slot_w`, `clr_align`, `clr_remove`, `clr_snap`, plus `lip` and `gasket_squeeze`.
+The plan's `floor` is named `floor_t`, because SolidCraft reserves `floor` (a function). The
+positions 3b needs (M6):
+- panel and its pocket: `panel_x0`, `panel_s0`, `bezel`, `window_xc`, `pocket_x0`, `pocket_x1`;
 - LED slot and light guide: `led_f0`, `led_h_slot`, `led_len`, `led_z`, `guide_t`;
 - adapter: `adapter_x`, `adapter_s`, `adapter_t`;
-- FFC: `ffc_len` (100 mm: about 45 of route plus a service loop of about 50, so the shell can lie
-  beside the base while the FFC is plugged in), into `j7_x0` … `j7_x1`;
+- FFC: `ffc_len` into `j7_x0` … `j7_x1`. The 100 mm is about 45 of route plus a service loop of
+  about 50, so the shell can lie beside the base while the FFC is plugged in;
 - dot and flexure on SW1's push axis: `sw_x`, `sw_z`, `dot_f`, `dot_d`;
-- light-sensor window: `lsw_x`, `lsw_z`, `lsw_d`;
-- intake slots: `slot_row1_z`, `slot_row2_z`;
+- light-sensor window: `lsw_x`, `lsw_z`, `lsw_d`, and its gap in the slot rows, `lsw_gap_x0` …
+  `lsw_gap_x1`;
+- intake rows: `slot_row1_z`, `slot_row2_z`, `row_x0` … `row_x1` (between the boss pockets) and
+  `slot_bar`. With 1.2 bars they give 154.8 mm² open;
+- outlet grille: `out_gx0` … `out_gx1`, `out_gz0` … `out_gz1`, `out_pitch` 2.4, `out_n` 32;
+- upper-rear exhaust: `exh_x0` … `exh_x1`, `exh_z0` … `exh_z1`, kept apart from the outlet;
 - USB-C: `usb_x`, `usb_z`, `usb_well` (6.6), `usb_chamfer`.
 
-The board's front edge `board_y0` is the study's binding constraint written as an expression: the
-LED faces' corner with the panel and the light guide in front of it.
+The board's front edge `board_y0` is the study's binding constraint, written as an expression: the
+corner of the LED faces, with the panel and the light guide in front of it.
 
-**Check design.** `uv run --with pyyaml python enclosure/src/airq_check.py --run` places all six
-references in `.build/airq-check.sc` (`ref_main` only there, R8), runs the interference check and
-prints the distances. `tests/enclosure/test_airq.py` repeats it.
+**Check design.** `uv run --with pyyaml python enclosure/src/airq_check.py --run` builds
+`.build/airq-check.sc` (`ref_main` only there, R8). It holds the six references, the cable
+keep-outs (`ko_*`), the air probes (`air_*`) and the shell's sweep (`sweep_*`, `shell_up_*`), at
+`gasket_squeeze` 0. The script then:
+1. runs the interference check;
+2. measures the probes' sections;
+3. checks the gaskets' contact;
+4. prints the distances.
+
+`tests/enclosure/test_airq.py` repeats it.
 
 ### Check table
 
@@ -645,16 +741,26 @@ Task 3a filled the rows its features answer. Task 3b completes the table.
 | Check | Rule | Value | How measured | Result |
 |---|---|---|---|---|
 | Envelope | 95 × 55 × 48 ±1, R22: 95 × 55 × ≈50 | 95.00 × 55.00 × 51.00 | `measure`, union of the bodies (`test_build_and_bounding_box`) | pass (R22; H 51 recorded) |
-| Interference with the references | 0 overlapping volume (R9) | 0 pairs; 357 bodies checked, 0 unchecked | `inspect.interference` on the check design; each reference's own internal overlaps excluded | pass |
-| Rebuild over the parameter range | no errors | wall 1.6 and 2.4, `clr_*` ±0.1: no feature errors, 12 bodies each, volume back to 57392.3 | `parameters.change` + `document.inspect` walk (`test_rebuilds_over_wall_and_clearances`) | pass |
-| Antenna to SEN66 | ≥ 15 (R12) | 17.8 | box distance from the placements (`airq_check.distances`) | pass |
+| Interference | 0 overlapping volume (R9) | 0 pairs; 399 bodies checked (all six references, `ref_main`'s 308 included; the keep-outs, probes and sweep), 0 unchecked | `inspect.interference` on the check design at `gasket_squeeze` 0; each reference's own internal overlaps excluded | pass |
+| Shell's way on (I1) | the shell lowers along −z onto the assembled base | swept boss columns and the shell raised 1–32 mm: 0 overlap | as above (`sweep_*`, `shell_up_*`) | pass |
+| Gaskets touch the SEN66 and the lip | zero gap, zero overlap (R9) | 0 at squeeze 0; at 0.05: ring 5.30, strip 2.05, ledge seal 4.67 mm³ (contact area × 0.05) | interference at two `gasket_squeeze` values (`test_gaskets_touch_what_they_seal`) | pass |
+| Rebuild over the parameter range | no errors | wall 1.6 and 2.4, `clr_*` ±0.1: no feature errors, 11 bodies each, volume back to the default | `parameters.change` + `document.inspect` walk (`test_rebuilds_over_wall_and_clearances`) | pass |
+| Intake path (R25) | ≥ 77.3 | gap at the inlets 80.7; in front of the SEN66 118.4; over the HCHO lid 401.4 | free probe boxes, sections from `measure` (`test_air_paths_are_free_sections`) | pass |
+| Outlet path (R25) | ≥ 330.1 | ring bore 346.4; plenum branches (section / share of 330.1 by grille slots): ring to H1 235.7 / 226.9, at H1 204.6 / 185.7, right of H1 224.1 / 165.1 | as above | pass |
+| HCHO path (R25) | ≥ 27.4 (the SFA40's opening) | over the cap 35.6; window into the chimney 47.2; chimney 30.3 | as above | pass |
+| Outlet grille (R18, R26) | ≥ 660.1, lower edge ≥ 10 | 664.3 (32 slots × 1.2 × 17.3, parameters for 3b); z 10 | arithmetic from the parameters; 3b cuts it | pass (by parameters) |
+| Intake rows (R18, M6) | ≥ 154.5 | 154.8 (two rows between the boss pockets, without the window's gap) | arithmetic from the parameters; 3b cuts them | pass (by parameters), small margin |
+| HCHO grille | ≥ 2 × the SFA40 opening (54.7), lower edge ≥ 10 | 67.8 mm²; z 10 | slot sizes (cut in 3a) | pass |
+| Tongue's slots (M4) | the slots in front of the tongue stay open | channel exits 48.0 ≥ the slots' 35.3 | probes `air_tongue_*` | pass |
+| Antenna to SEN66 | ≥ 15 (R12) | 16.7 | box distance from the placements (`airq_check.distances`) | pass |
 | Antenna to the USB plug and cable | ≥ 15 (R12) | 18.6 | as above, 12.5 × 7 overmold | pass |
-| Antenna to the inserts and screws | ≥ 15 (R12) | 23.8 (shell bosses), 21.8 (standoff screws) | as above | pass |
-| Tongue to U3 / U2 | ≥ 20 | 50.5 / 42.5 | as above | pass |
-| Support boss near the USB-C | within 8 mm | H1 standoff: 7.7 to J1's centre, 3.2 to its shell | as above (interface.yaml H1, J1) | pass |
-| HCHO grille | open area ≥ 2 × the SFA40 opening (54.7); lower edge ≥ 10 | 67.2 mm²; lower edge z 11.0 | slot sizes | pass |
-| Antenna end to the rear wall | inside the case | 0.58 mm (default wall). At wall 2.4 the inner face reaches the strip: D needs +0.1 there | arithmetic | pass at the default, note at wall 2.4 |
-| Intake and outlet grilles, LED/guide wall, MS5611 line of sight, light-sensor window, USB-C opening | plan, R13 | – | Task 3b | pending (3b) |
+| Antenna to the inserts and screws | ≥ 15 (R12) | 45.5 (shell bosses), 21.8 (standoff screws) | as above | pass |
+| Antenna to the SFA40 | its metal is kept out of the 15 mm too | 28.5 | as above | pass |
+| Tongue to U3 / U2 | ≥ 20 | 20.9 / 29.5 (U2 from `layout.yaml` and its courtyard) | as above | pass |
+| Support boss near the USB-C (M7) | within 8 mm, stiff | H1: 7.7 to J1's centre, 3.2 to its shell; braced by the plenum plate, 2.1 mm free | as above | pass |
+| Antenna end to the rear wall | inside the case | 0.58 mm at the default wall. At wall 2.4 the inner face reaches the strip, so D needs +0.1 there | arithmetic | pass at the default, note at wall 2.4 |
+| Positions from their sources (R27) | read, not retyped | every board and reference position compared with `interface.yaml`, the references and `layout.yaml` | `test_positions_are_read_from_their_sources`, `test_generator_retypes_no_board_numbers` | pass |
+| Intake to outlet grille ≥ 20, LED/guide wall, MS5611 line of sight, light-sensor window, USB-C opening | plan, R13 | – | Task 3b | pending (3b) |
 
 ## Sources
 
@@ -694,6 +800,16 @@ These values are parameters, so a correction is a parameter change and a rebuild
 - The FPC height above the panel back (`tail_z`, 0.6, scaled from the side view).
 - The hatched block: its position, and its thickness, which is taken as the panel's.
 - The folded tail's `fold_out` (0.5) and `fold_r` (1.0). Check both on a real panel and adapter.
+
+**airQ cables and plugs** (the check design's keep-outs are envelopes)
+
+- The SEN66's connector: its place on the connector face (x 17–29 from the inlet end, scaled) and
+  its mating direction. The keep-out takes a plug 5 mm out of the face with its cable bending down.
+- The plugs' sizes (JST GH 6-pin, JST SH Qwiic) and the cables' diameters (`cable_gh_d` 3.0,
+  `cable_qw_d` 2.4). The SFA40's rear plug has about 3.0 mm before the pocket's rear wall.
+- J3 (the tongue's Qwiic on the main board) cannot take a plug in the airQ: the panel and the
+  light guide stand in its path. The tongue chains through the SFA40 to J4 instead (owner item; a
+  PCB change could move J3).
 
 **SFA40**
 

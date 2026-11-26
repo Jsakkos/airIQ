@@ -29,6 +29,7 @@ import math
 from dataclasses import dataclass, replace
 from functools import lru_cache
 
+import board_sources as B
 from sclib import mechanical
 
 
@@ -225,7 +226,7 @@ def front_layer(m: Model, y_port: float, under_ledge: bool = False, step: float 
     in front of the SEN66's port face (at y_port) under the zone wall. That is the most an outlet
     duct running along the module's front, to its end and back, can have (R25 needs 330.1).
     under_ledge: also take the strip under the ledge, which is the intake slots' plenum."""
-    y0 = m.wall if under_ledge else (m.lip - SLAB - m.lip) * m.s / m.c + (ZW_TF + m.zone_wall) / m.c
+    y0 = m.wall if under_ledge else (ZW_TF + m.zone_wall - SLAB * m.s) / m.c       # the ledge's back edge
     n = int((y_port - y0) / step)
     return sum((_z_under(m, y0 + (i + 0.5) * step) - m.floor) * step for i in range(n))
 
@@ -285,7 +286,9 @@ def board_points() -> tuple:
     j2, j3, j5 = m["j_sen66"]["body"], m["j_qwiic_tongue"]["body"], m["j_led_ext"]["body"]
     usb = m["usb_c"]
     btn = m["button"]
-    mod_h, qwiic_h, led_h, fpc_h, sw_h, usb_len = 3.1, 2.9, 2.0, 2.0, 3.3, 7.35   # interface.yaml comments
+    # interface.yaml gives these only in comments: board_sources reads them (R27, not retyped)
+    mod_h, qwiic_h, led_h, fpc_h, sw_h, usb_len = (B.module_h(), B.connector_h("j_qwiic_tongue"), B.led_body_h(),
+                                                   B.j7_body()[2], B.sw_body_h(), B.usb_len())
     return (
         (mod[0][1], 0.0, "antenna"), (mod[0][1], mod_h, "antenna"), (mod[1][1], mod_h, "panel"),
         (0.0, usb["shell"][1], "panel"), (usb_len, usb["shell"][1], "panel"),
@@ -410,7 +413,7 @@ def pose(m: Model, alpha_deg: float) -> dict | None:
     else:
         usb_exit_z = math.inf
     pts = [dev(Y, Z) for Y, Z, _ in board_points()]
-    ant = [dev(Y, Z) for Y in (mb["antenna"]["module_body"][0][1], 0.0) for Z in (0.0, 3.1)]
+    ant = [dev(Y, Z) for Y in (mb["antenna"]["module_body"][0][1], 0.0) for Z in (0.0, B.module_h())]
     ant_end = dev(mb["antenna"]["module_body"][0][1], 0.0)
     tpb = (m.bezel + r["panel_t"]) if m.front == "panel" else m.wall
     lowest = min(p[1] for p in pts)
