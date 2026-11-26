@@ -35,6 +35,7 @@ import airq
 import board_sources as B
 import enclosure_common as C
 import encbuild
+import ref_sen66
 import ref_sfa40
 from sclib import ENCLOSURE
 
@@ -44,7 +45,9 @@ REFS = ("ref_sen66", "ref_epd", "ref_fpc_adapter", "ref_sfa40", "ref_tongue", "r
 SHELL_BORNE = ("ref_epd", "ref_fpc_adapter")     # the panel and the adapter are in the shell and come down with it
 SWEEP_DZ = (1, 2, 4, 8, 16, 32)                  # the shell's raised copies (mm along +z)
 TOUCH_SQUEEZE = 0.05                             # the gaskets overlap their seats by this much when they touch at 0
-TOUCHES = (("gasket_out", "sen66_body"), ("gasket_in", "sen66_body"), ("zone_seal", "base_plate"))
+TOUCHES = (("gasket_out", "sen66_body"), ("gasket_in", "sen66_body"), ("zone_seal", "base_plate"), ("sen66_pad", "sen66_body"))
+# every squeeze and preload: 0 in the check (R9: faces touch), TOUCH_SQUEEZE in the touch run
+SQUEEZES = ("gasket_squeeze", "wiper_squeeze", "pad_squeeze", "ring_preload")
 
 
 def _rows(rot, t):
@@ -84,6 +87,7 @@ J4 = B.MAIN["j_qwiic_aux"]["body"]
 TQ = B.TONGUE["qwiic"]
 TQH = B.connector_h("qwiic", board="tongue")
 _SFA = ref_sfa40.build().v
+_SEN = ref_sen66.build().v
 SFA_QW = (f"sfa_x0 + {_SFA('qwiic_y')} - {_SFA('qwiic_w')} / 2", f"sfa_x0 + {_SFA('qwiic_y')} + {_SFA('qwiic_w')} / 2")   # its Qwiic plugs' x span (ref_sfa40)
 
 
@@ -172,7 +176,7 @@ def air_probes(s) -> list[dict]:
     return [
         _box("air_intake_gap", "inlet_x0", "sen_y1", "floor_t", "sen_x1", "plate_y0", "zw_z0"),
         _box("air_intake_front", "plug_x1 + 1.5", "wall + 0.1", "floor_t + 3.8", "plug_x1 + 2.0",
-             "sen_y0 - clr_align - iwall", "ledge_z0"),
+             "sen_y0 - sen_d_tol - clr_align - iwall", "ledge_z0"),
         _box("air_intake_right", "hx0", "cy1 + iwall + 0.5", "tongue_z0 + tongue_t + 3.0", "h2_x - standoff_d / 2 - collar_w - 0.1", "cy1 + iwall + 1.0", "zw_z0"),
         _cyl("air_outlet_ring", ["outlet_x", "sen_y1", "outlet_z"], "ring_bore", "plate_y1 - sen_y1", axis="Y"),
         _box("air_outlet_right", "h1_x + standoff_d / 2 + 0.3", "plate_y1", "floor_t", "h1_x + standoff_d / 2 + 0.7",
@@ -241,6 +245,34 @@ def window_backing(s) -> dict:
     return out
 
 
+EXTREME_PARTS = ("base_plate", "zone_wall", "sen66_pad", "gasket_out", "gasket_in")
+
+
+def extremes(s) -> list[dict]:
+    """I3(b): the front of the SEN66 at its depth tolerance's ends, its port face on the ring (the
+    datum): `ext_max_*` 21.8 deep (its plinth, inset plinth_in, and a slice of the block behind
+    it), `ext_min_plinth` 20.8 deep. Only the pad may meet them."""
+    pin = _SEN("plinth_inset")
+    ph = _SEN("H") - _SEN("block_h")
+    fx = ("sen_x0", "sen_x1")
+    z0, z1 = "floor_t + foam", "sen_top"
+    out = []
+    for tag, dy in (("max", "- sen_d_tol"), ("min", "+ sen_d_tol")):
+        y = f"sen_y0 {dy}"
+        out.append(_box(f"ext_{tag}_plinth", f"{fx[0]} + {pin}", y, f"{z0} + {pin}", f"{fx[1]} - {pin}", f"{y} + {ph}", f"{z1} - {pin}"))
+    out.append(_box("ext_max_block", fx[0], f"sen_y0 - sen_d_tol + {ph}", z0, fx[1], f"sen_y0 - sen_d_tol + {ph} + 0.5", z1))
+    return out
+
+
+def extreme_reach(ext: dict) -> dict:
+    """{(probe, body): its overlap's depth along y} from the extremes run."""
+    out = {}
+    for p in ext["interferences"]:
+        a, b = (p["a"], p["b"]) if p["a"].startswith("ext_") else (p["b"], p["a"])
+        out[(a, b)] = p["bbox"]["max"][1] - p["bbox"]["min"][1]
+    return out
+
+
 def check_bodies(s) -> list[str]:
     names = []
     for c in keepouts(s) + air_probes(s) + sweeps(s):
@@ -271,7 +303,7 @@ def check_script(save: Path = CHECK_SC, budget_s: float = 900) -> dict:
         if "configuration" in pl:
             params["configuration"] = pl["configuration"]
         steps.append({"command": "component.insert_design", "params": params})
-    steps.append({"command": "parameters.change", "params": {"changes": {"gasket_squeeze": "0 mm"}}})
+    steps.append({"command": "parameters.change", "params": {"changes": {n: "0 mm" for n in SQUEEZES}}})
     extra = keepouts(s) + air_probes(s) + sweeps(s)
     steps += extra
     names = check_bodies(s)
@@ -294,10 +326,21 @@ def check_script(save: Path = CHECK_SC, budget_s: float = 900) -> dict:
         "budget_s": 120, "bodies": [*names_w, "shell", "base_plate", "zone_wall"],
         "exclude_pairs": [[a, b] for i, a in enumerate(names_w) for b in names_w[i + 1:]]
         + [["shell", "base_plate"], ["shell", "zone_wall"], ["base_plate", "zone_wall"]]}})
-    steps.append({"command": "parameters.change", "params": {"changes": {"gasket_squeeze": f"{TOUCH_SQUEEZE} mm"}}})
+    # I3(b): the SEN66 at the ends of its depth tolerance, its port face on the ring: the front of
+    # the deepest module clears the cradle and the zone wall, and the pad (free) still presses the
+    # shallowest one
+    ext = extremes(s)
+    steps += ext
+    names_e = [c["params"]["body_name"] for c in ext]
+    steps.append({"command": "parameters.change", "params": {"changes": {"pad_squeeze": f"{s.v('pad_t - pad_gap')} mm"}}})
+    mark["extremes"] = len(steps)
+    steps.append({"command": "inspect.interference", "params": {
+        "budget_s": 120, "bodies": [*names_e, *EXTREME_PARTS],
+        "exclude_pairs": [[a, b] for i, a in enumerate(names_e) for b in names_e[i + 1:]]}})
+    steps.append({"command": "parameters.change", "params": {"changes": {n: f"{TOUCH_SQUEEZE} mm" for n in SQUEEZES}}})
     mark["touch"] = len(steps)
     steps.append({"command": "inspect.interference", "params": {"budget_s": 120, "bodies": sorted({b for p in TOUCHES for b in p})}})
-    steps.append({"command": "parameters.change", "params": {"changes": {"gasket_squeeze": "0 mm"}}})
+    steps.append({"command": "parameters.change", "params": {"changes": {n: "0 mm" for n in SQUEEZES}}})
     steps.append({"command": "file.save", "params": {"path": str(save), "cache": False}})
     return {"commands": steps, "mark": mark}
 
@@ -318,7 +361,7 @@ def run(cli: str | None = None) -> dict:
         raise RuntimeError(f"check run failed: {res if isinstance(res, dict) else proc.stderr or proc.stdout}")
     m = sc["mark"]
     return {"inserted": res[:6], "interference": res[m["interference"]], "measure": res[m["measure"]],
-            "touch": res[m["touch"]], "nudge": res[m["nudge"]], "window": res[m["window"]]}
+            "touch": res[m["touch"]], "nudge": res[m["nudge"]], "window": res[m["window"]], "extremes": res[m["extremes"]]}
 
 
 def nudge_faults(nudge: dict, s=None) -> list[str]:
@@ -458,6 +501,38 @@ def distances(s=None) -> dict:
     }
 
 
+TPU_E = (26.0, 50.0)        # TPU 95A tensile modulus range, MPa (filament data sheets; the print decides)
+
+
+def sen66_hold(s=None) -> dict:
+    """I3(b), arithmetic: the SEN66 is held by its port face on the outlet ring's land (its rear
+    stop) and by the pad at its front; its depth tolerance goes into the pad.
+    - pad_compression: the pad's compression at 20.8, 21.3 and 21.8 deep (of pad_t);
+    - front_clear_rail / front_clear_slant: a 21.8 module's connector face to the right rail, and
+      its plinth's top front edge to the zone wall's slant (the plinth is inset plinth_inset);
+    - wiper_force: the inlet blade's push on the port face for TPU_E (cantilever, 3 E I / L^3
+      along the blade, over the module's height, the axial part sin^2 of its lean);
+    - pad_force_min: the least pad force that keeps the ring's reaction inside its bore's circle
+      against the blade's moment about the outlet axis (no tipping, no yaw)."""
+    s = s or airq.build()
+    v = s.v
+    tol, gap, t = v("sen_d_tol"), v("pad_gap"), v("pad_t")
+    comp = {d: 1 - (gap + k * tol) / t for d, k in ((21.3 - 0.5, 1), (21.3, 0), (21.3 + 0.5, -1))}
+    front = v("sen_y0") - tol
+    pin = _SEN("plinth_inset")
+    z_edge = v("sen_top") - pin
+    y_slant = v(C.yb(str(z_edge)))
+    rail_r = v("sen_y0 - sen_d_tol - clr_align")
+    a = math.radians(s.params["wiper_deg"].value)
+    L = (v("plate_y0") - v("sen_y1") + v("wiper_squeeze")) / math.cos(a)
+    inertia = v("wiper_t") ** 3 / 12
+    force = [3 * e * inertia / (L ** 3 * math.sin(a) ** 2) * v("sen_up") * v("wiper_squeeze") for e in TPU_E]
+    arm = abs((v("wiper_x1") - v("wiper_lean") - v("wiper_w") / 2) - v("outlet_x"))
+    return {"pad_compression": comp, "front_clear_rail": front - rail_r, "front_clear_slant": front - y_slant,
+            "wiper_force": tuple(force), "pad_force_min": max(force) * (1 + arm / (v("ring_bore") / 2)),
+            "pad_pressure_kpa_min": max(force) * (1 + arm / (v("ring_bore") / 2)) / (v("pad_w") * v("pad_h")) * 1000}
+
+
 def intake_open(s) -> float:
     """Open area of the two intake rows (1.2 slots, slot_bar bars) between row_x0 and row_x1 with
     the light-sensor window's gap: each span holds slots end to end with bars between."""
@@ -514,6 +589,7 @@ if __name__ == "__main__":
         print("nudge (N1):", [(p["a"], p["b"], round(p["volume_mm3"], 3), [round(c, 3) for c in p["bbox"]["min"]],
                                [round(c, 3) for c in p["bbox"]["max"]]) for p in r["nudge"]["interferences"]],
               "faults:", nudge_faults(r["nudge"]) or "none")
+        print("extremes (I3b) overlap depth along y:", {f"{a}|{b}": round(x, 3) for (a, b), x in extreme_reach(r["extremes"]).items()})
         need = window_backing(airq.build())
         print("window (N2) fill / need / shell:", {k: (round(f, 2), round(need[k], 2), round(sh, 3))
                                                    for k, (f, sh) in window_fill(r["window"]).items()})

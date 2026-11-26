@@ -29,7 +29,7 @@ from sclib import ENCLOSURE, REPO, interface
 
 S = airq.build()
 V = S.v
-BODIES = ["shell", "base_plate", "zone_wall", "zone_seal", "sen66_foam", "gasket_out", "gasket_in", "hcho_lid",
+BODIES = ["shell", "base_plate", "zone_wall", "zone_seal", "sen66_foam", "gasket_out", "gasket_in", "sen66_pad", "hcho_lid",
           "grommet_zone", "grommet_j4", "grommet_tongue"]
 TPU = ["gasket_out", "gasket_in", "zone_seal", "grommet_zone", "grommet_j4", "grommet_tongue"]
 # positions Task 3b needs (task-3-scope, M6), fixed here as parameters
@@ -254,9 +254,30 @@ def test_screw_heads_leave_a_floor():
 
 
 def test_gaskets_have_a_squeeze_and_seats():
-    """I3/R9: the TPU parts are sized at contact plus gasket_squeeze; the check runs at 0."""
-    assert V("gasket_squeeze") > 0 and V("seat_d") > 0
-    assert "gasket_squeeze" in json.dumps(airq_check.check_script()["commands"][6])
+    """I3/R9: the TPU parts are sized at contact plus their squeeze; the check runs at 0."""
+    assert V("gasket_squeeze") > 0 and V("seat_d") > 0 and V("wiper_squeeze") > 0 and V("pad_squeeze") > 0
+    first = json.dumps(airq_check.check_script()["commands"][6])
+    assert all(n in first for n in airq_check.SQUEEZES)
+
+
+def test_sen66_held_over_its_depth_tolerance():
+    """I3(b): the port face rests on the outlet ring's land (ring_preload 0: the ring is the stop),
+    so the seals see the same port face at 20.8, 21.3 and 21.8 deep; the pad at the front takes the
+    tolerance between 33 and 67 % compression; a 21.8 module still clears the guide rail and the
+    zone wall's slant; and the pad's force (through the ring's axis) beats the soft inlet blade's
+    moment, so the module cannot tip or yaw off the ring."""
+    h = airq_check.sen66_hold(S)
+    assert V("ring_preload") == 0 and V("pad_y0") + V("pad_gap") == pytest.approx(V("sen_y0"))
+    comp = h["pad_compression"]
+    assert 0.25 <= min(comp.values()) and max(comp.values()) <= 0.70
+    assert h["front_clear_rail"] >= V("clr_align") - 1e-9 and h["front_clear_slant"] >= V("clr_align")
+    assert max(h["wiper_force"]) < 2.0 and h["pad_force_min"] < 6.0
+    assert V("outlet_z") - V("pad_h") / 2 >= V("floor_t") + V("foam") + ref_sen66.build().v("plinth_inset")   # on the plinth
+    # the blade stays out of the inlets' path (R25) and clear of H1
+    assert V("wiper_x1") <= V("inlet_x0") - 1.0 + 1e-9
+    y_h1 = V("h1_y") - V("standoff_d") / 2                                   # H1's front, standing into the gap
+    blade_left = V("wiper_x1 - wiper_w") - (V("plate_y0") - y_h1) * math.tan(math.radians(S.params["wiper_deg"].value))
+    assert blade_left > V("h1_x") + V("standoff_d") / 2
 
 
 def test_face_positions_follow_their_parts():
@@ -315,11 +336,23 @@ def test_gaskets_touch_what_they_seal(check):
     vols = airq_check.touch_volumes(check["touch"])
     q = airq_check.TOUCH_SQUEEZE
     ring = math.pi / 4 * (V("ring_od") ** 2 - V("ring_bore") ** 2) * q
-    strip = V("seal_w") * V("sen_up") * q
+    strip = V("wiper_w") * V("sen_up") * q
     lip = 2 * V("bp_x0") * V("ledge_t") * q
+    pad = V("pad_w") * V("pad_h") * q
     assert vols[("gasket_out", "sen66_body")] == pytest.approx(ring, rel=0.05)
     assert vols[("gasket_in", "sen66_body")] == pytest.approx(strip, rel=0.05)
     assert vols[("zone_seal", "base_plate")] == pytest.approx(lip, rel=0.05)
+    assert vols[("sen66_pad", "sen66_body")] == pytest.approx(pad, rel=0.05)
+
+
+def test_sen66_at_its_depth_extremes(check):
+    """I3(b) on the geometry: with the port face on the ring, a 21.8 module's front (plinth and
+    block) meets nothing but the pad, which it squeezes to pad_t - 2 tol (67 %); a 20.8 module's
+    front still meets the free pad, by pad_t - pad_gap - tol."""
+    reach = airq_check.extreme_reach(check["extremes"])
+    assert set(reach) == {("ext_max_plinth", "sen66_pad"), ("ext_min_plinth", "sen66_pad")}, reach
+    assert reach[("ext_max_plinth", "sen66_pad")] == pytest.approx(V("pad_t - pad_gap + sen_d_tol"), abs=0.01)
+    assert reach[("ext_min_plinth", "sen66_pad")] == pytest.approx(V("pad_t - pad_gap - sen_d_tol"), abs=0.01)
 
 
 def test_shell_nudged_meets_the_base_only_on_its_datums(check):
