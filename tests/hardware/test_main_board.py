@@ -95,15 +95,16 @@ def test_connector_records_match_the_layout():
     assert rot == 0 and MECH["fpc"]["center_x"] == x
     assert MECH["fpc"]["mouth_y"] == pytest.approx(y + FPC_MOUTH)
     assert MECH["fpc"]["pin1_x"] == pytest.approx(x + FPC_PIN1)
-    for key, ref, face in (("j_sen66", "J2", GH_FACE), ("j_qwiic_aux", "J4", SH_FACE),
-                           ("j_qwiic_tongue", "J3", SH_FACE)):
+    for key, ref, face in (("j_sen66", "J2", GH_FACE), ("j_qwiic_aux", "J4", SH_FACE)):
         x, y, rot = _at(ref)
         rec = MECH[key]
         assert rot == 270 and rec["edge"] == "-X" and rec["center_y"] == y, key   # mouth toward -X
         assert rec["mating_face_x"] == pytest.approx(x - face, abs=0.01), key
-    x, y, rot = _at("J5")
-    assert rot == 0 and MECH["j_led_ext"]["center_x"] == x
-    assert MECH["j_led_ext"]["mating_face_y"] == pytest.approx(y + SH_FACE)
+    for key, ref in (("j_qwiic_tongue", "J3"), ("j_led_ext", "J5")):
+        x, y, rot = _at(ref)
+        rec = MECH[key]
+        assert rot == 0 and rec["edge"] == "+Y" and rec["center_x"] == x, key      # mouth toward +Y
+        assert rec["mating_face_y"] == pytest.approx(y + SH_FACE), key
 
 
 def test_connector_pin1_records_match_the_board(board):
@@ -111,7 +112,7 @@ def test_connector_pin1_records_match_the_board(board):
     assert pads[("J7", "1")][1] == pytest.approx(MECH["fpc"]["pin1_x"])
     assert pads[("J2", "1")][2] == pytest.approx(MECH["j_sen66"]["pin1_y"], abs=0.01)
     assert pads[("J4", "1")][2] == pytest.approx(MECH["j_qwiic_aux"]["pin1_y"], abs=0.01)
-    assert pads[("J3", "1")][2] == pytest.approx(MECH["j_qwiic_tongue"]["pin1_y"], abs=0.01)
+    assert pads[("J3", "1")][1] == pytest.approx(MECH["j_qwiic_tongue"]["pin1_x"], abs=0.01)
     assert pads[("J5", "1")][1] == pytest.approx(MECH["j_led_ext"]["pin1_x"], abs=0.01)
     assert pads[("J6", "1")][1:] == pytest.approx(tuple(MECH["aux_uart"]["pin1"]))
 
@@ -169,10 +170,13 @@ def test_front_edge_leds_fpc_led_socket_and_button():
 
 
 def test_sen66_and_qwiic_toward_the_front_left():
-    ys = [MECH[k]["center_y"] for k in ("j_sen66", "j_qwiic_aux", "j_qwiic_tongue")]
-    assert ys == sorted(ys) and ys[-1] > H - 5                 # tongue socket at the front-left corner
-    for k in ("j_sen66", "j_qwiic_aux", "j_qwiic_tongue"):
-        assert MECH[k]["mating_face_x"] <= 0.7, k              # mouths at the left edge
+    """J_SEN66 on the left edge's front half, the tongue socket in the front-left corner facing the
+    front (the tongue sits behind the intake lip), the spare Qwiic socket further back on the left edge."""
+    sen, aux, tongue = MECH["j_sen66"], MECH["j_qwiic_aux"], MECH["j_qwiic_tongue"]
+    assert sen["edge"] == "-X" and sen["mating_face_x"] <= 0.7 and sen["center_y"] > H / 2
+    assert aux["edge"] == "-X" and aux["mating_face_x"] <= 0.7 and aux["center_y"] < sen["center_y"]
+    assert tongue["edge"] == "+Y" and tongue["mating_face_y"] >= H - 1.0
+    assert tongue["center_x"] < MECH["leds"]["chain"][0]["center_x"] - 5      # left of the LEDs
 
 
 def test_every_part_is_placed_inside_the_outline():
@@ -236,6 +240,70 @@ def test_usb_pair_runs_side_by_side_to_the_module(board):
     assert sum(1 for v in children(board, "via") if atom(v, "net") == "USB_DN") == 0
 
 
+def _graph(board, net):
+    """Track graph of a net: {point: {neighbour point: length}}, points rounded to 0.01 mm (track
+    ends, vias joining the layers at the same point)."""
+    g = {}
+    for a, b, *_ in _segments(board, net):
+        a, b = (round(a[0], 2), round(a[1], 2)), (round(b[0], 2), round(b[1], 2))
+        g.setdefault(a, {})[b] = g.setdefault(b, {})[a] = math.dist(a, b)
+    return g
+
+
+def _node(g, xy):
+    """The graph point on a pad (a track ending within 0.3 mm of its centre)."""
+    p = min(g, key=lambda q: math.dist(q, xy))
+    assert math.dist(p, xy) < 0.3, xy
+    return p
+
+
+def _reach(g, start):
+    """Shortest track length from `start` to every point it reaches (Dijkstra)."""
+    import heapq
+    dist, todo = {start: 0.0}, [(0.0, start)]
+    while todo:
+        d, p = heapq.heappop(todo)
+        if d > dist[p]:
+            continue
+        for q, w in g[p].items():
+            if d + w < dist.get(q, math.inf):
+                dist[q] = d + w
+                heapq.heappush(todo, (d + w, q))
+    return dist
+
+
+@pytest.mark.parametrize("net,contacts,esd_in,esd_out,mcu", [
+    ("USB_DP", ("A6", "B6"), "6", "1", "14"),
+    ("USB_DN", ("A7", "B7"), "4", "3", "13"),
+])
+def test_usb_contacts_go_through_the_esd_part(board, net, contacts, esd_in, esd_out, mcu):
+    """Both connector contacts of each line reach the USBLC6's flow-through input pin and nothing else;
+    its output pin alone reaches the module, so the line passes through the ESD part (no stub)."""
+    pads, g = _pads(board), _graph(board, net)
+    node = lambda ref, pad: _node(g, pads[(ref, pad)][1:])  # noqa: E731
+    starts = [node("J1", c) for c in contacts]
+    assert all(node("U3", mcu) in _reach(g, s) for s in starts)
+    for pin in (esd_in, esd_out):            # every path from a contact to the module crosses both pins
+        cut = {p: {q: w for q, w in nb.items() if q != node("U1", pin)}
+               for p, nb in g.items() if p != node("U1", pin)}
+        assert all(node("U3", mcu) not in _reach(cut, s) for s in starts), pin
+    # and the contacts reach the input pin before the output pin: the input side holds no output pad
+    cut = {p: {q: w for q, w in nb.items() if q != node("U1", esd_in)}
+           for p, nb in g.items() if p != node("U1", esd_in)}
+    assert all(node("U1", esd_out) not in _reach(cut, s) for s in starts)
+
+
+def test_usb_pair_lengths_match(board):
+    """ESD output to module pin: D+ and D- within 0.5 mm of each other (USB full speed needs far less)."""
+    pads = _pads(board)
+    length = {}
+    for net, esd_out, mcu in (("USB_DP", "1", "14"), ("USB_DN", "3", "13")):
+        g = _graph(board, net)
+        length[net] = _reach(g, _node(g, pads[("U1", esd_out)][1:]))[_node(g, pads[("U3", mcu)][1:])]
+    assert 25 < length["USB_DP"] < 35
+    assert abs(length["USB_DP"] - length["USB_DN"]) <= 0.5, length
+
+
 def test_buck_hot_loop_is_tight(board):
     """TPS562201: C1 straddles VIN (pin 3) and GND (pin 1); SW (pin 2) runs straight to L1."""
     pads = _pads(board)
@@ -243,3 +311,14 @@ def test_buck_hot_loop_is_tight(board):
     assert pads[("U2", "3")][0] == "+5V" and pads[("U2", "1")][0] == "GND"
     assert d(("U2", "3"), ("C1", "1")) < 2.0 and d(("U2", "1"), ("C1", "2")) < 2.0
     assert d(("U2", "2"), ("L1", "1")) < 4.0
+
+
+def test_buck_switch_node_is_small(board):
+    """The SW node is the short run pin 2 -> L1 plus the bootstrap cap's stub west of the GND pin: no
+    second path round the hot-loop ground (pin 1, C1-, its vias) and little dv/dt copper."""
+    segs = list(_segments(board, "/power/BUCK_SW"))
+    assert sum(math.dist(a, b) for a, b, *_ in segs) <= 8.0
+    gnd_pin_x = _pads(board)[("U2", "1")][1]                  # 25.95
+    for a, b, *_ in segs:
+        for x, y in (a, b):
+            assert y <= 4.0 or x < gnd_pin_x - 0.5, (a, b)    # below the SW row only on the C4 stub

@@ -116,18 +116,21 @@ KiCad's top view are left and right for someone in front of the device.
 - **Front edge (y = 30):** the four side-emitting LEDs in chain order left to right (D1, D2 = the mini's CO₂
   half; D3, D4 = the PM2.5 half) with the FPC between the halves (an 18 mm gap for the light-guide
   divider), J_LED_EXT and, at the front-right, the side-push button.
-- **Left edge:** J_SEN66, J_QWIIC_AUX and, at the front-left corner, J_QWIIC_TONGUE, mouths out of the edge.
-- Pressure sensor and LED buffer on the left, away from the module and the buck; the e-ink panel's
+- **Front-left:** J_SEN66 on the front half of the left edge and J_QWIIC_TONGUE in the corner with its mouth
+  out of the front edge (toward the tongue behind the intake lip); J_QWIIC_AUX at the rear of the left edge.
+- Pressure sensor at the rear-left and LED buffer at the front-left, away from the module and the buck; the e-ink panel's
   capacitors in a row behind the FPC, its boost circuit (L2, Q1, diodes) between the FPC and the module;
   the unfitted J_AUX_UART pads across the middle-left; H2 at the front-right, next to the button.
-- **Copper:** GND pours on both layers over the whole board (except the rule areas), about 85 stitching
+- **Copper:** GND pours on both layers over the whole board (except the rule areas), about 80 stitching
   vias. Other rule areas: no top tracks under the module (its signals leave through vias), no top tracks
   or vias under the USB-C shell, no copper in the button's "prohibited area", no tracks or vias round
   the screw heads. A custom rule ties J1's ground pins solidly to the pours.
 
 **How it was routed** (one-off, like routing in KiCad; the items live in the board file): the critical
-nets were drawn first (the buck's VIN/GND/SW/BST loop, the FB divider and its sense line, USB D+/D− from
-the connector through the ESD part to the module as a pair, module and LED decoupling, the VBUS feed);
+nets were drawn first (the buck's VIN/GND/SW loop with a short SW stub to the bootstrap cap, the FB divider
+and its sense line, USB D+/D− from both connector contacts into the ESD part's flow-through inputs and on to
+the module as a length-matched pair, module and LED decoupling, the VBUS feed, and the e-ink SPI's escape
+vias at the module and a via fan below the FPC's pins);
 Freerouting 2.5.0 then routed every other net except GND from the DSN that `build.py` writes
 (`tools/hw/kicad_dsn.py BOARD OUT.dsn`; GND moved to a net class Freerouting was told to ignore, power nets
 at 0.3 mm, a 0.35 mm keep-out band inside the outline); the session was imported with

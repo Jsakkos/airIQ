@@ -9,7 +9,9 @@
 #   at the rear-right corner, its antenna strip over the rear edge (rule area ANTENNA_KEEPOUT).
 # - front edge: LEDs D1, D2 (mini CO2 half) | FPC J7 (in the divider gap) | D3, D4 (PM2.5 half),
 #   J_LED_EXT, and the side-push button at the front-right.
-# - left edge: J_SEN66, J_QWIIC_AUX, J_QWIIC_TONGUE (front-left corner), mouths out of the edge.
+# - front-left: J_SEN66 on the left edge's front half and J_QWIIC_TONGUE in the corner, its mouth
+#   out of the front edge (toward the tongue behind the intake lip); J_QWIIC_AUX at the rear of the
+#   left edge.
 # Routing, pours and rule areas live in the board file (README, regeneration contract).
 
 board:
@@ -77,25 +79,25 @@ placement:
   R6: {at: [39.3, 4.6, 0], ref: hide}
   C10: {at: [39.5, 6.6, 270], ref: hide}
   R7: {at: [39.3, 12.9, 0], ref: hide}
-  # -- left edge: SEN66, Qwiic aux, Qwiic tongue (front-left corner)
-  J2: {at: [3.4, 9.12, 270], ref: [-0.5, 0, 90]}
-  C12: {at: [7.6, 7.2, 270], ref: hide}
-  J4: {at: [3.15, 18.69, 270], ref: [-0.3, 0, 90]}
-  J3: {at: [3.15, 26.19, 270], ref: [-0.3, 0, 90]}
-  U4: {at: [9.0, 12.2, 180], ref: hide}
-  C11: {at: [12.4, 13.2, 90], ref: hide}
-  R8: {at: [8.0, 15.05, 0], ref: hide}
-  R9: {at: [10.3, 15.05, 0], ref: hide}
+  # -- left edge: Qwiic aux (rear), SEN66 (front half); Qwiic tongue in the front-left corner, facing +Y
+  J2: {at: [3.4, 18.0, 270], ref: [-0.5, 0, 90]}
+  C12: {at: [7.9, 13.9, 0], ref: hide}
+  J4: {at: [3.15, 8.4, 270], ref: [-0.3, 0, 90]}
+  J3: {at: [4.4, 26.86, 0], ref: [0, 0.74]}
+  U4: {at: [8.6, 8.0, 90], ref: hide}
+  C11: {at: [11.5, 9.3, 90], ref: hide}
+  R8: {at: [8.2, 11.3, 0], ref: hide}
+  R9: {at: [10.5, 11.3, 0], ref: hide}
   J6: {at: [8.0, 17.45, 90], ref: [10.5, -2.15]}
   # -- front edge: LED buffer, LEDs, FPC, LED socket, button
-  U5: {at: [9.5, 25.0, 180], ref: [0, 0, 90]}
-  C13: {at: [10.8, 22.3, 90], ref: hide}
-  R10: {at: [8.4, 22.3, 90], ref: hide}
-  C18: {at: [8.0, 28.3, 0], ref: hide}
-  D1: [12.6, 28.64, 0]
-  D2: [17.7, 28.64, 0]
-  D3: [39.9, 28.64, 0]
-  D4: [45.0, 28.64, 0]
+  U5: {at: [11.5, 23.2, 180], ref: [0, 0, 90]}
+  C13: {at: [14.55, 22.25, 0], ref: hide}
+  R10: {at: [8.4, 22.0, 90], ref: hide}
+  C18: {at: [9.05, 27.9, 90], ref: hide}
+  D1: {at: [12.6, 28.64, 0], ref: [1.6, -2.3]}
+  D2: {at: [17.7, 28.64, 0], ref: [1.6, -2.3]}
+  D3: {at: [39.9, 28.64, 0], ref: [1.6, -2.3]}
+  D4: {at: [45.0, 28.64, 0], ref: [1.6, -2.3]}
   C14: {at: [12.15, 26.4, 90], ref: hide}
   C15: {at: [17.25, 26.4, 90], ref: hide}
   C16: {at: [39.45, 26.4, 90], ref: hide}

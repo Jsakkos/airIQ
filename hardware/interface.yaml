@@ -118,24 +118,24 @@ mechanical:
       mouth_y: 30.0                # body front face on the edge; body 15.5 wide x 5.4 deep x 2.0 high
       pin1_x: 34.55                # pin 1 on the viewer's right, pin 24 at x 23.05
       insertion: unfolded, display side up -> FPC pin i on connector pin i (lib README, R27)
-    j_sen66:                       # J2, JST GH 6-pin side entry (SM06B-GHS-TB)
+    j_sen66:                       # J2, JST GH 6-pin side entry (SM06B-GHS-TB), front half of the left edge
       edge: -X                     # left edge; the cable leaves toward -X
-      center_y: 9.12
+      center_y: 18.0
       mating_face_x: 0.35
-      pin1_y: 5.99                 # pin 1 (VDD) at the rear end
-      body: [[0.35, 3.75], [5.21, 14.5]]  # 4.25 high
-    j_qwiic_aux:                   # J4, JST SH 4-pin side entry (SM04B-SRSS-TB)
+      pin1_y: 14.87                # pin 1 (VDD) at the rear end
+      body: [[0.35, 12.63], [5.21, 23.38]]  # 4.25 high
+    j_qwiic_aux:                   # J4, JST SH 4-pin side entry (SM04B-SRSS-TB), rear of the left edge
       edge: -X
-      center_y: 18.69
+      center_y: 8.4
       mating_face_x: 0.64
-      pin1_y: 17.19                # GND; pin 1 on the left seen into the mouth
-      body: [[0.64, 15.69], [5.59, 21.69]]  # 2.9 high
-    j_qwiic_tongue:                # J3, JST SH 4-pin side entry, cable to the sense tongue
-      edge: -X
-      center_y: 26.19
-      mating_face_x: 0.64
-      pin1_y: 24.69
-      body: [[0.64, 23.19], [5.59, 29.19]]
+      pin1_y: 6.9                  # GND; pin 1 on the left seen into the mouth
+      body: [[0.64, 5.4], [5.59, 11.4]]  # 2.9 high
+    j_qwiic_tongue:                # J3, JST SH 4-pin side entry, front-left corner, cable to the sense tongue
+      edge: +Y                     # front edge: the cable leaves toward the tongue behind the intake lip
+      center_x: 4.4
+      mating_face_y: 29.37
+      pin1_x: 2.9                  # GND; pin 1 on the viewer's left
+      body: [[1.4, 24.42], [7.4, 29.37]]  # 2.9 high
     j_led_ext:                     # J5, JST SH 3-pin side entry (SM03B-SRSS-TB)
       edge: +Y
       center_x: 50.85
