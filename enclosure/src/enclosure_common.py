@@ -118,7 +118,8 @@ def shell(s: Script, bosses: list[tuple[str, str]], rear_boss: tuple[str, str] |
     s.shell("Shell walls", [[0, v("D") / 2, 0], [0, v("D"), v("H") / 2]], "wall")
     # R24: the lower front lip belongs to the base (a U printed floor down); the shell keeps the
     # sloped face, the top and the sides, and is lowered onto the base from above (+z down)
-    s.box("Lip to the base", ["-W / 2 - 1", -1, -1], ["W + 2", "wall + 1", "lip + 1"], operation="cut", targets=["shell"])
+    s.box("Lip to the base", ["-W / 2 - wall", "-wall", "-wall"], ["W + 2 * wall", "2 * wall", "lip + wall"], operation="cut",
+          targets=["shell"])
     for i, (bx, by) in enumerate(bosses, 1):
         s.cylinder(f"Insert boss {i}", [bx, by, "floor_t"], "boss_d", "boss_h", operation="join", targets=["shell"])
         s.cylinder(f"Insert hole {i}", [bx, by, "floor_t - 0.5"], "insert_d", "insert_depth + 0.5",
