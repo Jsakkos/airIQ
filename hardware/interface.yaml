@@ -128,17 +128,28 @@ mechanical:
       insertion: unfolded, display side up -> FPC pin i on connector pin i (lib README, R27)
       # Any route (folds, twists): the order in J7 depends only on which tail face is up inside it.
       pin_order: contacts (display side) up -> FPC pin i on pin i; contacts down -> mirrored (pin 1 on 24)
-      airq_fit: not reachable as placed, owner decision open (hardware/README.md, E-ink FPC fit)
+      airq_fit:                    # owner decision 2026-11-26, option (b) (hardware/README.md, E-ink FPC fit)
+        route: extension           # the tail cannot reach J7 directly: about 22.7 mm short (24.9 turned 180)
+        adapter: 24-pin 0.5 mm FPC adapter at the panel's tail end, behind the panel
+        tail_fold: 180 deg behind the panel into the adapter  # 79.0 + 14.4 = 93.4 > ~91 mm interior (95 mm case)
+        ffc: 24-pin 0.5 mm pitch FFC from the adapter to J7 as placed; length and contact sides from Plan 3
+        board_change: none
+        pin_order: pin_order above, applied to the FFC face inside J7; a 180 deg twist in the FFC fixes a mirror
+        prototype_check: pin 1 on J7 pin 1 (meter, before power); clean refreshes with GDR/RESE through it
+        mini: not needed           # the mini's panel lies flat with its tail straight into J7
       panel_tail:                  # the GDEY029T94's FPC tail, read from GoodDisplay "GDEY029T94 Product
         # Specifications" Rev 1.0 (2021/03/15), section 4 "Mechanical Drawing of EPD module" (p. 7):
         # front view (display side, panel landscape, tail on the left) and side view ("CONTACT SIDE",
         # "STIFFENER"). Quoted labels are the drawing's dimensions.
         exits: short end           # one 36.7 mm end of the 79.0 x 36.7 outline, flat in the panel plane
         length: 14.40              # outline to the finger end ("14.40")
-        width: 12.50               # "12.50+-0.1" over the 9.56 mm next to the finger end ("9.56"); then it
-                                   # widens to 15.31 at the glass bond (10.42 / 10.97 from the long edges)
-        offset: 0.60               # tail centre off the end's centre, toward the pin-24 long edge: 11.50 from
-                                   # that edge ("11.50"), 12.70 from the pin-1 edge
+        width: 12.50               # "12.50+-0.1" over the 9.56 mm next to the finger end ("9.56")
+        offset: 0.60               # narrow part's centre off the end's centre, toward the pin-24 long edge:
+                                   # 11.50 from that edge ("11.50"), 12.70 from the pin-1 edge
+        root:                      # then it flares; full width from 11.98 mm ("11.98") from the finger end
+          width: 15.31             # to the outline, i.e. the last 2.42 mm outside the glass
+          from_finger_end: 11.98
+          edge_gaps: [10.97, 10.42]  # to the pin-24 ("10.97") and pin-1 ("10.42") long edges; + width = 36.70
         contacts: [24, 0.5, 3.66]  # count, pitch ("P0.5X23=11.50+-0.05"), length ("3.66"); on the display side
         stiffener: 6.20            # "6.20+-0.3" from the finger end, on the back (dashed in the front view);
                                    # 0.3 +-0.03 thick there, so only the 8.2 mm next to the glass can bend

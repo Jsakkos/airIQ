@@ -128,6 +128,14 @@ def test_panel_tail_record_matches_j7(board):
     pads = _pads(board)
     assert pads[("J7", "1")][1] - pads[("J7", "24")][1] == pytest.approx((count - 1) * pitch)
     assert tail["width"] == pytest.approx((count - 1) * pitch + 2 * 0.5)   # outer contacts 0.5 from the edges
+    # The flared root spans the panel's short end ("36.70") with its gaps, and is wider than the narrow
+    # part on both sides (narrow-part gaps: 11.50 pin-24 side, 12.70 pin-1 side, from width and offset).
+    end, root = 36.70, tail["root"]
+    assert sum(root["edge_gaps"]) + root["width"] == pytest.approx(end)
+    narrow_gaps = ((end - tail["width"]) / 2 - tail["offset"], (end - tail["width"]) / 2 + tail["offset"])
+    assert narrow_gaps == pytest.approx((11.50, 12.70))
+    assert all(r < n for r, n in zip(root["edge_gaps"], narrow_gaps))
+    assert tail["length"] - root["from_finger_end"] == pytest.approx(2.42)   # full width outside the glass
 
 
 def test_led_and_button_records_match_the_layout():

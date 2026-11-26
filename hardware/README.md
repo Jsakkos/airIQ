@@ -49,9 +49,13 @@ them and a test fails if the committed ones differ from a rebuild, see "Fab outp
    uv run python tools/hw/check_bom.py hardware/fab/tongue/bom.csv hardware/bom/parts.csv --fresh-days 7
    ```
    Watch the VEML7700-TR (C504893, tongue): only 308 were in stock on 2026-11-25.
-3. **Main boards meant for airQs: decide the e-ink FPC fit first.** The panel's tail does not reach J7 in
-   the airQ enclosure ("E-ink FPC fit (airQ)" below); record the owner's choice of option there. Boards for
-   the bench or the airQ mini are not affected.
+3. **Main boards meant for airQs: test the e-ink extension first.** In the airQ the panel's tail does not
+   reach J7, so it connects through a 24-pin adapter and FFC (owner decision 2026-11-26, "E-ink FPC fit
+   (airQ)" below). Before ordering main boards for airQs beyond the prototype round, run one prototype airQ
+   with the real adapter and FFC: check with a meter, before power, that FPC pin 1 reaches J7 pin 1, then
+   confirm full and partial refreshes are clean with the panel's boost (GDR, RESE) running through the
+   extension. If either fails, the options in that section are open again. Boards for the bench or the
+   airQ mini are not affected.
 4. **Side-looking parts, if one of each is at hand:** check against the real part that the SK6812SIDE-A
    emits from the face opposite its terminals (footprint +y, out of the main board's front edge) and that the
    VEML7700-TR's window is on the side opposite its leads (footprint −y, out of the tongue's front edge).
@@ -67,7 +71,9 @@ them and a test fails if the committed ones differ from a rebuild, see "Fab outp
    order; KiCad's own checks and `tests/hardware/test_fab.py` are all that has read them.
 
 **Bought separately** (not on JLC's BOM): 11 SEN66, SEN6x cables (JST GH 6-pin), e-ink panels (GoodDisplay
-GDEY029T94), Qwiic cables (JST SH 4-pin, also for the tongue), and the optional SFA40.
+GDEY029T94), Qwiic cables (JST SH 4-pin, also for the tongue), and the optional SFA40. For each airQ (the
+mini needs neither): a 24-pin 0.5 mm FPC adapter and a 24-pin 0.5 mm-pitch FFC for the panel, the FFC's
+length and contact sides set by Plan 3's route ("E-ink FPC fit (airQ)" below).
 
 **USB supply and cable** (not part of the BOM, spec §6.7): a 5 V supply good for 1 A and a decent cable. The
 TPS562201 buck is specified for VIN ≥ 4.5 V (its undervoltage lockout wakes at 3.8–4.3 V), and the LED buffer
@@ -114,16 +120,27 @@ The USB-C receptacle J1's four plated shell legs have pin-in-paste apertures on 
 tied solid), so they solder in JLC's SMT reflow with the rest of the part. Still confirm in JLC's review that
 the legs get soldered.
 
-### E-ink FPC fit (airQ): open owner decision
+### E-ink FPC fit (airQ): decided, extension (option b)
+
+**Decision** (owner, 2026-11-26): option (b) below. A 24-pin 0.5 mm adapter at the panel's tail end takes
+the tail, and a 24-pin 0.5 mm FFC runs from it to J7 as placed. **No board change.** In the airQ the tail
+folds behind the panel into the adapter. Before ordering airQ boards beyond the prototype round, one
+prototype must show the panel's boost (GDR, RESE) working through the extension, and pin 1 arriving on J7
+pin 1 (step 3 of "Before each order"). Recorded in `interface.yaml` `mechanical.main.fpc.airq_fit`. The
+analysis behind it follows.
 
 **The panel's tail**, read from GoodDisplay's *GDEY029T94 Product Specifications* Rev 1.0 (2021/03/15),
 section 4 "Mechanical Drawing of EPD module", p. 7 (front view of the display side, panel landscape, tail on
-the left; side view), recorded in `interface.yaml` `mechanical.main.fpc.panel_tail`:
+the left; side view), recorded in `interface.yaml` `mechanical.main.fpc.panel_tail`. "Upper" and "lower"
+are as in that view:
 
 - It leaves one **short (36.7 mm) end** of the 79.0 × 36.7 mm outline, flat, in the panel's plane.
 - It is **14.40 mm long** from the outline to the finger end, and **12.50 mm wide** over the 9.56 mm next to
-  the finger end. From there it widens to 15.31 mm where it is bonded to the glass.
-- Its centre is 0.60 mm off the centre of that end: 11.50 mm from one long edge, 12.70 mm from the other.
+  the finger end. There its edges are 11.50 mm from the lower long edge and 12.70 mm from the upper, so its
+  centre is 0.60 mm off the centre of that end.
+- It then flares and reaches its full **15.31 mm** 11.98 mm from the finger end, so the last 2.42 mm before
+  the outline (the root) is full width. The root's edges are 10.97 mm from the lower long edge and 10.42 mm
+  from the upper.
 - Its 24 contacts (0.5 mm pitch, 3.66 mm long) are on the display side. A 6.20 mm stiffener is on the back,
   from the finger end (the tail is 0.3 mm thick there), so only the 8.2 mm next to the glass can bend.
 - Seen from the display side with the tail on the left, **pin 1 is the upper contact**, on the side of the
@@ -137,22 +154,27 @@ the left; side view), recorded in `interface.yaml` `mechanical.main.fpc.panel_ta
   board's width (x 30).
 - The board is horizontal below it, its front edge just behind the front face.
 - The panel's lower edge is at or above the board's top face (the LED line is under the screen).
+- **The tail folds behind the panel.** The airQ is 95 mm wide outside, about 91 mm inside. The panel's
+  79.0 mm plus a flat 14.4 mm tail is 93.4 mm, so wherever the panel sits the tail cannot stay flat in its
+  plane: it folds 180° behind the panel (within the 8.2 mm that can bend), and the adapter sits there.
 
 J7 takes the tail through its mouth on the front edge (x 22.55–35.05 for the 12.5 mm tail, about 1 mm above
-the board), travelling −Y. The rest is geometry (lower bounds, with a zero bend radius):
+the board), travelling −Y. The rest is geometry, with a zero bend radius:
 
 - **Distance** (figures for the tail on the user's left; in brackets, on the right, with the panel turned
-  180°). The tail starts at the panel's end, x −9.5 (69.5), and at least 11.50 (12.70) mm up the tilted
-  panel, so at least 9.96 (11.0) mm above the board. From its nearest corner to the nearest end of J7's slot
-  is at least 33.8 (36.4) mm in a straight line, and about 3.5 mm more goes inside the connector. That needs
-  at least 37.3 (39.9) mm of tail. There are 14.4 mm: **short by at least 22.9 (25.5) mm**, before any fold.
+  180°). The tail's root is at the panel's end, x −9.5 (69.5), 9.5 mm beyond the board's side edge. Its
+  lowest corner is 10.97 (10.42) mm up the tilted panel, so 9.50 (9.02) mm above the board. From that corner
+  to the nearest end of J7's slot is about 33.6 (35.8) mm in a straight line, and about 3.5 mm more goes
+  inside the connector. That needs about 37.1 (39.3) mm of tail. There are 14.4 mm: **about 22.7 (24.9) mm
+  short**, before any fold. The exact pose moves this by a few tenths of a millimetre; the horizontal gap
+  alone makes it at least 21.1 (23.5) mm.
 - **Direction.** The tail leaves along ±X with its width running up the panel. J7 needs it travelling −Y,
   with its width along X and lying flat. That takes a diagonal (45°) crease and a bend, or a twist, and each
   uses up more length.
-- **Moving J7 alone does not help.** Even directly under the tail's root, a connector on the board's top
-  face takes the tail at least 8.96 mm below the root's lowest corner. That is more than the 8.2 mm of tail
-  that can bend, and laying the tail's width flat on the board needs about 12.5 mm more (a diagonal crease)
-  or a twist. So no position of J7 on this board reaches the tail directly.
+- **Moving J7 alone does not help.** The root is 9.5 mm beyond the board's side edges (the panel is 79 mm
+  wide, the board 60), so no J7 on the board sits under it. Even with J7 at the board's left end, the
+  straight line from the root's lowest corner to its slot is about 15 mm, plus 3.5 mm inside J7: about
+  18.5 mm against the tail's 14.4, before the direction change and the fold behind the panel.
 
 **Pin 1, whatever the route.** Folds and twists turn the tail but never mirror it. The order in J7 therefore
 depends only on which face of the tail is up inside J7:
@@ -165,18 +187,21 @@ For example, a tail folded 180° behind the panel and then turned down into J7 a
 mirrored. Taken one at a time: a 180° fold keeps the tail's edges where they are but turns its face over, and
 a twist about its axis swaps the edges and turns the face over.
 
-**Options** (the owner decides; the layout is unchanged):
+**Options** (the owner chose (b) on 2026-11-26; the layout is unchanged):
 
 - **(a) Move J7 toward the panel's tail end** (the left or right board edge). Not enough on its own (above).
-  It helps only with (b), where it shortens the extension.
-- **(b) Extension.** A 24-pin 0.5 mm adapter at the panel's tail end takes the tail, and a 24-pin 0.5 mm FFC
-  runs from it to J7 as placed.
+  It helps only with (b), where it shortens the extension. Not taken.
+- **(b) Extension. Chosen.** A 24-pin 0.5 mm adapter at the panel's tail end takes the tail, and a 24-pin
+  0.5 mm FFC runs from it to J7 as placed.
   - No board change. J7's contacts are on both sides, so either FFC face mates; the route sets the order (the
     rule above, applied to the FFC), and a 180° twist in the FFC's free span corrects a mirrored arrival.
-  - Costs: an adapter and an FFC per airQ (the mini needs neither).
-  - Risks: the panel's boost gate drive (GDR) and current sense (RESE) run through the extension, so test it
-    on the prototype. The FFC enters at the front edge between D2 and D3, in the strip the light guide needs
-    too (Plan 3).
+  - In the airQ the adapter sits behind the panel, and the tail's 180° fold into it turns the tail's face
+    over (the rule above). Plan 3 routes the FFC from there to J7 and sets its length and contact sides.
+  - Costs: an adapter and an FFC per airQ (the mini needs neither); see "Bought separately".
+  - Risks: the panel's boost gate drive (GDR) and current sense (RESE) run through the extension. **Test it
+    on the prototype before ordering airQ boards beyond the prototype round** (step 3 of "Before each
+    order"). The FFC enters at the front edge between D2 and D3, in the strip the light guide needs too
+    (Plan 3).
 - **(c) A panel whose tail reaches J7:** a longer tail, or one leaving a long edge. None is known. The spec's
   other candidate, the Waveshare 2.9″ V2 raw panel, was not measured here.
 

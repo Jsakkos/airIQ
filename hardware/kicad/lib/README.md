@@ -282,7 +282,8 @@ Each check compares the footprint's pad numbers and positions (from the `.kicad_
   one case: it leaves the contacts facing down.
 - Panel tail (final review, GDEY029T94 spec section 4 drawing, p. 7): it leaves a short (36.7 mm) end of the panel, 14.40 mm long,
   12.50 mm wide, with a 6.20 mm stiffener; recorded in `hardware/interface.yaml` `mechanical.main.fpc.panel_tail`. In the airQ
-  enclosure it does not reach J7: `hardware/README.md`, "E-ink FPC fit (airQ)".
+  enclosure it does not reach J7, so it connects through an adapter and FFC (owner, 2026-11-26): `hardware/README.md`,
+  "E-ink FPC fit (airQ)".
 
 ## Antenna keep-out (ESP32-C6-WROOM-1; applied in Task 5 as the board rule area `ANTENNA_KEEPOUT`)
 
@@ -302,11 +303,11 @@ ESP32-C6 Module's Antenna (Antenna feed point on the right)", units mm:
 
 Owner gate, 2026-11-25 ("Approve, option A"): both boards approved as laid out, with R22 confirmed (WROOM-1-N8 and MS5611),
 the SKRTLAE010 and USB-C pad trims (fixes 18, 19), the SKRTLAE010 actuator direction and J7 at the front-edge centre. The FPC
-contact side and pin 1 are verified for the unfolded, display-up insertion (R27 above). Still open:
+contact side and pin 1 are verified for the unfolded, display-up insertion (R27 above). The final review then found that
+the panel's tail does not reach J7 in the airQ enclosure; on 2026-11-26 the owner chose an adapter and FFC extension (option b,
+no board change; `hardware/README.md`, "E-ink FPC fit (airQ)"), to be tested on the prototype before airQ boards are ordered
+beyond the prototype round. Still open:
 
-- **E-ink FPC fit in the airQ** (found by the final review, after the gate): the panel's tail leaves a short end and does not
-  reach J7 in the airQ enclosure. The geometry and the options are in `hardware/README.md`, "E-ink FPC fit (airQ)". Decide
-  before ordering main boards for airQs; bench and mini boards are not affected.
 - **Side-emitting LED and side-looking VEML7700 directions** were derived from 2-D drawings: SK6812SIDE-A light toward footprint +y,
   VEML7700 window toward footprint −y (re-checked against the vector drawing in Task 6, fix 13). The EasyEDA 3D bodies have no
   visible lens, so the 3D viewer cannot show the window. Check against a physical part if one is at hand before the board is
