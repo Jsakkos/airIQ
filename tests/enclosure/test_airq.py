@@ -67,6 +67,17 @@ def test_distances_answered_by_the_layout():
     assert d["hcho_grille_lower_edge_z"] >= V("grille_min_z")                       # 10 mm rule
 
 
+def test_shell_lowers_onto_the_base():
+    """I1, R24: the shell goes on from above along -z, after the base, zone wall, SEN66 and board
+    (assembly order, plan Task 5): its floor bosses pass the zone wall's notches, clear of the
+    board's footprint, and the rear boss stays above and left of the board."""
+    assert airq_check.insertion_probe(S) == []
+
+
+def test_screw_heads_leave_a_floor():
+    assert V("floor_t") - V("head_depth") >= 1.6                                   # M5: >= 1.6 under the head
+
+
 def test_face_positions_follow_their_parts():
     assert V("dot_f") == pytest.approx(V("lip") + (V("sw_z") - V("lip")) / V("cos_t"))   # on SW1's push axis
     assert V("sw_x") - V("dot_d") / 2 > V("panel_x0") + V("panel_l") + V("clr_remove") + 1.2   # right of the pocket

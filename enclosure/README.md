@@ -586,20 +586,27 @@ LED slot, so H is 51.
 - The SFA40's sealed pocket is at the rear left, with its own grille in the rear wall.
 - The tongue lies behind the lip in the intake air.
 
-**Print split.** Printed face down, the rear wall would be a 60° overhang. So:
-- `shell` (the lip, the face, the top and both sides) prints face down on textured PEI.
-- `base_plate` is one L-shaped part: the floor, the rear wall and the two board standoffs. It
-  prints floor down, so its posts and grilles are vertical.
-- The insert bosses are in the shell (R10b). They are inclined in print: confirm them at the
-  first shell print (Task 2 M7). The rear left has no boss: the HCHO pocket and the SEN66's
-  cable bay fill that corner, and the base plate's rear wall holds the shell's rear.
+**Print split (R24) and assembly (I1).**
+- `shell` holds the 30° face, the top and both sides. It prints face down on textured PEI.
+- `base_plate` is a U of the floor, the vertical front lip carrying the intake slots, and the
+  rear wall, with the two board standoffs joined to it. It prints floor down: the lip, the rear
+  wall, the posts and the grilles stand vertical and need no supports.
+- The shell goes on last, lowered onto the base along −z, after the zone wall, the SEN66, the
+  tongue and the board.
+- Fastening, three M2 screws into heat-set inserts in the shell:
+  - two front floor bosses, screwed from underneath (heads under the felt feet). They pass the
+    zone wall through notches in its ledge on the way down, clear of the board's footprint.
+  - one rear boss under the top wall at the rear left, screwed through the base's rear wall. It
+    is 69 mm from the antenna. The rear face may show a fastener; the front and sides do not.
+- `airq_check.insertion_probe` checks this path (`test_shell_lowers_onto_the_base`).
+- The screw counterbores leave 1.6 mm of floor under the heads.
 
 **Bodies** (volume in mm³; size and minimum corner in mm):
 
 | Body | Volume | Size | Min corner | What, material |
 |---|---|---|---|---|
-| `shell` | 21365 | 95.00 × 55.00 × 51.00 | −47.5, 0, 0 | lip, face, top and sides; three M2 insert bosses; the panel pocket. Shell material |
-| `base_plate` | 18013 | 91.00 × 53.00 × 49.00 | −45.5, 2.0, 0 | floor and rear wall (an L), screw counterbores, standoffs H1 (the USB-C support) and H2, the HCHO grille |
+| `shell` | – | 95.00 × 55.00 × 51.00 | −47.5, 0, 0 | 30° face, top and sides (R24); three M2 insert bosses; the panel pocket. Shell material |
+| `base_plate` | – | 95.00 × 55.00 × 49.00 | −47.5, 0, 0 | floor, front lip and rear wall (a U, R24), screw counterbores, standoffs H1 (the USB-C support) and H2, the HCHO grille |
 | `zone_wall` | 9348 | 91.00 × 51.00 × 16.90 | −45.5, 2.0, 13.8 | ledge behind the lip, slanted part behind the panel, horizontal part over the SEN66 |
 | `sen66_foam` | 1176 | 55.20 × 21.30 × 1.00 | −45.5, 20.0, 2.0 | the 1 mm foam under the SEN66 |
 | `sen66_cradle` | 236 | 36.85 × 1.60 × 4.00 | −45.5, 41.45, 2.0 | rear rail (stops short of the H1 standoff) |

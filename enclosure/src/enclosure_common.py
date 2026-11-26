@@ -97,7 +97,7 @@ def add_standoffs(s: Script) -> None:
     p("h2_y", f"board_y0 + board_d - {h2y}", "H2 y (interface.yaml)")
 
 
-def shell(s: Script, bosses: list[tuple[str, str]]) -> None:
+def shell(s: Script, bosses: list[tuple[str, str]], rear_boss: tuple[str, str] | None = None) -> None:
     """`shell`: lip, sloped face, top and both sides in one part that prints face down on
     textured PEI. Its rear and bottom are open: `base_plate` (floor and rear wall) closes both.
     The insert bosses for the screws from underneath (R10b) stand on the base plate's top face and
@@ -112,14 +112,27 @@ def shell(s: Script, bosses: list[tuple[str, str]]) -> None:
         sk.polyline([(0, 0), ("D", 0), ("D", "H"), ("y_top", "H"), (0, "lip")])
     s.extrude("Envelope", "Envelope profile", "W", body="shell")
     v = s.v
-    # the crease and the top front edge; the top rear edge borders the rear face the shell
-    # removes, so it is not chamfered before the shell (its inward offset would meet the rear wall)
-    s.chamfer("Edge chamfers", [[0, 0, v("lip")], [0, v("y_top"), v("H")]], "edge_chamfer", body="shell")
+    # the top front edge only: the top rear edge borders the rear face the shell removes (its
+    # inward offset would meet the rear wall), and the crease is now the seam to the base's lip
+    s.chamfer("Edge chamfers", [[0, v("y_top"), v("H")]], "edge_chamfer", body="shell")
     s.shell("Shell walls", [[0, v("D") / 2, 0], [0, v("D"), v("H") / 2]], "wall")
+    # R24: the lower front lip belongs to the base (a U printed floor down); the shell keeps the
+    # sloped face, the top and the sides, and is lowered onto the base from above (+z down)
+    s.box("Lip to the base", ["-W / 2 - 1", -1, -1], ["W + 2", "wall + 1", "lip + 1"], operation="cut", targets=["shell"])
     for i, (bx, by) in enumerate(bosses, 1):
         s.cylinder(f"Insert boss {i}", [bx, by, "floor_t"], "boss_d", "boss_h", operation="join", targets=["shell"])
         s.cylinder(f"Insert hole {i}", [bx, by, "floor_t - 0.5"], "insert_d", "insert_depth + 0.5",
                    operation="cut", targets=["shell"])
+    if rear_boss:
+        # a boss under the top wall at a rear corner, its insert entered from the rear: one M2
+        # screw through the base's rear wall (the rear face may show a fastener; front and
+        # sides may not)
+        bx, bz = rear_boss
+        s.param("rear_boss_len", 6.0, "rear insert boss length along y")
+        s.cylinder("Rear insert boss", [bx, "D - wall - clr_remove - rear_boss_len", bz], "boss_d", "rear_boss_len",
+                   axis="Y", operation="join", targets=["shell"])
+        s.cylinder("Rear insert hole", [bx, "D - wall - clr_remove - insert_depth", bz], "insert_d",
+                   "insert_depth + 0.5", axis="Y", operation="cut", targets=["shell"])
 
 
 def panel_pocket(s: Script) -> None:
@@ -138,7 +151,7 @@ def panel_pocket(s: Script) -> None:
               targets=["shell"], direction="negative")
 
 
-def base_plate(s: Script, screw_xy: list[tuple[str, str]]) -> None:
+def base_plate(s: Script, screw_xy: list[tuple[str, str]], rear_screw: tuple[str, str] | None = None) -> None:
     """`base_plate`: the floor and the rear wall, one L-shaped part, inset in the shell by
     clr_remove. It prints floor down, so its bosses and posts are vertical (coupons R20/M7) and
     its rear grilles are vertical slots. Screws go up through it into the shell's inserts, under
@@ -146,15 +159,22 @@ def base_plate(s: Script, screw_xy: list[tuple[str, str]]) -> None:
     p = s.param
     p("screw_d", 2.4, "M2 screw clearance hole")
     p("head_d", 4.4, "M2 screw head counterbore, under a felt foot")
-    p("head_depth", 1.2, "counterbore depth")
-    s.box("Floor", ["-inner_x + clr_remove", "wall + clr_remove", 0],
-          ["2 * (inner_x - clr_remove)", "D - 1.5 * wall - clr_remove", "floor_t"], body="base_plate")
+    p("head_depth", 0.4, "counterbore depth: leaves floor_t - 0.4 = 1.6 under the head (the felt foot covers it)")
+    s.box("Floor", ["-inner_x + clr_remove", "wall / 2", 0],
+          ["2 * (inner_x - clr_remove)", "D - 1.5 * wall", "floor_t"], body="base_plate")
+    s.box("Front lip", ["-W / 2", 0, 0], ["W", "wall", "lip"], operation="join", targets=["base_plate"])
     s.box("Rear wall", ["-inner_x + clr_remove", "D - wall", 0],
           ["2 * (inner_x - clr_remove)", "wall", "H - wall - clr_remove"], operation="join", targets=["base_plate"])
     for i, (x, y) in enumerate(screw_xy, 1):
         s.cylinder(f"Screw hole {i}", [x, y, "-head_depth"], "screw_d", "floor_t + 2 * head_depth", operation="cut",
                    targets=["base_plate"])
         s.cylinder(f"Screw head {i}", [x, y, "-head_depth"], "head_d", "2 * head_depth", operation="cut", targets=["base_plate"])
+    if rear_screw:
+        x, z = rear_screw
+        s.cylinder("Rear screw hole", [x, "D - wall - 1", z], "screw_d", "wall + 2", axis="Y", operation="cut",
+                   targets=["base_plate"])
+        s.cylinder("Rear screw head", [x, "D - head_depth", z], "head_d", "2 * head_depth", axis="Y", operation="cut",
+                   targets=["base_plate"])
 
 
 def standoffs(s: Script) -> None:
@@ -168,7 +188,7 @@ def standoffs(s: Script) -> None:
                    operation="cut", targets=["base_plate"])
 
 
-def zone_wall(s: Script) -> None:
+def zone_wall(s: Script, boss_xy: list[tuple[str, str]] = ()) -> None:
     """`zone_wall`: the wall between the sensor zone (low) and the electronics zone (high). It
     has three parts:
     - a ledge behind the lip, between the intake slots and the LED slot;
@@ -195,6 +215,10 @@ def zone_wall(s: Script) -> None:
     for name, (x, y) in (("H1", ("h1_x", "h1_y")), ("H2", ("h2_x", "h2_y"))):
         s.cylinder(f"Zone wall hole {name}", [x, y, "zw_z0 - 1"], "standoff_d + 2 * clr_align", "zone_t + 2",
                    operation="cut", targets=["zone_wall"])
+    for i, (x, y) in enumerate(boss_xy, 1):     # the shell's floor bosses pass here on the way down
+        s.box(f"Zone wall boss notch {i}", [f"{x} - boss_d / 2 - clr_remove", 0, "ledge_z0 - 1"],
+              ["boss_d + 2 * clr_remove", f"{y} + boss_d / 2 + clr_remove", "zw_z1 - ledge_z0 + 2"],
+              operation="cut", targets=["zone_wall"])
 
 
 def sen66_cradle(s: Script) -> None:

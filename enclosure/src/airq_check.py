@@ -113,8 +113,10 @@ def distances(s=None) -> dict:
     plug = ((usb_x - 6.25, usb_x + 6.25), (dev(0, 0)[1], v("D") + 20.0), (v("usb_z") - 3.5, v("usb_z") + 3.5))   # 12.5 x 7 overmold out the rear
     r = v("boss_d") / 2
     bosses = [((x - r, x + r), (y - r, y + r), (v("floor_t") - v("head_depth"), v("floor_t") + v("boss_h")))
-              for x, y in ((-v("inner_x") + r - 0.5, v("wall") + 3.0), (v("inner_x") - r + 0.5, v("wall") + 3.0),
-                           (v("inner_x") - r + 0.5, v("D") - v("wall") - 4.5))]
+              for x, y in ((-v("inner_x") + r - 0.5, v("wall") + 3.0), (v("inner_x") - r + 0.5, v("wall") + 3.0))]
+    rz = v("H") - v("wall") - r + 0.5           # the rear boss, screwed from the rear
+    bosses.append(((-v("inner_x") + r - 0.5 - r, -v("inner_x") + r - 0.5 + r), (v("D") - v("wall") - 6.2, v("D")),
+                   (rz - r, rz + r)))
     sfa = ((v("sfa_x0"), v("sfa_x0") + 25.4), (v("sfa_y0"), v("sfa_y0") + 4.5), (v("sfa_z0"), v("sfa_z0") + 25.4))
     h1 = (v("h1_x"), v("h1_y"))
     j1 = ((usb_x - 8.94 / 2, usb_x + 8.94 / 2), tuple(sorted((dev(0, 0)[1], dev(0, 7.35)[1]))))
@@ -136,9 +138,34 @@ def distances(s=None) -> dict:
     }
 
 
+def insertion_probe(s=None) -> list[str]:
+    """I1: the shell is lowered onto the assembled base along -z (R24). Everything of the shell
+    below the zone wall's top must pass the zone wall through a notch, and no part of the shell
+    may pass through the board's footprint below the board's top. Returns the conflicts (none
+    when it assembles). The rear boss sits above the board's parts and left of the board."""
+    s = s or airq.build()
+    v = s.v
+    out = []
+    r = v("boss_d") / 2
+    board = ((v("board_x0"), v("board_x0") + v("board_w")), (v("board_y0"), v("board_y0") + v("board_d") + v("antenna_out")))
+    for i, (x, y) in enumerate(((-v("inner_x") + r - 0.5, v("wall") + 3.0), (v("inner_x") - r + 0.5, v("wall") + 3.0)), 1):
+        notch = s.commands[[c["params"].get("name") for c in s.commands].index(f"Zone wall boss notch {i}")]["params"]
+        nx0, ny0 = v(notch["corner"][0]), v(notch["corner"][1])
+        nx1, ny1 = nx0 + v(notch["length"]), ny0 + v(notch["width"])
+        if not (nx0 <= x - r and x + r <= nx1 and ny0 <= y - r and y + r <= ny1):
+            out.append(f"floor boss {i} does not pass the zone wall's notch")
+        if board[0][0] < x + r and x - r < board[0][1] and board[1][0] < y + r and y - r < board[1][1]:
+            out.append(f"floor boss {i} passes through the board's footprint")
+    rx, rz = -v("inner_x") + r - 0.5, v("H") - v("wall") - r + 0.5
+    if rx + r > board[0][0] and rz - r < v("board_z0") + v("board_t") + 4.25:
+        out.append("rear boss passes the board")
+    return out
+
+
 if __name__ == "__main__":
     d = distances()
     print(json.dumps({k: round(x, 2) for k, x in d.items()}, indent=1))
+    print("insertion probe:", insertion_probe() or "clear")
     if "--run" in sys.argv:
         r = run()
         i = r["interference"]

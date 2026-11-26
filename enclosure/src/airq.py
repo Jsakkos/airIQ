@@ -100,10 +100,15 @@ def build() -> Script:
     p("hcho_x1", "sfa_x0 + 25.4 + 5.2", "HCHO pocket's right wall: room for the Qwiic plug at J1")
 
     # --- bodies -------------------------------------------------------------------------------
+    # fastening (I1): two floor bosses at the front corners (clear of the board's footprint, so the
+    # shell lowers past it) and one rear boss under the top wall at the rear left (69 mm from the
+    # antenna), screwed through the base's rear wall
     inner = "inner_x - boss_d / 2 + 0.5"
-    C.shell(s, [(f"-({inner})", "wall + 3.0"), (inner, "wall + 3.0"), (inner, "D - wall - 4.5")])
+    floor_bosses = [(f"-({inner})", "wall + 3.0"), (inner, "wall + 3.0")]
+    rear = (f"-({inner})", "H - wall - boss_d / 2 + 0.5")
+    C.shell(s, floor_bosses, rear)
     C.panel_pocket(s)
-    C.base_plate(s, [(f"-({inner})", "wall + 3.0"), (inner, "wall + 3.0"), (inner, "D - wall - 4.5")])
+    C.base_plate(s, floor_bosses, rear)
     C.standoffs(s)
     # HCHO pocket's own grille: vertical slots in the rear wall, in front of the SFA40's opening
     p("hcho_slot_h", 14.0, "HCHO grille slot length (z)")
@@ -111,7 +116,7 @@ def build() -> Script:
     for i in range(4):
         s.box(f"HCHO grille slot {i + 1}", [f"hcho_slot_x + {i} * 3.0", "D - wall - 1", "grille_min_z + 1"],
               ["slot_w", "wall + 2", "hcho_slot_h"], operation="cut", targets=["base_plate"])
-    C.zone_wall(s)
+    C.zone_wall(s, floor_bosses)
     C.sen66_cradle(s)
     C.gasket_out(s, "outlet_x", "outlet_z")
     C.gasket_in(s, "sen_x0", "baffle_x0 - wall")
