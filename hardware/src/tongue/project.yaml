@@ -9,6 +9,8 @@ title: airQ v3 sense tongue
 company: airQ open hardware (CC BY-SA 4.0)
 rev: 3.0-dev
 output: ../../kicad/tongue         # KiCad project folder, relative to this file
+fab: ../../fab/tongue              # JLC upload files (Gerber zip, bom.csv, cpl.csv), rewritten by every build
+step: ../../step/airq-tongue.step  # 3-D model for the enclosure: build.py --step
 
 # The interface contract: J1 (Role J_QWIIC_TONGUE) takes its pinout from it (gen_sch.py).
 interface: ../../interface.yaml

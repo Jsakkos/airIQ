@@ -60,6 +60,12 @@ mechanical:
     outline: [22.0, 13.0]          # W x H rectangle, square corners
     thickness: 1.6
     max_part_height: 3.0           # VEML7700 (J1 is 2.95); bottom side 0
+    step:                          # hardware/step/airq-tongue.step (build.py tongue --step: --grid-origin)
+      x: X                         # STEP x = X
+      y: -Y                        # STEP y = -Y (KiCad's 3-D frame has Y up)
+      z: Z + 1.6                   # parts sit on the top face at STEP z = 1.6; board bottom at z = 0
+      # KiCad's board body is the dielectric only (no copper, mask): z 0 .. 1.51; checked in
+      # SolidCraft 2026-11-25: board x 0..22, y -13..0; U2 (VEML7700) x 14.95..21.75, y -2.6..-0.25, top 4.596
     mounting_hole:
       center: [4.5, 10.4]          # below the SHT45 island
       diameter: 2.2                # non-plated, M2
@@ -69,7 +75,7 @@ mechanical:
       body: [1.5, 1.5, 0.55]       # L x W x H, sensing opening on top (+Z)
       island: [[2.5, 2.5], [7.5, 6.5]]   # board island it sits on; joins the board only via the neck
       neck: [[7.5, 3.3], [8.5, 5.7]]
-      slot_width: 1.0              # milled slot round the island on 3 sides (top, left, bottom)
+      slot_width: 1.0              # milled slot round the island on 3 sides (top, left, bottom); = JLC's minimum
       slot: [[1.5, 1.5], [8.5, 1.5], [8.5, 3.3], [7.5, 3.3], [7.5, 2.5], [2.5, 2.5], [2.5, 6.5],
              [7.5, 6.5], [7.5, 5.7], [8.5, 5.7], [8.5, 7.5], [1.5, 7.5]]   # cutout polygon
     veml7700:                      # ambient light, side-view package, at the end opposite the SHT45
@@ -93,15 +99,17 @@ mechanical:
     outline: [60.0, 30.0]          # W x H rectangle, square corners (global limit 60 x 30)
     thickness: 1.6
     max_part_height: 4.25          # J_SEN66 (JST GH side entry); the module is 3.1, the button 3.35
-    step:                          # kicad-cli pcb export step --grid-origin (checked in SolidCraft)
+    step:                          # hardware/step/airq-main.step (build.py main --step: --grid-origin)
       x: X                         # STEP x = X
       y: -Y                        # STEP y = -Y (KiCad's 3-D frame has Y up)
       z: Z + 1.6                   # parts sit on the top face at STEP z = 1.6; board bottom at z = 0
+      # KiCad's board body is the dielectric only (no copper, mask): z 0 .. 1.51; checked in
+      # SolidCraft 2026-11-25: board x 0..60, y -30..0; J2 body x 0.35..5.21, y -23.38..-12.63, top 5.845
     mounting_holes:                # M2, non-plated
       diameter: 2.2
       centers: [[8.55, 2.6], [57.4, 22.8]]   # H1 rear-left (8 mm from the USB-C), H2 front-right (button)
       clear_diameter: 4.4          # no tracks or vias (screw head / boss); the GND pour runs up to the hole
-    antenna:                       # ESP32-C6-WROOM-1 (U3, PROVISIONAL R22) at the rear-right corner
+    antenna:                       # ESP32-C6-WROOM-1 (U3; option A, owner-confirmed 2026-11-25) at the rear-right corner
       module_body: [[41.0, -5.99], [59.0, 19.51]]   # 18 x 25.5, 3.1 high; part of it hangs over the edge
       overhang: 5.99               # the 6.0 mm antenna strip lies beyond the rear edge (y < 0)
       feed_side: +X                # Espressif keep-out: >= 15 mm toward -X, 2 mm toward +X

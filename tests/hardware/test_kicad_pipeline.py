@@ -64,10 +64,9 @@ def test_dnp_and_fields_reach_the_netlist(make_design, libs, tmp_path):
 BOARDS = ("main", "tongue")      # tools/hw/build.py boards: hardware/src/<board> -> hardware/kicad/<board>
 
 
-def _tracked(board: str) -> list[str]:
-    """Names of the committed (git-tracked) files in hardware/kicad/<board>."""
-    out = subprocess.run(["git", "ls-files", f"hardware/kicad/{board}"], cwd=REPO,
-                         capture_output=True, text=True)
+def _tracked(folder: str) -> list[str]:
+    """Names of the committed (git-tracked) files in `folder` (relative to the repository)."""
+    out = subprocess.run(["git", "ls-files", folder], cwd=REPO, capture_output=True, text=True)
     if out.returncode != 0:
         pytest.skip("git is not available")
     return sorted(Path(line).name for line in out.stdout.splitlines())
@@ -87,13 +86,15 @@ def _scratch_repo(root: Path, board: str = "main") -> Path:
     shutil.copy(REPO / "hardware/kicad/lib/airq.kicad_sym", lib)
     shutil.copytree(REPO / "hardware/kicad/lib/airq.pretty", lib / "airq.pretty")
     (root / f"hardware/kicad/{board}").mkdir()
-    for name in _tracked(board):
+    for name in _tracked(f"hardware/kicad/{board}"):
         shutil.copy(REPO / f"hardware/kicad/{board}" / name, root / f"hardware/kicad/{board}" / name)
     return root
 
 
 def _text(path: Path) -> bytes:
-    return path.read_bytes().replace(b"\r\n", b"\n")
+    """The file's bytes; a text file's with LF line ends (git may check them out with CRLF)."""
+    data = path.read_bytes()
+    return data if path.suffix == ".zip" else data.replace(b"\r\n", b"\n")
 
 
 @pytest.fixture(scope="module", params=BOARDS)
@@ -117,17 +118,20 @@ def test_board_is_clean(board_build):
     assert not [k for (_, k) in res.drc if k == "silk_edge_clearance"], res.drc
 
 
-def test_rebuilding_the_committed_project_changes_nothing(board_build):
-    """The stale-output guard: the committed files are exactly what a rebuild leaves behind.
+@pytest.mark.parametrize("folder", ["kicad", "fab"])
+def test_rebuilding_the_committed_project_changes_nothing(board_build, folder):
+    """The stale-output guard: the committed files are exactly what a rebuild leaves behind, both
+    the KiCad project (hardware/kicad/<board>/) and the JLC upload files (hardware/fab/<board>/:
+    Gerber zip, bom.csv, cpl.csv).
 
     Fails when the source changed without a rebuild, after a KiCad GUI save that a rebuild
     normalises, or when a generated file is not committed (or an obsolete one still is).
     """
     board, root, res = board_build
-    written = sorted(p.name for p in res.written)
-    assert written == _tracked(board), f"commit exactly the files tools/hw/build.py {board} writes"
-    stale = [n for n in written if _text(root / f"hardware/kicad/{board}" / n)
-             != _text(REPO / f"hardware/kicad/{board}" / n)]
+    written = sorted(p.name for p in (res.written if folder == "kicad" else res.fab))
+    where = f"hardware/{folder}/{board}"
+    assert written == _tracked(where), f"commit exactly the files tools/hw/build.py {board} writes"
+    stale = [n for n in written if _text(root / where / n) != _text(REPO / where / n)]
     assert not stale, f"run tools/hw/build.py {board} and commit: {stale}"
 
 

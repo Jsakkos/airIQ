@@ -84,6 +84,10 @@ class Design:
     # hardware/interface.yaml (`signals`, `connectors`) when project.yaml names it: the generator
     # then wires the MCU (Role MCU) and every Role-tagged connector from it, see gen_sch.py
     interface: dict | None = None
+    # project.yaml `fab` (folder for the JLC upload files: Gerber zip, bom.csv, cpl.csv) and `step`
+    # (the board's STEP model, written by `build.py --step`); None when not given
+    fab_dir: Path | None = None
+    step_file: Path | None = None
 
     def rel(self, path: Path) -> str:
         """`path` relative to the repository root (the source folder is hardware/src/<board>)."""
@@ -94,7 +98,7 @@ class Design:
 
 
 _PROJECT_KEYS = {"project", "title", "company", "rev", "sheets", "power_symbols", "libraries",
-                 "output", "erc_severities", "interface"}
+                 "output", "fab", "step", "erc_severities", "interface"}
 _SHEET_KEYS = {"title", "paper", "parts", "notes"}
 _NOTE_KEYS = {"text", "at", "size"}
 _PART_KEYS = {"symbol", "at", "rot", "mirror", "stub", "value", "footprint", "lcsc", "dnp",
@@ -409,4 +413,6 @@ def load_design(src_dir: Path) -> Design:
         footprint_libs={k: (src_dir / v).resolve() for k, v in (libs.get("footprints") or {}).items()},
         out_dir=(src_dir / proj["output"]).resolve(),
         erc_severities={str(k): str(v) for k, v in (proj.get("erc_severities") or {}).items()},
-        layout=layout, src_dir=src_dir.resolve(), interface=interface)
+        layout=layout, src_dir=src_dir.resolve(), interface=interface,
+        fab_dir=(src_dir / proj["fab"]).resolve() if proj.get("fab") else None,
+        step_file=(src_dir / proj["step"]).resolve() if proj.get("step") else None)

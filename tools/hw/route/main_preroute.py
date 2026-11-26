@@ -9,8 +9,9 @@ the matching lines here must be redrawn by hand. It is an authoring record (how 
 made), not part of the build.
 
 Like routing drawn in KiCad, what it writes is board-owned: tools/hw/build.py keeps it on every rebuild
-(hardware/README.md, regeneration contract). Re-runnable: it first removes what it wrote before
-(boarditems.Items, uuid5 namespace below). Coordinates: mm from the board's top-left corner.
+(hardware/README.md, regeneration contract). Run it only from route_main.sh, on an unrouted board
+(route_main.sh runs `cleanup.py unroute` first); its items carry uuid5 names (boarditems.Items,
+namespace below). Coordinates: mm from the board's top-left corner.
 """
 import sys
 from pathlib import Path

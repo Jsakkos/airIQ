@@ -1,6 +1,6 @@
 """Build a board's KiCad 10 project from its design source, then check and export it.
 
-    uv run --with pyyaml python tools/hw/build.py {main,tongue} [--routed]
+    uv run --with pyyaml python tools/hw/build.py {main,tongue} [--routed] [--step]
 
 Steps (outputs other than the KiCad project go to build/):
  1. read hardware/src/<board>/ (design.py);
@@ -13,7 +13,13 @@ Steps (outputs other than the KiCad project go to build/):
     current board, and let KiCad re-save it (`kicad-cli pcb upgrade --force`);
  6. ERC, and DRC with schematic parity after refilling the zones; DRC saves the board, so the
     committed zone fills always match the footprints (build/<board>-erc.json, -drc.json);
- 7. JLC BOM and CPL (build/<board>-bom.csv, -cpl.csv) and Specctra DSN (build/<board>.dsn).
+ 7. JLC BOM and CPL (build/<board>-bom.csv, -cpl.csv), Gerbers and drill files
+    (build/<board>-gerbers/, zipped as build/<project>-gerbers.zip; options in jlc.py) and the
+    Specctra DSN (build/<board>.dsn);
+ 8. publish the JLC upload files into the project's `fab` folder (hardware/fab/<board>/:
+    <project>-gerbers.zip, bom.csv, cpl.csv); they are committed, like the KiCad project;
+ 9. with --step only: the STEP model into the project's `step` file (hardware/step/), for the
+    enclosure. Not part of every build: the export takes seconds and is not byte-reproducible.
 
 Exit status 1 if ERC reports an error, or DRC reports an error other than unrouted
 connections; with --routed (after routing) those count too.
@@ -34,12 +40,17 @@ from design import DesignError, load_design
 from gen_pcb import Board, generate_board, read_netlist
 from gen_project import kicad_dru, kicad_pro, lib_tables
 from gen_sch import generate_schematics, resolve_design
-from jlc import BOM_ARGS, cpl_from_pos
+from jlc import BOM_ARGS, DRILL_ARGS, GERBER_ARGS, cpl_from_pos, gerber_zip
 from kicad_lib import Libraries
 
 REPO = Path(__file__).resolve().parents[2]
 BOARDS = {"main": REPO / "hardware/src/main", "tongue": REPO / "hardware/src/tongue"}
 UNROUTED = "unconnected_items"
+# STEP origin = KiCad's grid origin, the board's top-left corner (the layout.yaml placement frame):
+# STEP x = X, y = -Y, z = Z + board thickness (board bottom at z = 0); recorded in
+# hardware/interface.yaml `mechanical.<board>.step`. DNP parts (the unfitted J_AUX_UART header) are
+# left out: they are not on the built board.
+STEP_ARGS = ["--subst-models", "--grid-origin", "--no-dnp", "--force"]
 
 
 def _write(path: Path, text: str) -> None:
@@ -120,16 +131,39 @@ def _print_counts(title: str, counts: Counter) -> None:
                           or "clean"))
 
 
-def export_fab(sch: Path, pcb: Path, build: Path, board: str) -> None:
-    kicad_env.run_cli("sch", "export", "bom", *BOM_ARGS, "-o", build / f"{board}-bom.csv", sch)
+def export_fab(sch: Path, pcb: Path, build: Path, board: str, fab_dir: Path | None) -> list[Path]:
+    """BOM, CPL, Gerber zip and DSN into `build`; the JLC upload files also into `fab_dir`.
+
+    Returns the files written into `fab_dir` (none without one)."""
+    bom, cpl = build / f"{board}-bom.csv", build / f"{board}-cpl.csv"
+    kicad_env.run_cli("sch", "export", "bom", *BOM_ARGS, "-o", bom, sch)
     pos = build / f"{board}-pos.csv"
     kicad_env.run_cli("pcb", "export", "pos", "--format", "csv", "--units", "mm", "--side", "front",
                       "--use-drill-file-origin", "--exclude-dnp", "-o", pos, pcb)
-    _write(build / f"{board}-cpl.csv", cpl_from_pos(pos.read_text(encoding="utf-8")))
+    _write(cpl, cpl_from_pos(pos.read_text(encoding="utf-8")))
+    gerbers = build / f"{board}-gerbers"
+    shutil.rmtree(gerbers, ignore_errors=True)
+    gerbers.mkdir(parents=True)
+    kicad_env.run_cli("pcb", "export", "gerbers", *GERBER_ARGS, "-o", gerbers, pcb)
+    kicad_env.run_cli("pcb", "export", "drill", *DRILL_ARGS, "-o", gerbers, pcb)
+    zipped = build / f"{pcb.stem}-gerbers.zip"
+    zipped.write_bytes(gerber_zip(gerbers))
     dsn = subprocess.run([str(kicad_env.kicad_python()), str(Path(__file__).with_name("kicad_dsn.py")),
                           str(pcb), str(build / f"{board}.dsn")], capture_output=True, text=True)
     if dsn.returncode != 0:
         raise RuntimeError(f"DSN export failed:\n{dsn.stdout}{dsn.stderr}")
+    if fab_dir is None:
+        return []
+    fab_dir.mkdir(parents=True, exist_ok=True)
+    published = [fab_dir / zipped.name, fab_dir / "bom.csv", fab_dir / "cpl.csv"]
+    for src, dst in zip((zipped, bom, cpl), published):
+        shutil.copyfile(src, dst)
+    return published
+
+
+def export_step(pcb: Path, step: Path) -> None:
+    step.parent.mkdir(parents=True, exist_ok=True)
+    kicad_env.run_cli("pcb", "export", "step", *STEP_ARGS, "-o", step, pcb)
 
 
 @dataclass
@@ -137,11 +171,13 @@ class BuildResult:
     sch: Path
     pcb: Path
     written: list[Path]       # every KiCad project file the generator owns (what to commit)
+    fab: list[Path]           # the JLC upload files published into the project's `fab` folder
     unplaced: list[str]
     hand_edges: list[str]     # UUIDs of Edge.Cuts items not from layout.yaml (kept)
     erc: Counter              # (severity, violation type) -> count
     drc: Counter
     edges_replaced: bool = False  # the board's generated Edge.Cuts differed from layout.yaml
+    step: Path | None = None      # the STEP model, when exported (--step)
 
     def errors(self, routed: bool) -> int:
         """ERC errors plus DRC errors; unrouted connections only count once `routed`."""
@@ -150,9 +186,13 @@ class BuildResult:
                       if sev == "error" and (routed or kind != UNROUTED)))
 
 
-def build(src_dir: Path, build_dir: Path, board: str) -> BuildResult:
-    """Run every step for the design in `src_dir`; exports go to `build_dir`/<board>*."""
+def build(src_dir: Path, build_dir: Path, board: str, step: bool = False) -> BuildResult:
+    """Run every step for the design in `src_dir`; exports go to `build_dir`/<board>*, the JLC
+    upload files also to the project's `fab` folder, and with `step` the STEP model to its `step`
+    file."""
     design = load_design(src_dir)
+    if step and design.step_file is None:
+        raise DesignError(["project.yaml: --step needs `step` (the STEP file to write)"])
     libs = upgrade_libraries(design, build_dir / "kicad-lib")
     sch, written = build_schematic(design, libs)
     netlist = build_dir / f"{board}.net"
@@ -160,9 +200,11 @@ def build(src_dir: Path, build_dir: Path, board: str) -> BuildResult:
     pcb, layout = build_board(design, libs, netlist)
     erc = run_erc(sch, build_dir / f"{board}-erc.json")
     drc = run_drc(pcb, build_dir / f"{board}-drc.json")
-    export_fab(sch, pcb, build_dir, board)
-    return BuildResult(sch, pcb, [*written, pcb], layout.unplaced, layout.hand_edges, erc, drc,
-                       layout.edges_replaced)
+    fab = export_fab(sch, pcb, build_dir, board, design.fab_dir)
+    if step:
+        export_step(pcb, design.step_file)
+    return BuildResult(sch, pcb, [*written, pcb], fab, layout.unplaced, layout.hand_edges, erc, drc,
+                       layout.edges_replaced, design.step_file if step else None)
 
 
 def main(argv: list[str]) -> int:
@@ -170,9 +212,11 @@ def main(argv: list[str]) -> int:
     ap.add_argument("board", choices=sorted(BOARDS))
     ap.add_argument("--routed", action="store_true",
                     help="treat unrouted connections as DRC errors (after routing)")
+    ap.add_argument("--step", action="store_true",
+                    help="also export the board's STEP model (project.yaml `step`) for the enclosure")
     args = ap.parse_args(argv)
     try:
-        res = build(BOARDS[args.board], REPO / "build", args.board)
+        res = build(BOARDS[args.board], REPO / "build", args.board, step=args.step)
     except DesignError as e:
         print("design source problems:\n" + "\n".join(f"  {p}" for p in e.problems))
         return 2
@@ -188,7 +232,13 @@ def main(argv: list[str]) -> int:
               f"{len(res.hand_edges)}")
     _print_counts("ERC", res.erc)
     _print_counts("DRC", res.drc)
-    print(f"exports:   build/{args.board}.net, -bom.csv, -cpl.csv, .dsn, -erc.json, -drc.json")
+    print(f"exports:   build/{args.board}.net, -bom.csv, -cpl.csv, -gerbers/, .dsn, -erc.json, "
+          "-drc.json")
+    if res.fab:
+        print(f"fab:       {res.fab[0].parent.relative_to(REPO).as_posix()}/: "
+              + ", ".join(p.name for p in res.fab))
+    if res.step:
+        print(f"step:      {res.step.relative_to(REPO).as_posix()}")
     return 1 if res.errors(args.routed) else 0
 
 

@@ -23,6 +23,7 @@ OX, OY = LAYOUT["board"]["origin"]
 SHT45_HALF = 0.75          # SHT45 body: 1.5 x 1.5 mm
 CLEAR = 1.5                # global constraint: no other copper within 1.5 mm of it
 VEML_FRONT = 1.85          # VEML7700 footprint: window face at footprint y = -1.85 (lib README)
+JLC_MIN_SLOT = 1.0         # "Min. Non-Plated Slots", jlcpcb.com/capabilities/pcb-capabilities
 
 
 def _inside(pt, poly) -> bool:
@@ -64,15 +65,15 @@ def test_arrangement_follows_the_front_edge():
 
 @pytest.mark.parametrize("direction", [(-1, 0), (0, -1), (0, 1)], ids=["left", "top", "bottom"])
 def test_slot_surrounds_the_sht45_on_three_sides(direction):
-    """Walking out from the SHT45 to the left, top and bottom crosses the slot, >= 0.8 mm wide
-    (JLC mills internal slots with a >= 0.8 mm bit); toward the neck (+X) there is no slot."""
+    """Walking out from the SHT45 to the left, top and bottom crosses the slot, at least JLCPCB's
+    minimum non-plated slot width of 1.0 mm wide; toward the neck (+X) there is no slot."""
     slot = [tuple(p) for p in LAYOUT["board"]["cutouts"][0]]
     cx, cy = PLACE["U1"][:2]
     step = 0.01
     hits = [i for i in range(1, 600)
             if _inside((cx + direction[0] * i * step, cy + direction[1] * i * step), slot)]
     width = (hits[-1] - hits[0] + 1) * step if hits else 0.0
-    assert width >= 0.8 - 1e-9
+    assert width >= JLC_MIN_SLOT - 1e-9
     assert len(hits) == hits[-1] - hits[0] + 1          # one continuous slot
     assert not any(_inside((cx + i * step, cy), slot) for i in range(1, 600))
 

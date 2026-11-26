@@ -23,9 +23,11 @@ board:
   origin: [100.0, 100.0]     # page position of the top-left corner
   thickness: 1.6
   cutouts:
-    # Milled slot around the SHT45, 1.0 mm wide (JLC mills internal slots with a >= 0.8 mm bit;
-    # the inside corners get the bit's radius). One polygon: top arm, left arm, bottom arm, and a
-    # 1.0 mm hook at each arm's right end that narrows the island's neck to 2.4 mm (y 3.3..5.7).
+    # Milled slot around the SHT45, 1.0 mm wide: JLCPCB's minimum non-plated slot ("Min. Non-Plated
+    # Slots: 1.0mm", drawn on the outline layer; jlcpcb.com/capabilities/pcb-capabilities, read
+    # 2026-11-25), so there is no margin: do not narrow it. The bit rounds the slot's ends. One
+    # polygon: top arm, left arm, bottom arm, and a 1.0 mm hook at each arm's right end that
+    # narrows the island's neck to 2.4 mm (y 3.3..5.7).
     - [[1.5, 1.5], [8.5, 1.5], [8.5, 3.3], [7.5, 3.3], [7.5, 2.5], [2.5, 2.5], [2.5, 6.5],
        [7.5, 6.5], [7.5, 5.7], [8.5, 5.7], [8.5, 7.5], [1.5, 7.5]]
 

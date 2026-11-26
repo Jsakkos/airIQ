@@ -65,7 +65,9 @@ class Items:
 
     def pour(self, net: str, layer: str, name: str, pts, clearance=0.2, thermal_gap=0.25,
              thermal_bridge=0.3, min_thickness=0.2) -> None:
-        """A copper pour, unfilled (the build's DRC run fills it). Keeps every island (mode 0)."""
+        """A copper pour, unfilled (the build's DRC run fills it). Isolated islands are removed:
+        KiCad's `island_removal_mode 0` means "always remove" (`island_area_min` only applies to
+        mode 2, "below that area")."""
         self.items.append(f"""\t(zone (net "{net}") (layer "{layer}") (uuid "{self._uid()}") (name "{name}")
 \t\t(hatch edge 0.5) (priority 0) (connect_pads (clearance {clearance})) (min_thickness {min_thickness})
 \t\t(filled_areas_thickness no)
