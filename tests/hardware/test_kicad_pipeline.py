@@ -1,5 +1,6 @@
 """End-to-end checks that need KiCad 10 (kicad-cli); skipped where it is not installed (CI)."""
 import csv
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -21,6 +22,19 @@ try:
 except kicad_env.KicadNotFound:
     HAVE_KICAD = False
 pytestmark = pytest.mark.skipif(not HAVE_KICAD, reason="kicad-cli (KiCad 10) not installed")
+KICAD_VERSION = kicad_env.kicad_version() if HAVE_KICAD else None
+# The byte-for-byte guard holds on the KiCad release the committed files were made with only: KiCad
+# re-saves the files and writes its version into the Gerber and drill headers.
+OTHER_KICAD = pytest.mark.skipif(
+    KICAD_VERSION != kicad_env.PINNED_VERSION,
+    reason=f"kicad-cli is {KICAD_VERSION}, the committed files were made with KiCad "
+           f"{kicad_env.PINNED_VERSION} (tools/hw/kicad_env.py PINNED_VERSION): rebuild both boards, "
+           f"check them, commit the result and update PINNED_VERSION (hardware/README.md, "
+           f"\"Regeneration contract\")")
+
+
+def test_kicad_version_is_read():
+    assert re.match(r"\d+\.\d+\.\d+", KICAD_VERSION or ""), KICAD_VERSION
 
 
 def _netlist(make_design, libs, tmp_path, parts) -> str:
@@ -118,6 +132,7 @@ def test_board_is_clean(board_build):
     assert not [k for (_, k) in res.drc if k == "silk_edge_clearance"], res.drc
 
 
+@OTHER_KICAD
 @pytest.mark.parametrize("folder", ["kicad", "fab"])
 def test_rebuilding_the_committed_project_changes_nothing(board_build, folder):
     """The stale-output guard: the committed files are exactly what a rebuild leaves behind, both
@@ -125,7 +140,8 @@ def test_rebuilding_the_committed_project_changes_nothing(board_build, folder):
     Gerber zip, bom.csv, cpl.csv).
 
     Fails when the source changed without a rebuild, after a KiCad GUI save that a rebuild
-    normalises, or when a generated file is not committed (or an obsolete one still is).
+    normalises, or when a generated file is not committed (or an obsolete one still is). Skipped
+    when kicad-cli is not the pinned release (kicad_env.PINNED_VERSION).
     """
     board, root, res = board_build
     written = sorted(p.name for p in (res.written if folder == "kicad" else res.fab))

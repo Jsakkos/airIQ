@@ -239,6 +239,11 @@ def main(argv: list[str]) -> int:
               + ", ".join(p.name for p in res.fab))
     if res.step:
         print(f"step:      {res.step.relative_to(REPO).as_posix()}")
+    version = kicad_env.kicad_version()
+    if version != kicad_env.PINNED_VERSION:
+        print(f"note:      kicad-cli {version}; the committed files were made with KiCad "
+              f"{kicad_env.PINNED_VERSION}, so the files KiCad saves may differ: check both boards, "
+              "commit the rebuild and update kicad_env.PINNED_VERSION (README, regeneration contract)")
     return 1 if res.errors(args.routed) else 0
 
 

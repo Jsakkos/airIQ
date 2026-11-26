@@ -126,6 +126,24 @@ mechanical:
       mouth_y: 30.0                # body front face on the edge; body 15.5 wide x 5.4 deep x 2.0 high
       pin1_x: 34.55                # pin 1 on the viewer's right, pin 24 at x 23.05
       insertion: unfolded, display side up -> FPC pin i on connector pin i (lib README, R27)
+      # Any route (folds, twists): the order in J7 depends only on which tail face is up inside it.
+      pin_order: contacts (display side) up -> FPC pin i on pin i; contacts down -> mirrored (pin 1 on 24)
+      airq_fit: not reachable as placed, owner decision open (hardware/README.md, E-ink FPC fit)
+      panel_tail:                  # the GDEY029T94's FPC tail, read from GoodDisplay "GDEY029T94 Product
+        # Specifications" Rev 1.0 (2021/03/15), section 4 "Mechanical Drawing of EPD module" (p. 7):
+        # front view (display side, panel landscape, tail on the left) and side view ("CONTACT SIDE",
+        # "STIFFENER"). Quoted labels are the drawing's dimensions.
+        exits: short end           # one 36.7 mm end of the 79.0 x 36.7 outline, flat in the panel plane
+        length: 14.40              # outline to the finger end ("14.40")
+        width: 12.50               # "12.50+-0.1" over the 9.56 mm next to the finger end ("9.56"); then it
+                                   # widens to 15.31 at the glass bond (10.42 / 10.97 from the long edges)
+        offset: 0.60               # tail centre off the end's centre, toward the pin-24 long edge: 11.50 from
+                                   # that edge ("11.50"), 12.70 from the pin-1 edge
+        contacts: [24, 0.5, 3.66]  # count, pitch ("P0.5X23=11.50+-0.05"), length ("3.66"); on the display side
+        stiffener: 6.20            # "6.20+-0.3" from the finger end, on the back (dashed in the front view);
+                                   # 0.3 +-0.03 thick there, so only the 8.2 mm next to the glass can bend
+        pin1: upper contact        # front view: display toward you, tail on the left -> pin 1 ("1") on top,
+                                   # nearer the long edge 12.70 mm away; pin 24 ("24") below
     j_sen66:                       # J2, JST GH 6-pin side entry (SM06B-GHS-TB), front half of the left edge
       edge: -X                     # left edge; the cable leaves toward -X
       center_y: 18.0

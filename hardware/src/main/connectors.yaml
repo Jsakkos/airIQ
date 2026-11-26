@@ -12,7 +12,7 @@ paper: A4
 
 notes:
   - {text: "J_SEN66: Sensirion SEN66, JST GH 6-pin side entry\nPin order: hardware/interface.yaml (SEN6x datasheet Table 16)\nPins 5, 6 NC; 7, 8 = mounting tabs", at: [17.78, 63.5], size: 1.8}
-  - {text: "SEN66 VDD: 10 uF at the connector (R15)", at: [17.78, 109.22], size: 1.8}
+  - {text: "SEN66 VDD: 10 uF bulk at the connector", at: [17.78, 109.22], size: 1.8}
   - {text: "Qwiic sockets, JST SH 4-pin side entry (pin order: hardware/interface.yaml)\nJ_QWIIC_TONGUE: cable to the sense tongue (SHT45, VEML7700)\nJ_QWIIC_AUX: spare, e.g. SFA40 formaldehyde (airQ)\nPins 5, 6 = fitting nails", at: [129.54, 63.5], size: 1.8}
   - {text: "J_LED_EXT: off-board LED segment, JST SH 3-pin\n+5V, LED_DOUT_5V (DOUT of the last on-board LED), GND\nPins 4, 5 = fitting nails", at: [17.78, 124.46], size: 1.8}
   - {text: "H1, H2: M2 mounting holes (2.2 mm, non-plated)", at: [17.78, 177.8], size: 1.8}

@@ -17,7 +17,7 @@ paper: A4
 
 notes:
   - {text: "ESP32-C6 module (Role MCU)\nESP32-C6-WROOM-1-N8 (owner-confirmed, ruling R22)\nGPIO signals: hardware/interface.yaml `signals`\nIO12 / IO13 = USB D- / D+ (native USB flashing)\nGPIO4, GPIO5, GPIO15 (straps) and IO0, IO1, IO3, IO10, IO11: not connected", at: [73.66, 50.8], size: 1.8}
-  - {text: "Module 3V3: 10 uF (R15) + 100 nF", at: [17.78, 63.5], size: 1.8}
+  - {text: "Module 3V3: 10 uF bulk + 100 nF", at: [17.78, 63.5], size: 1.8}
   - {text: "EN: 10 k / 1 uF reset RC", at: [17.78, 99.06], size: 1.8}
   - {text: "GPIO8 strap: 10 k pull-up\n(ROM download needs it high)\nGPIO9 = BUTTON: pull-up on\nthe leds_button sheet", at: [17.78, 142.24], size: 1.8}
   - {text: "I2C bus: 4.7 k pull-ups to +3V3 (main board only)\nShared by SEN66, sense tongue, Qwiic aux, pressure sensor", at: [154.94, 63.5], size: 1.8}

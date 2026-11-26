@@ -40,7 +40,8 @@ them and a test fails if the committed ones differ from a rebuild, see "Fab outp
 
 1. Rebuild both boards (`build.py main --routed`, `build.py tongue --routed`: exit 0, DRC clean), run the
    gates and the tests ("Build and check a board" below), and check that `git status` is clean, so the files
-   you upload are what was checked.
+   you upload are what was checked. This holds on KiCad 10.0.8, the pinned release: on any other, the
+   rebuild rewrites the files KiCad saves (see "Regeneration contract"); check and commit that rebuild first.
 2. On the day of the order, look up every BOM part on LCSC/JLC (stock, still "Economic"), update `stock` and
    `checked_on` in `bom/parts.csv`, then run the freshness gate. It must print nothing (exit 0):
    ```
@@ -48,15 +49,30 @@ them and a test fails if the committed ones differ from a rebuild, see "Fab outp
    uv run python tools/hw/check_bom.py hardware/fab/tongue/bom.csv hardware/bom/parts.csv --fresh-days 7
    ```
    Watch the VEML7700-TR (C504893, tongue): only 308 were in stock on 2026-11-25.
-3. After uploading, **check JLC's rotation/offset preview against the silkscreen before paying**: every
+3. **Main boards meant for airQs: decide the e-ink FPC fit first.** The panel's tail does not reach J7 in
+   the airQ enclosure ("E-ink FPC fit (airQ)" below); record the owner's choice of option there. Boards for
+   the bench or the airQ mini are not affected.
+4. **Side-looking parts, if one of each is at hand:** check against the real part that the SK6812SIDE-A
+   emits from the face opposite its terminals (footprint +y, out of the main board's front edge) and that the
+   VEML7700-TR's window is on the side opposite its leads (footprint −y, out of the tongue's front edge).
+   Both directions were read from 2-D drawings only (`kicad/lib/README.md`, "Pad maps checked by hand", fix 13).
+5. After uploading, **look at the files in JLC's Gerber viewer** (every copper, mask, paste and silkscreen
+   layer; the outline with the tongue's slot; the drill holes, including the USB-C shell-leg slots and their
+   paste) **and check its rotation/offset preview against the silkscreen before paying**: every
    part's pin 1 or polarity mark (D5–D7 cathode bars, the SOT-23 parts U1, U2, U5, Q1, the module U3, U4, and
    the tongue's U1), and the parts that look out of a board edge (LEDs D1–D4, J1–J5, the FPC J7, the button
    SW1, the tongue's VEML7700 U2 and J1) facing out of that edge as the silkscreen shows. The CPL uses
    KiCad's rotations with no per-part offsets (see "Fab outputs"); correct any part JLC shows turned in its
-   preview, and note it here for the next order.
+   preview, and note it here for the next order. No Gerber viewer was run on these files before the first
+   order; KiCad's own checks and `tests/hardware/test_fab.py` are all that has read them.
 
 **Bought separately** (not on JLC's BOM): 11 SEN66, SEN6x cables (JST GH 6-pin), e-ink panels (GoodDisplay
 GDEY029T94), Qwiic cables (JST SH 4-pin, also for the tongue), and the optional SFA40.
+
+**USB supply and cable** (not part of the BOM, spec §6.7): a 5 V supply good for 1 A and a decent cable. The
+TPS562201 buck is specified for VIN ≥ 4.5 V (its undervoltage lockout wakes at 3.8–4.3 V), and the LED buffer
+(SN74AHCT1G125, VCC 4.5–5.5 V) runs on +5 V too. A long or thin cable that lets VBUS sag at about 1 A can brown
+the board out (ruling R29).
 
 **Not fitted:** J6 (`J_AUX_UART`, DNP): JLC drills and plates its six 2.54 mm holes and fits no header.
 
@@ -75,10 +91,97 @@ GDEY029T94), Qwiic cables (JST SH 4-pin, also for the tongue), and the optional 
 | Board size, assembly | 60 × 30 mm, 22 × 13 mm | Economic PCBA: 10 × 10 mm minimum, one side, 2–50 boards, edge rails and fiducials "not necessary" |
 | Silkscreen | text 1.0 mm high, 0.15 mm stroke; some footprint outlines 0.06–0.12 mm (KiCad stock and EasyEDA footprints) | line width ≥ 0.15 mm, text ≥ 1.0 mm high: the thinner outline lines may print faint (cosmetic) |
 
-The main board's module antenna overhangs the rear edge by 6 mm. Economic PCBA lists edge rails as not
-necessary; if JLC's review asks for rails or a panel because of the overhang, that is an owner decision (cost).
-The USB-C receptacle J1's four shell legs are plated slots with no paste in the files (the vendor footprint);
-JLC places the part on its SMT line, so confirm in its review that the legs get soldered.
+**Parts at the board edges** (for JLC's question about edge rails, a panel or tabs; Economic PCBA lists edge
+rails as not necessary, so adding them is an owner decision on cost). Positions from `interface.yaml`
+`mechanical.*`:
+
+| Edge | Parts at or over it |
+|---|---|
+| Main, rear (y = 0) | the module U3's 6 mm antenna strip **overhangs** it (x 41–59); the USB-C J1's mouth is flush (y 0.03, x 11.7–20.7) |
+| Main, front (y = 30) | the LEDs D1–D4 (light faces on the edge), the FPC J7's mouth (on the edge, x 21–36.5), the button SW1's actuator **0.24 mm beyond** it (x 56–58), the J3 and J5 mouths 0.6 and 0.8 mm inside |
+| Main, left (x = 0) | the J2 (SEN66) and J4 (Qwiic) mouths, 0.35 and 0.64 mm inside |
+| Main, right (x = 60) | nothing; the module body ends 1 mm inside |
+| Tongue, front (y = 0) | the VEML7700 U2's window face, 0.25 mm inside (x 14.95–21.75) |
+| Tongue, rear (y = 13) | the Qwiic J1's mouth, 0.64 mm inside (x 12–18) |
+
+So the main board's right edge is the only one free of parts, and the only one a rail or V-groove could run
+along without touching a part (the module ends 1 mm from it). On the other three edges the parts need their
+edge clear: a routed outline with tabs placed away from them, and nothing at all in front of the antenna
+strip. On the tongue, keep rails and tabs off the front and rear edges.
+
+The USB-C receptacle J1's four plated shell legs have pin-in-paste apertures on F.Paste, sized to their pads
+(`kicad/lib/README.md` fix 22), and reach the pours through thermal reliefs (only its SMD ground pins are
+tied solid), so they solder in JLC's SMT reflow with the rest of the part. Still confirm in JLC's review that
+the legs get soldered.
+
+### E-ink FPC fit (airQ): open owner decision
+
+**The panel's tail**, read from GoodDisplay's *GDEY029T94 Product Specifications* Rev 1.0 (2021/03/15),
+section 4 "Mechanical Drawing of EPD module", p. 7 (front view of the display side, panel landscape, tail on
+the left; side view), recorded in `interface.yaml` `mechanical.main.fpc.panel_tail`:
+
+- It leaves one **short (36.7 mm) end** of the 79.0 × 36.7 mm outline, flat, in the panel's plane.
+- It is **14.40 mm long** from the outline to the finger end, and **12.50 mm wide** over the 9.56 mm next to
+  the finger end. From there it widens to 15.31 mm where it is bonded to the glass.
+- Its centre is 0.60 mm off the centre of that end: 11.50 mm from one long edge, 12.70 mm from the other.
+- Its 24 contacts (0.5 mm pitch, 3.66 mm long) are on the display side. A 6.20 mm stiffener is on the back,
+  from the finger end (the tail is 0.3 mm thick there), so only the 8.2 mm next to the glass can bend.
+- Seen from the display side with the tail on the left, **pin 1 is the upper contact**, on the side of the
+  long edge 12.70 mm away; pin 24 is the lower one.
+- An unlabelled hatched block at that end, about 2.3–7.4 mm from the pin-1 long edge, reaches about 4.6 mm
+  past the outline (scaled from the drawing). Check it on a real panel before sizing the panel pocket.
+
+**Reach: not reachable as placed.** The assumed airQ pose (spec §6.4, §6.9):
+
+- The panel is landscape on the front face, display toward the user, tilted 30° back and centred over the
+  board's width (x 30).
+- The board is horizontal below it, its front edge just behind the front face.
+- The panel's lower edge is at or above the board's top face (the LED line is under the screen).
+
+J7 takes the tail through its mouth on the front edge (x 22.55–35.05 for the 12.5 mm tail, about 1 mm above
+the board), travelling −Y. The rest is geometry (lower bounds, with a zero bend radius):
+
+- **Distance** (figures for the tail on the user's left; in brackets, on the right, with the panel turned
+  180°). The tail starts at the panel's end, x −9.5 (69.5), and at least 11.50 (12.70) mm up the tilted
+  panel, so at least 9.96 (11.0) mm above the board. From its nearest corner to the nearest end of J7's slot
+  is at least 33.8 (36.4) mm in a straight line, and about 3.5 mm more goes inside the connector. That needs
+  at least 37.3 (39.9) mm of tail. There are 14.4 mm: **short by at least 22.9 (25.5) mm**, before any fold.
+- **Direction.** The tail leaves along ±X with its width running up the panel. J7 needs it travelling −Y,
+  with its width along X and lying flat. That takes a diagonal (45°) crease and a bend, or a twist, and each
+  uses up more length.
+- **Moving J7 alone does not help.** Even directly under the tail's root, a connector on the board's top
+  face takes the tail at least 8.96 mm below the root's lowest corner. That is more than the 8.2 mm of tail
+  that can bend, and laying the tail's width flat on the board needs about 12.5 mm more (a diagonal crease)
+  or a twist. So no position of J7 on this board reaches the tail directly.
+
+**Pin 1, whatever the route.** Folds and twists turn the tail but never mirror it. The order in J7 therefore
+depends only on which face of the tail is up inside J7:
+
+- **contacts (display side) up:** FPC pin *i* lands on J7 pin *i*, as on the bench (panel flat, display up,
+  tail pointing straight into J7; `kicad/lib/README.md` R27);
+- **contacts down:** mirrored, FPC pin 1 on J7 pin 24.
+
+For example, a tail folded 180° behind the panel and then turned down into J7 arrives contacts down, so it is
+mirrored. Taken one at a time: a 180° fold keeps the tail's edges where they are but turns its face over, and
+a twist about its axis swaps the edges and turns the face over.
+
+**Options** (the owner decides; the layout is unchanged):
+
+- **(a) Move J7 toward the panel's tail end** (the left or right board edge). Not enough on its own (above).
+  It helps only with (b), where it shortens the extension.
+- **(b) Extension.** A 24-pin 0.5 mm adapter at the panel's tail end takes the tail, and a 24-pin 0.5 mm FFC
+  runs from it to J7 as placed.
+  - No board change. J7's contacts are on both sides, so either FFC face mates; the route sets the order (the
+    rule above, applied to the FFC), and a 180° twist in the FFC's free span corrects a mirrored arrival.
+  - Costs: an adapter and an FFC per airQ (the mini needs neither).
+  - Risks: the panel's boost gate drive (GDR) and current sense (RESE) run through the extension, so test it
+    on the prototype. The FFC enters at the front edge between D2 and D3, in the strip the light guide needs
+    too (Plan 3).
+- **(c) A panel whose tail reaches J7:** a longer tail, or one leaving a long edge. None is known. The spec's
+  other candidate, the Waveshare 2.9″ V2 raw panel, was not measured here.
+
+The prototype round is not affected: on the bench the panel lies flat, display up, with its tail straight
+into J7 (1:1).
 
 ## Toolchain
 
@@ -110,7 +213,7 @@ Rejected candidates:
 
 ### Install
 
-- **KiCad 10.0** (10.0.8 here): the installer from <https://www.kicad.org/download/>. The per-user Windows
+- **KiCad 10.0** (10.0.8, the release the committed files were made with; see "Regeneration contract"): the installer from <https://www.kicad.org/download/>. The per-user Windows
   install puts `kicad-cli.exe` and KiCad's Python (with `pcbnew`) in `%LOCALAPPDATA%\Programs\KiCad\10.0\bin`.
   `tools/hw/kicad_env.py` finds them there, in `%ProgramFiles%`, on macOS and Linux, or through the
   `KICAD_CLI` / `KICAD_PYTHON` environment variables. kicad-cli is not needed on PATH.
@@ -199,10 +302,10 @@ KiCad's top view are left and right for someone in front of the device.
   on the top layer, west under the module in lanes east of the EPAD, out of its bottom end and through
   vias just west of it. The top layer over the EPAD side is kept free of tracks too (`U3_EPAD_TOP`).
   Other rule areas: no top tracks or vias under the USB-C shell, no copper in the button's "prohibited
-  area", no tracks or vias round the screw heads. Custom rules tie J1's ground pins and U3's ground pads
-  (EPAD and its thermal vias) solidly to the pours. `tests/hardware/test_main_board.py` bounds the B.Cu
-  signal track under the module (none) and checks the bottom pour's cover there (≥ 90 % of the body,
-  ≥ 95 % round the EPAD).
+  area", no tracks or vias round the screw heads. Custom rules tie J1's SMD ground pins (its plated shell
+  legs keep thermal reliefs) and U3's ground pads (EPAD and its thermal vias) solidly to the pours.
+  `tests/hardware/test_main_board.py` bounds the B.Cu signal track under the module (none) and checks the
+  bottom pour's cover there (≥ 90 % of the body, ≥ 95 % round the EPAD).
 - The LED data line: SN74AHCT1G125 output → 33 Ω series resistor R14 (beside the buffer) → D1 DIN.
 
 **How it was routed** (like routing in KiCad: the items live in the board file, and rebuilds keep them).
@@ -244,7 +347,8 @@ and run `route_main.sh` again.
 
 The output is deterministic: every UUID is a uuid5 of a stable name (project, reference, pin), KiCad's
 zone fill is repeatable, and the Gerber zip carries no dates, so a rebuild without source changes leaves the
-committed files byte-identical, routed or not (the STEP model excepted, see below).
+committed files byte-identical, routed or not (the STEP model excepted, see below), on the same KiCad release
+(see "Regeneration contract").
 
 ### Fab outputs
 
@@ -276,7 +380,9 @@ kicad-cli pcb export pos --format csv --units mm --side front --use-drill-file-o
   three files agree (`tests/hardware/test_fab.py` checks the outline, the mounting holes and every CPL line).
 - **Reproducible**: `jlc.gerber_zip` drops the creation date (the optional `.CreationDate` attribute and the
   date in KiCad's header comment) and stores the files uncompressed with a fixed timestamp, so an unchanged
-  board gives a byte-identical zip and `git status` stays clean.
+  board gives a byte-identical zip and `git status` stays clean. The KiCad version stays in the Gerber and
+  drill headers (`TF.GenerationSoftware`, `Created by KiCad`), which is one reason the files are pinned to one
+  KiCad release ("Regeneration contract").
 - **BOM and CPL**: one BOM line per value + footprint + LCSC number; DNP parts (J6, J_AUX_UART) and the
   mounting holes are in neither file, and their pads get no paste. The CPL uses KiCad's rotations with **no
   per-part offsets**: every polarised part has an EasyEDA (JLC library) footprint, which keeps JLC's placement
@@ -336,6 +442,11 @@ STEP or a removed one is still in it (a moved part it cannot see).
 - **Commit** the regenerated `hardware/kicad/<board>/` and `hardware/fab/<board>/` files with the source
   change. `tests/hardware/test_kicad_pipeline.py` copies the committed project into a scratch folder, rebuilds
   it, and fails if any KiCad or fab file changes or if a committed set differs from the files the build writes.
+- **KiCad version: pinned to 10.0.8** (`tools/hw/kicad_env.py` `PINNED_VERSION`). kicad-cli re-saves the
+  schematics and boards in its own format and writes its version into the Gerber and drill headers, so the
+  committed files equal a rebuild on that release only. On any other, the guard test above skips with a
+  message saying so, and `build.py` prints a note. **After upgrading KiCad:** rebuild both boards, run the
+  gates and the tests, commit the rebuilt files and set `PINNED_VERSION` to the new release, in one commit.
 
 ### Design source format
 

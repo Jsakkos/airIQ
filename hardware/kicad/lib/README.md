@@ -233,6 +233,12 @@ Its stock is only 308 (enough for 10 boards plus attrition).
     SKRTLAE010 actuator outline (their side lines are cut 0.5 mm short of the edge), the WROOM-1's antenna
     pattern and antenna-end outline (they hang over the board edge), the USB-C pin-1 dot (it sat on a shell leg).
     The SM06B's two short tab lines are cut back clear of the tab pads.
+22. **USB-C shell legs soldered pin-in-paste** (final review): the four plated shell-leg slots (pads 13 and 14)
+    were on `*.Cu *.Mask` only, so the stencil left them without paste, although JLC places C2765186 on its SMT
+    line (fix 9). They now carry `F.Paste` too: an aperture the size of each pad (1.1 × 1.9 and 1.2 × 1.6 mm
+    ovals), printed over the slot, so reflow solders the legs with the SMD pins. On the main board the "J1
+    ground: solid to the pours" rule (`hardware/src/main/layout.yaml`) covers only J1's SMD ground pads; the legs
+    keep thermal reliefs, so the pours do not sink the heat the paste in the slots needs.
 
 ## Pad maps checked by hand
 
@@ -271,6 +277,12 @@ Each check compares the footprint's pad numbers and positions (from the `.kicad_
   double-sided contacts still mate, but the pin order reverses (pin 1 ↔ 24). The schematic would then have to mirror the map.
 - Source caveat: LCSC's PDF for C2856831 itself is corrupt (pdf.js: "Invalid or corrupted PDF file"). The check used the identical
   series drawing in the FPC-05FB-6PH20 (C2856827) datasheet, whose dimension table lists FPC-05FB-24PH20.
+- Any route (final review): folds and twists turn the tail but never mirror it, so the order in J7 depends only on which face
+  of the tail is up inside J7. Contacts (display side) up: pin *i* on pin *i*; contacts down: mirrored. The 180° fold above is
+  one case: it leaves the contacts facing down.
+- Panel tail (final review, GDEY029T94 spec section 4 drawing, p. 7): it leaves a short (36.7 mm) end of the panel, 14.40 mm long,
+  12.50 mm wide, with a 6.20 mm stiffener; recorded in `hardware/interface.yaml` `mechanical.main.fpc.panel_tail`. In the airQ
+  enclosure it does not reach J7: `hardware/README.md`, "E-ink FPC fit (airQ)".
 
 ## Antenna keep-out (ESP32-C6-WROOM-1; applied in Task 5 as the board rule area `ANTENNA_KEEPOUT`)
 
@@ -288,16 +300,21 @@ ESP32-C6 Module's Antenna (Antenna feed point on the right)", units mm:
 
 ## Open for owner review
 
-- **R22 is confirmed** (owner, 2026-11-25): WROOM-1-N8 + MS5611 (Economic); MINI-1-N4 + BMP585 (Standard tier) remains documented as the swap-back. See above.
-- **FPC contact side and fold**: verified from the series drawing for the unfolded, display-up insertion only. Confirm the enclosure's FPC
-  routing in the Task 5 owner review; a 180° fold mirrors the pin order.
+Owner gate, 2026-11-25 ("Approve, option A"): both boards approved as laid out, with R22 confirmed (WROOM-1-N8 and MS5611),
+the SKRTLAE010 and USB-C pad trims (fixes 18, 19), the SKRTLAE010 actuator direction and J7 at the front-edge centre. The FPC
+contact side and pin 1 are verified for the unfolded, display-up insertion (R27 above). Still open:
+
+- **E-ink FPC fit in the airQ** (found by the final review, after the gate): the panel's tail leaves a short end and does not
+  reach J7 in the airQ enclosure. The geometry and the options are in `hardware/README.md`, "E-ink FPC fit (airQ)". Decide
+  before ordering main boards for airQs; bench and mini boards are not affected.
 - **Side-emitting LED and side-looking VEML7700 directions** were derived from 2-D drawings: SK6812SIDE-A light toward footprint +y,
   VEML7700 window toward footprint −y (re-checked against the vector drawing in Task 6, fix 13). The EasyEDA 3D bodies have no
-  visible lens, so the 3D viewer cannot show the window. Check against a physical part if one is at hand before the board is ordered.
-- **SKRTLAE010 actuator direction**: in the 3D view (Task 5) the actuator points out of the footprint's +y side,
-  as the Alps drawing shows (the actuator is on the body face opposite the terminals). Confirm in KiCad.
-- **SKRTLAE010 and USB-C pads trimmed** for JLC's 0.2 mm NPTH-to-copper minimum (fixes 18, 19): a small change to
-  the vendors' land patterns. Confirm you are happy with it (the alternative is another switch without guide bosses).
-- The WROOM-1 3D body is a stand-in (the S3-WROOM-1 body with the same outline). Good enough for the enclosure STEP, not for a photo-real render.
-- Licence: the EasyEDA-derived symbols, footprints and models come from the LCSC/EasyEDA library through easyeda2kicad.
-  Their redistribution terms are EasyEDA's, not CC BY-SA. The owner should confirm that is acceptable for a public repository.
+  visible lens, so the 3D viewer cannot show the window. Check against a physical part if one is at hand before the board is
+  ordered (`hardware/README.md`, "Before each order").
+- **Licence**: the EasyEDA-derived symbols, footprints and models come from the LCSC/EasyEDA library through easyeda2kicad.
+  Their redistribution terms are EasyEDA's, not CC BY-SA; `hardware/LICENSE.md` ("Third-party content") states this. The owner
+  should confirm that publishing them in a public repository is acceptable.
+- **Library STEP size**: `airq.3dshapes/` holds about 34 MB of STEP text. Before the first push is the cheapest moment to switch
+  to compressed `.stpZ` models.
+- The WROOM-1 3D body is a stand-in (the S3-WROOM-1 body with the same outline). Good enough for the enclosure STEP, not for a
+  photo-real render.

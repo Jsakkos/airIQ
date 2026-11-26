@@ -70,3 +70,4 @@ The spec covers three subsystems. Each can be built and tested on its own, so ea
 - **Tongue front edge.** The sense tongue's front edge is the long edge opposite the cable (R34); the VEML7700 faces it.
 - **J_EPD pin 4/5 correction.** Pins 4 and 5 of the e-ink FPC connector were corrected in the board design and `interface.yaml`.
 - **J_SEN66 pins 5/6 are NC.** The SEN66 pins 5 and 6 are not connected on the board.
+- **E-ink FPC fit in the airQ: open owner decision.** The GDEY029T94's FPC tail leaves a short end of the panel and is 14.4 mm long, so with the panel landscape on the airQ's front face it cannot reach J7 at the main board's front-edge centre (short by at least 22.9 mm). J7 stays where the owner approved it. The options (an adapter and FFC extension, moving J7, another panel) and the pin-order rule are in `hardware/README.md`, "E-ink FPC fit (airQ)"; Plan 3 models the tail from `interface.yaml` `mechanical.main.fpc.panel_tail`.

@@ -135,6 +135,28 @@ def test_no_paste_on_unfitted_parts(board):
             assert not [p for p in paste if math.dist(p, (bx, by)) < 0.5], (ref, bx, by)
 
 
+def test_usb_c_shell_legs_are_pin_in_paste():
+    """J1's four plated shell legs get paste apertures (kicad/lib/README.md fix 22): JLC places the
+    receptacle on its SMT line, so the paste printed over the slots solders them in reflow."""
+    tree = parse((REPO / "hardware/kicad/main/airq-main.kicad_pcb").read_text(encoding="utf-8"))
+    h = _layout("main")["board"]["height"]
+    ox, oy = _layout("main")["board"]["origin"]
+    paste = [(int(x) / 1e6, int(y) / 1e6) for x, y, op in
+             _XY.findall(_zip("main").read("airq-main-F_Paste.gtp").decode()) if op == "3"]
+    j1 = next(fp for fp in children(tree, "footprint")
+              if any(str(p[1]) == "Reference" and str(p[2]) == "J1" for p in children(fp, "property")))
+    fx, fy, frot = (float(v) for v in child(j1, "at")[1:4])
+    legs = [p for p in children(j1, "pad") if str(p[2]) == "thru_hole"]
+    assert len(legs) == 4
+    a = math.radians(frot)
+    for pad in legs:
+        assert "F.Paste" in [str(layer) for layer in child(pad, "layers")[1:]]
+        px, py = float(child(pad, "at")[1]), float(child(pad, "at")[2])
+        bx = fx + px * math.cos(a) + py * math.sin(a) - ox
+        by = oy + h - (fy - px * math.sin(a) + py * math.cos(a))
+        assert [p for p in paste if math.dist(p, (bx, by)) < 0.01], (bx, by)
+
+
 @pytest.mark.parametrize("board", BOARDS)
 def test_step_holds_every_fitted_part_with_a_model(board):
     """`build.py --step` writes the board body and one instance per fitted part that has a 3-D

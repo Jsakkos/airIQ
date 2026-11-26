@@ -45,12 +45,14 @@ drc_severities: {}
 
 # KiCad custom DRC rules, written to airq-main.kicad_dru. Each needs a reason.
 custom_rules: |
-  # USB-C J1: its ground pins and shell legs carry the USB return and ESD current; connect them to
+  # USB-C J1: its ground pins carry the USB return and ESD current; connect its SMD ground pads to
   # both pours solid (no thermal relief) so the pour around the connector's crowded pin row cannot
-  # leave them starved.
+  # leave them starved. The four plated shell legs (through-hole, also GND) keep thermal relief: they
+  # are soldered pin-in-paste on the SMT line (F.Paste apertures, kicad/lib/README.md fix 22), and
+  # solid joints to both pours would sink the heat the paste in the slots needs.
   (rule "J1 ground: solid to the pours"
     (constraint zone_connection solid)
-    (condition "A.Type == 'Pad' && A.memberOfFootprint('J1') && A.NetName == 'GND'"))
+    (condition "A.Type == 'Pad' && A.memberOfFootprint('J1') && A.NetName == 'GND' && A.Pad_Type == 'SMD'"))
   # ESP32-C6-WROOM-1 U3: its EPAD and the thermal vias in it carry the module's heat into both ground
   # pours; connect them (and its GND pins) solid, not through thermal-relief spokes.
   (rule "U3 ground: solid to the pours"
@@ -109,7 +111,7 @@ placement:
   C16: {at: [39.45, 26.4, 90], ref: hide}
   C17: {at: [44.55, 26.4, 90], ref: hide}
   J7: {at: [28.8, 26.12, 0], ref: [0, 2.0]}
-  J5: [50.85, 26.7, 0]
+  J5: {at: [50.85, 26.7, 0], ref: [0, 0.74]}
   SW1: {at: [57.0, 28.28, 0], ref: [0, -2.68]}
   R11: {at: [53.85, 23.1, 0], ref: hide}    # on the BUTTON line, below the module's signal lanes
   H2: {at: [57.4, 22.8, 0], ref: hide}

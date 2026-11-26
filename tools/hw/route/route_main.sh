@@ -9,7 +9,7 @@
 # -> hand fixes (main_postfix.py) -> GND pours + stitching vias (main_pour.py, stitch.py) -> rebuild.
 #
 # Needs: KiCad 10 (kicad_env.py finds it), uv, Java, and the Freerouting 2.5.0 release JAR at
-# build/tools/freerouting-2.5.0/freerouting-2.5.0.jar (hardware/README.md, "Requirements").
+# build/tools/freerouting-2.5.0/freerouting-2.5.0.jar (hardware/README.md, "Install").
 # main_preroute.py hard-codes the current placement: after moving parts, redraw its lines first.
 # Freerouting's result depends on its whole input (any pre-route change re-rolls it) and its
 # multi-threaded optimiser adds small run-to-run differences: a re-run gives an equivalent board, check

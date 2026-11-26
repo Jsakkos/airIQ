@@ -118,6 +118,18 @@ def test_connector_pin1_records_match_the_board(board):
     assert pads[("J6", "1")][1:] == pytest.approx(tuple(MECH["aux_uart"]["pin1"]))
 
 
+def test_panel_tail_record_matches_j7(board):
+    """The e-ink panel's FPC tail (mechanical.main.fpc.panel_tail, from the GDEY029T94 drawing) has
+    one contact per J_EPD pin at J7's pitch: its contact row spans J7's pin 1 .. 24."""
+    tail = MECH["fpc"]["panel_tail"]
+    count, pitch, length = tail["contacts"]
+    epd = yaml.safe_load((REPO / "hardware/interface.yaml").read_text(encoding="utf-8"))["connectors"]["J_EPD"]
+    assert count == len(epd) == 24 and length < tail["stiffener"] < tail["length"]
+    pads = _pads(board)
+    assert pads[("J7", "1")][1] - pads[("J7", "24")][1] == pytest.approx((count - 1) * pitch)
+    assert tail["width"] == pytest.approx((count - 1) * pitch + 2 * 0.5)   # outer contacts 0.5 from the edges
+
+
 def test_led_and_button_records_match_the_layout():
     leds = MECH["leds"]
     assert [c["ref"] for c in leds["chain"]] == ["D1", "D2", "D3", "D4"]

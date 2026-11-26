@@ -1709,7 +1709,7 @@
 		)
 		(uuid "e6d04656-0b8f-5db6-86bd-47ce3a9f195d")
 	)
-	(text "SEN66 VDD: 10 uF at the connector (R15)"
+	(text "SEN66 VDD: 10 uF bulk at the connector"
 		(exclude_from_sim no)
 		(at 17.78 109.22 0)
 		(effects

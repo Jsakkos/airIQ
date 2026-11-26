@@ -1639,7 +1639,7 @@
 			(embedded_fonts no)
 		)
 	)
-	(text "Module 3V3: 10 uF (R15) + 100 nF"
+	(text "Module 3V3: 10 uF bulk + 100 nF"
 		(exclude_from_sim no)
 		(at 17.78 63.5 0)
 		(effects

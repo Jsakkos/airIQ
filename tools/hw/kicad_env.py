@@ -14,6 +14,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+# The KiCad release the committed KiCad and fab files were written with. kicad-cli re-saves the
+# schematics and boards and writes its version into the Gerber and drill headers, so a rebuild is
+# byte-identical to the committed files on this release only: after a KiCad update, rebuild both
+# boards, check them, commit the result and change this line (hardware/README.md, "Regeneration
+# contract"). The stale-output guard test skips on any other version.
+PINNED_VERSION = "10.0.8"
+
 _CANDIDATES = [
     Path(os.environ.get("LOCALAPPDATA", "")) / "Programs/KiCad/10.0/bin/kicad-cli.exe",
     Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "KiCad/10.0/bin/kicad-cli.exe",
@@ -71,6 +78,11 @@ def stock_symbol_dir() -> Path:
 def stock_footprint_dir() -> Path:
     env = os.environ.get("KICAD10_FOOTPRINT_DIR")
     return Path(env) if env else _share_dir() / "footprints"
+
+
+def kicad_version() -> str:
+    """The installed kicad-cli's version, e.g. '10.0.8' (`kicad-cli version`)."""
+    return run_cli("version").stdout.strip()
 
 
 def run_cli(*args: str | Path, check: bool = True) -> subprocess.CompletedProcess:

@@ -1,10 +1,12 @@
 (version 1)
-# USB-C J1: its ground pins and shell legs carry the USB return and ESD current; connect them to
+# USB-C J1: its ground pins carry the USB return and ESD current; connect its SMD ground pads to
 # both pours solid (no thermal relief) so the pour around the connector's crowded pin row cannot
-# leave them starved.
+# leave them starved. The four plated shell legs (through-hole, also GND) keep thermal relief: they
+# are soldered pin-in-paste on the SMT line (F.Paste apertures, kicad/lib/README.md fix 22), and
+# solid joints to both pours would sink the heat the paste in the slots needs.
 (rule "J1 ground: solid to the pours"
   (constraint zone_connection solid)
-  (condition "A.Type == 'Pad' && A.memberOfFootprint('J1') && A.NetName == 'GND'"))
+  (condition "A.Type == 'Pad' && A.memberOfFootprint('J1') && A.NetName == 'GND' && A.Pad_Type == 'SMD'"))
 # ESP32-C6-WROOM-1 U3: its EPAD and the thermal vias in it carry the module's heat into both ground
 # pours; connect them (and its GND pins) solid, not through thermal-relief spokes.
 (rule "U3 ground: solid to the pours"
