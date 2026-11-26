@@ -16,7 +16,7 @@ Contents:
 - [Using the references in an enclosure design](#using-the-references-in-an-enclosure-design)
 - [Printing the coupons](#printing-the-coupons)
 - [Coupon results](#coupon-results)
-- [airQ layout](#airq-layout)
+- [Layout studies](#layout-studies)
 - [Sources](#sources)
 - [To confirm](#to-confirm)
 
@@ -32,7 +32,7 @@ print and assembly guide (Task 5). The print-test coupons (Task 2) are below.
 | `src/encbuild.py` | The design registry (`DESIGNS`) and the build: script, `solidcraft-cli run`, save, checks |
 | `src/ref_*.py` | One generator per reference part (`ref_pcb.py` wraps the board STEP files) |
 | `src/coupons.py` | The print-test coupons' generator |
-| `src/airq_layout.py` | The airQ layout study's section arithmetic (pure Python; `tests/enclosure/test_airq_layout.py`) |
+| `src/layout_study.py` | The layout studies' section arithmetic for both models (pure Python; `tests/enclosure/test_layout_study.py`) |
 | `coupons.sc` | The coupons design, built from `src/coupons.py` (committed) |
 | `export/` | Printable exports (`coupons.3mf`, `coupons.step`), written by `build.py` (committed) |
 | `reference/*.sc` | The reference designs, built from the generators (committed) |
@@ -317,38 +317,61 @@ is not measured: test it with the first enclosure print.
 | Light guide, 1.2 mm divider (shell material and colour) | pending owner print | leak: ? | `divider` 1.2 |
 | Light guide, 2.0 mm divider (shell material and colour) | pending owner print | leak: ?; thickness that stops it: ? | `divider_thick` 2.0 |
 
-## airQ layout
+## Layout studies
 
-The layout study (ruling R14) that every airQ feature is placed from. The numbers come from
-`src/airq_layout.py`, which is pure Python:
-`uv run --with pyyaml python enclosure/src/airq_layout.py` prints them, and
-`tests/enclosure/test_airq_layout.py` pins the conclusions.
+These are the layout studies (ruling R14) that every feature of the two enclosures is placed from.
+- **Source.** The numbers come from `src/layout_study.py`, which is pure Python.
+  `uv run --with pyyaml python enclosure/src/layout_study.py` prints them, and
+  `tests/enclosure/test_layout_study.py` pins the conclusions.
+- **Models.** Each model is a `Model` preset, `AIRQ` or `MINI`. A variant is written
+  `dataclasses.replace(MINI, lip=15.5)`.
 
-**Status: blocked on the envelope, owner decision needed (2026-11-26).** The main board, the
-SEN66 and the panel do not fit 95 × 55 × 48 mm (±1) in any board pose. The only poses within a
-few millimetres break the air and heat rules. The options are at the end of this section.
-Nothing is modelled until one is chosen.
+**Status (2026-11-26): the owner must decide both envelopes.** Nothing is modelled until then.
+- **airQ.** The main board, the SEN66 and the panel do not fit 95 × 55 × 48 mm (±1) when the
+  whole front is sloped. The only poses within a few millimetres break the air and heat rules.
+  The options are below.
+- **airQ mini.** It fits its hard maximum, 66 × 50 × 42, only with R15's vertical lower lip (15.5
+  mm) and a horizontal board. Two figures fall short and are flagged:
+  - the antenna is about 5 mm from the SEN66 (R12 asks for 15);
+  - the outlet grille has 442 mm² open (R18 asks for 660, with a floor of 296).
 
-Coordinates: the enclosure frame (R3), plus s = distance up the front face from its bottom edge
-and t = depth behind the face's outer surface.
+**How the numbers are found.** The main board is modelled as a rigid side section: the outline,
+over all x, of its parts from `interface.yaml`.
+- **Pose.** The section is tilted by α (front edge down) and placed by its front-bottom corner.
+- **Constraints.** Each one is a half-plane, so every pose is an exact 2-D linear problem:
+  - the rear wall (with a hood, the board's rear edge instead);
+  - the top wall;
+  - the front: behind the lip and the slope, behind the panel's back on the airQ, and behind
+    the light guide in front of the LED faces and J7;
+  - the SEN66 below the board, with the zone wall between.
+- **Depth.** The smallest depth is found by bisection.
+
+**Coordinates.**
+- The enclosure frame is R3's.
+- `lip` is the height of the vertical lower lip under the slope (0 = none).
+- s is the distance up the slope from its bottom edge.
+- t is the depth behind the slope's outer surface.
+- f is the distance along the whole front from its bottom edge.
 
 **Fixed inputs.**
 
 | # | Item | Value | Source |
 |---|---|---|---|
-| 1 | Envelope | 95 × 55 × 48, front 30° from vertical: the face is 55.4 long, the top 27.3 deep | plan |
+| 1 | Envelope | airQ 95 × 55 × 48, front 30°; mini at most 66 × 50 × 42, front 24° | plan, spec §5 |
 | 2 | Margins | wall 1.8, floor 2.0, zone wall 1.8 with 0.3 air gaps, part-to-wall gaps 0.2 | plan, `src/clearances.py` |
-| 3 | SEN66 | 55.2 (x) × 21.3 (y) × 25.6 (z) on 1 mm foam, so z 3.0 to 28.6; 5 mm behind it for the cable plug or the outlet plenum | R17, `ref_sen66` |
-| 4 | Zone rule | over the SEN66 the board's bottom is at least 28.6 + 0.3 + 1.8 + 0.3 = 31.0 | global constraints |
-| 5 | Panel | 36.7 up the face; its back at t 2.2 (1.0 window lip + 1.2 panel); its top edge at most s 54.4 on a 48 mm face | R16, `ref_epd` |
-| 6 | Main board | 30 deep plus the 6.0 antenna strip past the rear edge: 36.0; parts up to 4.25; LEDs and J7 on the front edge, 2.0 high | `interface.yaml` |
-| 7 | Light guide | 2.0 thick in front of the LED faces and J7, between them and the panel's back | R11, R20 coupon |
-| 8 | USB-C | mouth on the rear edge; the plug's 7 mm overmold (to confirm) must pass through the rear wall | `interface.yaml` |
+| 3 | SEN66 | 55.2 (x) × 21.3 (y) × 25.6 (z) on 1 mm foam, so z 3.0 to 28.6. Behind it, 5 mm for the cable plug or the outlet plenum; in front, 3 mm for the inlet gasket | R17, `ref_sen66` |
+| 4 | Zone rule | over the SEN66 the board's bottom is at least 28.6 + 0.3 + 1.8 + 0.3 = 31.0, and no part of the board is below the SEN66's top | global constraints |
+| 5 | Tongue | 13 deep, lying in the intake air in front of the SEN66's ports, top at z 14.6 | `interface.yaml` tongue |
+| 6 | Main board | 30 deep, plus the 6.0 antenna strip past the rear edge: 36.0. Parts up to 4.25; the LEDs and J7 on the front edge, 2.0 high | `interface.yaml` |
+| 7 | airQ panel | 36.7 up the face, its back at t 2.2 (1.0 window lip + 1.2 panel). A 2.0 light guide between it and the LED faces | R16, R11, R20 |
+| 8 | Mini front | no panel; 1.0 in front of the LED faces for the guides' entry and holder | plan Task 4 |
+| 9 | USB-C | mouth on the rear edge; the plug's 7 mm overmold (to confirm) must pass through the rear wall | `interface.yaml` |
 
-**Board pose.** For each tilt α (front edge down), the smallest depth D at which the board fits.
-It must sit behind the panel and the light guide, under the top wall, inside the rear wall, and
-above the SEN66 with the zone wall between. The table uses the default margins; walls of 1.6 and
-gaps of 0.2 save 0.4 to 0.7 mm.
+### airQ
+
+**Board pose, whole front sloped.** For each tilt α (front edge down), the table gives the
+smallest depth D at which the board fits. It uses the default margins; walls of 1.6 and gaps of
+0.2 save 0.4 to 0.7 mm.
 
 | α | Pose | D needed | Lowest board point (SEN66 top 28.6) | USB-C plug | SW1 and the dot | Antenna strip behind the panel |
 |---|---|---|---|---|---|---|
@@ -373,7 +396,8 @@ What the table says:
   - It takes the USB-C plug through the top face.
   - SW1's push axis runs along the face, so the top-right dot would need a linkage of about 25 mm.
   - It puts the antenna strip 1 to 4 mm behind the e-ink panel (spec §6.8: away from the panel).
-- **Keeping the zone rule and a rear USB-C needs D ≥ 61.3** (tilted 15°) or 63.3 (horizontal).
+- **Keeping the zone rule and a rear USB-C needs D ≥ 61.3** (tilted 15°) or 63.3 (horizontal),
+  with the whole front sloped.
 
 **Front face**, independent of the pose, from the bottom up:
 
@@ -388,32 +412,51 @@ What the table says:
 | 48 | LED line in the top slot row | 16.95 to 53.65 | 54.39 | 0.74 | 121.0, short (R18) |
 | 50 | LED slot above the slots | 19.35 to 56.05 | 56.70 | 0.65 | 161.3 |
 
+**Minimum envelopes.** These are W × D × H; H is 48 or what the face needs, whichever is
+larger.
+
+| Layout | Envelope | What changes |
+|---|---|---|
+| Horizontal board, whole front sloped | 95 × 63.3 × 49.5 | 8.3 deeper: a deeper wedge with the same silhouette |
+| Board tilted 15°, whole front sloped | 95 × 61.3 × 49.5 | the USB-C enters 15° downward; the board needs tilted standoffs; the dot is lower (s 35) |
+| Horizontal board, 14.5 mm vertical lower lip | 95 × 55 × 50.1 | the slots move to a vertical lip under the 30° screen face, as on the mini (and like mockup card 2's lip); the top is 34.5 deep |
+| Horizontal board, rear antenna hood | 95 × 57.3 × 49.5, plus a 6 mm hood | a bump about 22 × 8 mm on the rear at z 31 to 38; the USB-C mouth sits at the rear wall |
+| Hood and a 4 mm lower lip | 95 × 55 × 49.5, plus a 6 mm hood | both of the above, each smaller |
+
+Tilting the board 5° to 15° shortens the lip by 1 to 3.5 mm. Every layout in this table:
+- keeps the zone rule;
+- takes the USB-C through the rear wall;
+- puts the dot on SW1's push axis;
+- leaves room for the tongue in front of the SEN66;
+- keeps the antenna 18 to 19 mm from the SEN66 and 23 to 28 mm behind the panel's plane.
+
 **Options for the owner.**
 
-1. **95 × 63.5 × 50 (recommended).** The board lies horizontal above the SEN66. The case is
-   8.5 mm deeper and 2 mm taller. The front keeps its 30°, and the top grows from 27.3 to 34.6 mm
-   deep. Every rule is met directly:
-   - The dot sits on SW1's push axis, at the right of the screen, 69 % up the face (s 40). SW1's
-     tip is 3.2 mm behind the face's inner surface: this is the direct flexure the coupon tests.
-     The mockup's dot is about 79 % up the face; raising it there costs about 2.2 mm more depth.
-   - The USB-C plug goes straight in through the rear wall, into a well 6.2 mm deep.
-   - The antenna strip is at the top rear, 28 mm behind the panel's plane and 16.5 mm from the
-     SEN66 in x alone.
-   - The zone wall runs over the SEN66 and steps down in front of it to meet the face between the
-     slots and the LED slot. The light guide, the FFC and the adapter, behind the panel, stay in
-     the electronics zone.
-2. **95 × 61.5 × 50, the board tilted 15°.** This is 2 mm less deep. The USB-C plug enters 15°
-   downward through the upper rear, the board sits on tilted standoffs, and the dot is lower (s
-   35, 61 % up the face).
-3. **95 × 57.5 × 50 plus a hood on the rear face** for the antenna strip, about 22 × 8 mm and
-   standing 6 mm out at z 31 to 38. The board lies horizontal with its rear edge at the rear
-   wall, so the USB-C plug enters straight. The footprint grows by 2.5 mm, and the hood is a bump
-   on the back.
+1. **95 × 55 × 50 with a 14.5 mm vertical lower lip (recommended).**
+   - The footprint and depth stay as agreed, and the height grows by 2 mm.
+   - The front is no longer one slope. The slots sit in a vertical band at the bottom, and the
+     LED slot and the screen on the 30° face above it.
+   - The mini needs the same lip (R15), so the two models share one front. Spec §6.9 asks for
+     this: "both models are parametric variants of one design wherever possible".
+   - The dot is 67 % up the face, and SW1's tip is 3.2 mm behind it.
+2. **95 × 63.5 × 50 with the whole front sloped.** The board lies horizontal above the SEN66. The
+   case is 8.5 mm deeper and keeps the mockup's silhouette; the top grows from 27.3 to 34.6 mm
+   deep.
+   - **Dot.** It sits 69 % up the face, on SW1's push axis. SW1's tip is 3.2 mm behind the face's
+     inner surface, which is the direct flexure the coupon tests. The mockup's dot is about 79 %
+     up the face; raising it there costs about 2.2 mm more depth.
+   - **USB-C.** The plug goes straight in through the rear wall, into a well 6.2 mm deep.
+   - **Antenna.** It is 28 mm behind the panel's plane and 16.5 mm from the SEN66 in x alone.
+   - **Zone wall.** It runs over the SEN66 and steps down in front of it to meet the face between
+     the slots and the LED slot. The light guide, the FFC and the adapter sit behind the panel,
+     so they stay in the electronics zone.
+3. **95 × 61.5 × 50, the board tilted 15°.**
+4. **95 × 57.5 × 50 with a rear antenna hood,** or 95 × 55 × 50 with the hood and a 4 mm lip.
 
 Not offered: the parallel pose inside 95 × 57 × 48. It breaks the zone rule, and the spec does
 not allow loosening the air and heat rules.
 
-**Option 1, plan view** (x):
+**Whole-front-sloped layout (option 2), plan view** (x; the lip layout is the same across x):
 
 | Part | x |
 |---|---|
@@ -427,7 +470,7 @@ not allow loosening the air and heat rules.
 | Antenna strip | 26.2 to 44.2 |
 | SEN66 | −45.5 to 9.7 |
 
-**Option 1, side section** (y to the right, z up, not to scale):
+**Whole-front-sloped layout (option 2), side section** (y to the right, z up, not to scale):
 
 ```
  z
@@ -443,6 +486,78 @@ not allow loosening the air and heat rules.
   0 +------------------------------------------------------------------------- y
     0          10        20        30        40        50        60   63.5
 ```
+
+
+### airQ mini
+
+The hard maximum is 66 × 50 × 42, with the front 24° from vertical (owner decision, spec §5).
+The interior is 62.4 wide, so the 60 mm board is centred with 1.2 mm each side. The SEN66 (55.2)
+cannot move away from the antenna in x.
+
+**Board pose, whole front sloped** (default margins):
+
+| α | D needed | Lowest board point (SEN66 top 28.6) | USB-C plug | Antenna to SEN66 |
+|---|---|---|---|---|
+| 0° | 56.7 | 31.0, above | rear, z 34 | 4.8 |
+| 5° | 56.4 | 30.2, above | rear, z 37 | 5.8 |
+| 10° | 57.4 | 29.1, above | through the top wall | 7.3 |
+| 15° to 55° | 56.5 to 66.5 | below | top | 5 to 7 |
+| 60° | 54.3 | 6.5, below | top | 4.7 |
+
+With the whole front sloped, no tilt fits 50 deep: R15's slightly tilted board is not enough.
+The horizontal board's front edge stands at y 18.7, which puts its antenna end at y 54.7. The
+case would need to be 6.7 mm deeper than its maximum.
+
+**Minimum envelopes:**
+
+| Layout | Envelope | Notes |
+|---|---|---|
+| Horizontal board, whole front sloped | 66 × 56.7 × 42 | 6.7 over the maximum |
+| Board tilted 5° | 66 × 56.4 × 42 | 6.4 over |
+| **Horizontal board, 15.5 mm vertical lower lip (R15)** | **66 × 49.8 × 42** | **fits**; the minimum lip is 15.0 |
+| Horizontal board, rear antenna hood | 66 × 50.7 × 42, plus a 6 mm hood | 0.7 over, and the tongue no longer fits in front of the SEN66 |
+| Hood and a 2 mm lower lip | 66 × 49.8 × 42, plus a 6 mm hood | fits, but the tongue does not fit in front of the SEN66 |
+
+**The fitting layout** (66 × 50 × 42, a 15.5 mm lip, the board horizontal):
+
+| # | Item | Position |
+|---|---|---|
+| 1 | Front | vertical lip z 0 to 15.5, then 29.0 of 24° slope; f runs from 0 to 44.5; the top is 38.2 deep |
+| 2 | Slots | three rows of 4 × 12.4 mm slots from z 10, at f 10.0 to 16.8, the third row just above the crease; 178.6 mm² open (≥ 154.5) |
+| 3 | Light-sensor window | on the lip by the slots, in front of the tongue's VEML7700 (the tongue sits behind the lip, in the intake air). The mockup puts it top left; that would need a light pipe down to the tongue |
+| 4 | Light band | at the LEDs' height, f about 34.9 to 36.9 (straight guides). CO₂ half x −25.35 to −4.35, over D1 and D2 (x −17.4, −12.3); PM2.5 half x 1.95 to 22.95, over D3 and D4 (x 9.9, 15.0); gap 6.3 (≥ 4) |
+| 5 | Labels | "CO₂" and "PM2.5" debossed 0.4 deep and 5 mm tall, under their halves; f 28 to 33 has room |
+| 6 | Orange dot | x 27.0 (SW1), f 36.6 (82 % up the face); 2.05 mm of wall to the PM2.5 half; SW1's tip 1.2 behind the face's inner surface |
+| 7 | Board | horizontal, bottom z 31.5, front edge y 12.0, antenna end y 48.0 |
+| 8 | SEN66 | x −31.0 to 24.2, y 18.2 to 39.5 (the tongue and the inlet gasket in front), z 3.0 to 28.6 |
+| 9 | USB-C | x −13.8, z 34.7, straight out the rear through a 6.2 mm well; 18.6 mm from the antenna in x |
+
+**Flags (owner items).**
+- **R12, antenna.** It is about 5 mm from the SEN66: the strip stands over the SEN66's end, 4.5
+  mm above its top. If the tongue moved elsewhere and the SEN66 went fully forward, it would be
+  10.7 mm. 15 mm cannot be reached. Check RSSI on the prototype.
+- **R18, outlet grille.** The whole lower rear, 58.4 × 18.9 mm at 40 % open, gives 441.5 mm².
+  That is below 2 × 330.1 = 660.1, and above the floor of 296.
+- **Tongue.** It is 28 mm from U3 and 29 mm from U2 (the rule is ≥ 20).
+
+### What the owner's questions buy
+
+The table gives the depth needed (mm) with the whole front sloped, for the horizontal board and
+for the smallest tilt that keeps the rules. It then gives the lower lip that would fit the target
+depth (airQ 55, mini 50) with a horizontal board.
+
+| Change | airQ horizontal | airQ best tilt | airQ lip for 55 | mini horizontal | mini best tilt | mini lip for 50 |
+|---|---|---|---|---|---|---|
+| As planned | 63.3 | 61.3 (15°) | 14.4 | 56.7 | 56.4 (5°) | 15.0 |
+| SEN66 lying flat, 21.3 tall (breaks Sensirion's orientation rule; information only) | 60.8 | 58.7 (20°) | 10.1 | 54.8 | 54.2 (10°) | 10.7 |
+| Walls 1.6 everywhere | 63.0 | 61.0 (15°) | 13.8 | 56.2 | 55.8 (5°) | 13.9 |
+| airQ front at 25° | 59.2 | 57.4 (15°) | 9.0 | – | – | – |
+
+- **SEN66 lying flat.** It saves 2 to 2.5 mm of depth, or 4 mm of lip. Even then, neither model
+  fits its target without a lip.
+- **1.6 mm walls.** They save less than 0.6 mm.
+- **25° airQ front.** It saves about 4 mm of depth. But the shorter face needs H 51.4 (+3.4) to
+  hold the slots, the LED line and the panel.
 
 ## Sources
 
