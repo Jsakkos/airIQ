@@ -346,10 +346,3 @@ class Sketch:
     def circle(self, center, diameter):
         self.s._check_exprs(diameter)
         self.s.cmd("sketch.circle.center", center=self._point(center), diameter=diameter)
-
-
-def box_bbox(script: Script, corner, size) -> dict:
-    """The bounding box a `Script.box` with these fields has, for expectations."""
-    lo = [script.v(c) for c in corner]
-    hi = [a + script.v(d) for a, d in zip(lo, size)]
-    return {"min": lo, "max": hi}

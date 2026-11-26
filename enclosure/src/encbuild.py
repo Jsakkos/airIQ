@@ -64,6 +64,7 @@ def script_for(name: str, save_to: Path) -> dict:
 
 def run_script(script_path: Path, cli: str, json_out: Path, extra: list[str] = ()) -> list:
     """Run a command script; return the per-step results or raise with the failing step."""
+    json_out.unlink(missing_ok=True)        # never read an earlier run's results
     proc = subprocess.run([cli, "run", str(script_path), "--results", "--quiet",
                            "--json-out", str(json_out), *extra],
                           capture_output=True, text=True)

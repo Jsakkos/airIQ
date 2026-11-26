@@ -114,6 +114,31 @@ def test_epd_tail_folds_with_its_parameter(cli, tmp_path):
     assert folded["epd_tail_folded"]["volume_mm3"] == pytest.approx(vol, rel=1e-6)
 
 
+def test_epd_fold_rebuilds_over_its_range(cli, tmp_path):
+    """The fold parameters walked to the ends of their commented ranges, one change after
+    another (solidcraft-checking: every allowed value), and back: each state rebuilds without
+    errors and keeps the flexible length round the bend."""
+    states = [(0.5, 0.5), (0.5, 0.2), (1.5, 0.2), (1.5, 1.5), (0.5, 1.5), (1.0, 0.5)]
+    steps = [{"command": "parameters.change", "params": {"name": "tail_folded", "expression": "1"}}]
+    for r, run in states:
+        steps += [{"command": "parameters.change", "params": {"changes": {"fold_r": f"{r} mm", "fold_out": f"{run} mm"}}},
+                  {"command": "inspect.measure", "params": {"summary": True}}]
+    script = tmp_path / "walk.json"
+    script.write_text(json.dumps({"commands": steps}), encoding="utf-8")
+    res = run_json(cli, ["run", str(script), "--in", str(ENCLOSURE / "reference/epd-2.9.sc"), "--results"],
+                   tmp_path / "walk.out.json")
+    t, w_root = 0.1, 15.31
+    for i, (r, run) in enumerate(states):
+        change, measure = res[1 + 2 * i], res[2 + 2 * i]
+        assert not change.get("errors"), change
+        bodies = {b["name"]: b for b in measure["bodies"]}
+        low = 8.2 - run - math.pi * (r + t / 2)
+        vol = (run + low) * w_root * t + math.pi / 2 * ((r + t) ** 2 - r ** 2) * w_root + 6.2 * 12.5 * t
+        assert bodies["epd_tail_folded"]["volume_mm3"] == pytest.approx(vol, rel=1e-6), (r, run)
+        assert bodies["epd_tail_folded"]["bbox"]["min"][0] == pytest.approx(-(run + r + t), abs=1e-6)
+        assert bodies["epd_tail_folded_stiffener"]["bbox"]["max"][2] < 0
+
+
 def test_references_insert_as_components(cli, tmp_path):
     """The way Tasks 3-4 use them: component.insert_design, by configuration for the panel."""
     refs = ENCLOSURE / "reference"
