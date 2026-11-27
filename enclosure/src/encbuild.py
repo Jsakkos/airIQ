@@ -15,6 +15,10 @@ Exports: `solidcraft-cli run --out` writes each of the design's EXPORTS into enc
 first (meshes at EXPORT_QUALITY), a 3MF is reopened to check it holds one part per body of the
 design, and each file is copied to enclosure/ when its bytes changed. Task 5 reuses this for every
 printed part: list its files in EXPORTS.
+
+A design with `PRINT_PARTS` ({body: {turns: [(axis, degrees)...], ref?: body}}) exports one file pair
+per part instead (`print_exports`): after the design is saved, each part is turned into its print
+orientation, set on the bed (z = 0), and written alone. The saved design is not touched.
 """
 from __future__ import annotations
 
@@ -142,6 +146,63 @@ def eval_bodies(path: Path, cli: str, json_out: Path) -> dict:
     return {b["name"]: b["bbox"] for b in json.loads(json_out.read_text(encoding="utf-8"))["bodies"]}
 
 
+def print_turns(mod) -> list[dict]:
+    """The solid.move steps that put every printed part in its print orientation."""
+    steps = []
+    for part, spec in mod.PRINT_PARTS.items():
+        for axis, deg in spec["turns"]:
+            steps.append({"command": "solid.move", "params": {
+                "bodies": [part], "origin": [0, 0, 0],
+                "axis": [1.0 if axis == "x" else 0.0, 1.0 if axis == "y" else 0.0, 1.0 if axis == "z" else 0.0],
+                "angle": f"{deg} deg", "name": f"print_turn_{part}_{axis}{deg}"}})
+    return steps
+
+
+def print_boxes(name: str, design: Path, cli: str, json_out: Path) -> dict:
+    """{part: {min, max, volume}} with every printed part turned into its print orientation,
+    before the move onto the bed."""
+    mod = module(name)
+    script = BUILD_DIR / f"{name}.print_turns.json"
+    script.write_text(json.dumps({"commands": print_turns(mod)}), encoding="utf-8")
+    json_out.unlink(missing_ok=True)
+    proc = subprocess.run([cli, "eval", str(script), "--in", str(design), "--quiet", "--json-out", str(json_out)],
+                          capture_output=True, text=True)
+    if proc.returncode != 0 or not json_out.exists():
+        raise RuntimeError(f"print orientation of {name} failed: {proc.stderr.strip() or proc.stdout.strip()}")
+    bodies = {b["name"]: b for b in json.loads(json_out.read_text(encoding="utf-8"))["bodies"]}
+    return {part: {**bodies[part]["bbox"], "volume": bodies[part]["volume_mm3"]} for part in mod.PRINT_PARTS}
+
+
+def print_exports(name: str, design: Path, cli: str) -> dict:
+    """Write each printed part of a design with PRINT_PARTS, turned into its print orientation and
+    set on the bed, to enclosure/.build/export/airq-<part>.{3mf,step}. Returns {part: expected box
+    {min, max} on the bed} (what the file must reopen as)."""
+    mod = module(name)
+    boxes = print_boxes(name, design, cli, BUILD_DIR / f"{name}.print_boxes.json")
+    commands = print_turns(mod)
+    expected = {}
+    for part, spec in mod.PRINT_PARTS.items():
+        lift = -boxes[spec.get("ref", part)]["min"][2]
+        b = boxes[part]
+        expected[part] = {"min": [b["min"][0], b["min"][1], b["min"][2] + lift],
+                          "max": [b["max"][0], b["max"][1], b["max"][2] + lift], "volume": b["volume"]}
+        commands.append({"command": "solid.move", "params": {"bodies": [part], "translate": [0, 0, f"{lift:.9f}"],
+                                                             "name": f"print_bed_{part}"}})
+    for rel in mod.EXPORTS:
+        part = Path(rel).stem.removeprefix("airq-")
+        target = (BUILD_DIR / rel).resolve()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.unlink(missing_ok=True)
+        params = {"bodies": [part], "path": str(target)}
+        if target.suffix == ".3mf":
+            params["quality"] = EXPORT_QUALITY
+        commands.append({"command": "file.export", "params": params})
+    script = BUILD_DIR / f"{name}.print_exports.json"
+    script.write_text(json.dumps({"commands": commands}, indent=1), encoding="utf-8")
+    run_script(script, cli, BUILD_DIR / f"{name}.print_exports.results.json", ["--in", str(design)])
+    return expected
+
+
 def build(name: str, cli: str | None = None, commit: bool = True) -> dict:
     """Build one design. Returns {design, file, bytes, committed, bodies, warnings, exports}, where
     exports is [{file, bytes, committed, parts}] (parts: bodies a 3MF reopens as, else None)."""
@@ -159,12 +220,13 @@ def build(name: str, cli: str | None = None, commit: bool = True) -> dict:
     script_path = BUILD_DIR / f"{name}.json"
     script_path.write_text(json.dumps(script, indent=1), encoding="utf-8")
     exports = [(BUILD_DIR / rel, ENCLOSURE / rel) for rel in exports_of(name)]
+    per_part = hasattr(mod, "PRINT_PARTS")
     extra = []
-    for built_export, _ in exports:
+    for built_export, _ in ([] if per_part else exports):
         built_export.parent.mkdir(parents=True, exist_ok=True)
         built_export.unlink(missing_ok=True)
         extra += ["--out", str(built_export.resolve())]
-    if exports:
+    if exports and not per_part:
         extra += ["--quality", EXPORT_QUALITY]
     results = run_script(script_path, cli, BUILD_DIR / f"{name}.results.json", extra)
     warnings = check_results(name, script["commands"], results)
@@ -176,12 +238,13 @@ def build(name: str, cli: str | None = None, commit: bool = True) -> dict:
     if committed and not same_contents(built, target):
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(built, target)
+    expected = print_exports(name, built, cli) if per_part else None
     done = []
     for built_export, target_export in exports:
         parts = None
         if built_export.suffix == ".3mf":
             parts = eval_bodies(built_export, cli, BUILD_DIR / f"{name}.{built_export.stem}.parts.json")
-            if len(parts) != len(bodies):
+            if len(parts) != (1 if per_part else len(bodies)):
                 raise RuntimeError(f"{name}: {built_export.name} reopens with {len(parts)} parts, "
                                    f"the design has {len(bodies)} bodies")
         keep = commit and built_export.stat().st_size <= COMMIT_LIMIT
@@ -189,6 +252,7 @@ def build(name: str, cli: str | None = None, commit: bool = True) -> dict:
             target_export.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(built_export, target_export)
         done.append({"file": target_export if keep else built_export, "bytes": built_export.stat().st_size,
-                     "committed": keep, "parts": parts})
+                     "committed": keep, "parts": parts,
+                     "expected": expected[Path(built_export).stem.removeprefix("airq-")] if per_part else None})
     return {"design": mod.DESIGN, "file": target if committed else built, "bytes": size,
             "committed": committed, "bodies": bodies, "warnings": warnings, "exports": done}

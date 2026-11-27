@@ -18,11 +18,12 @@ Contents:
 - [Coupon results](#coupon-results)
 - [Layout studies](#layout-studies)
 - [airQ enclosure](#airq-enclosure)
+- [Print and assembly guide (airQ)](#print-and-assembly-guide-airq)
 - [Sources](#sources)
 - [To confirm](#to-confirm)
 
-Later tasks add their own sections: the layout study and check table (Tasks 3 and 4), and the
-print and assembly guide (Task 5). The print-test coupons (Task 2) are below.
+The print and assembly guide for the airQ (Task 5) is under "Print and assembly guide (airQ)"; the
+airQ mini's follows once its envelope is decided. The print-test coupons (Task 2) are below.
 
 ## Files
 
@@ -40,7 +41,7 @@ print and assembly guide (Task 5). The print-test coupons (Task 2) are below.
 | `airq.sc` | The airQ enclosure design (committed) |
 | `src/layout_study.py` | The layout studies' section arithmetic for both models (pure Python; `tests/enclosure/test_layout_study.py`) |
 | `coupons.sc` | The coupons design, built from `src/coupons.py` (committed) |
-| `export/` | Printable exports (`coupons.3mf`, `coupons.step`), written by `build.py` (committed) |
+| `export/` | Printable exports, written by `build.py` (committed): `coupons.3mf` / `.step`, and `airq-<part>.3mf` / `.step` for each printed airQ part, in its print orientation |
 | `reference/*.sc` | The reference designs, built from the generators (committed) |
 | `.build/` | Generated scripts, run results and anything not committed (gitignored) |
 
@@ -71,6 +72,16 @@ uv run --with pytest --with pyyaml pytest tests/enclosure   # the checks
    per body of the design. Each export is copied to `export/` when its bytes changed. The same
    input gives the same bytes. Task 5 reuses this for every printed part: list its files in
    `EXPORTS` (for example `["export/airq-shell.3mf", "export/airq-shell.step"]`).
+
+A design with a `PRINT_PARTS` table (the airQ) exports one file pair per printed part instead
+(`encbuild.print_exports`): after the design is saved, each part is turned into its print orientation
+and set on the bed, and written alone, so the saved design is not touched. The build fails unless each
+3MF reopens with exactly one part. `tests/enclosure/test_airq_exports.py` also checks every file's box
+and volume against the design's body.
+
+**Toolchain.** The committed designs were built with SolidCraft 0.50.0 (save format `solidcraft/69`)
+and the tests that compare a fresh build with the committed files assume that toolchain: a different
+SolidCraft can write different bytes for the same design (R38).
 
 An unchanged design leaves the committed file untouched. When comparing builds, the random
 identities SolidCraft gives configuration rows are ignored.
@@ -1073,6 +1084,149 @@ Every row is measured on the geometry where the check design can (probes with `i
 | Positions from their sources (R27) | read, not retyped | every board and reference position compared with `interface.yaml`, the references and `layout.yaml` | `test_positions_are_read_from_their_sources`, `test_generator_retypes_no_board_numbers` | pass |
 | Intake and outlet grilles apart (review focus 2) | ≥ 20, on different faces | **51.4** between the intake slots' inner faces (y 1.8) and the outlet's (y 53.2), 55.0 outer face to outer face; the intake is in the lip's front face (faces −y), the outlet and the exhaust in the rear wall (+y), the HCHO grille in the right side (+x) | arithmetic: `inspect.clearance` between probe boxes built from the parameters (D − 2·wall), not a model of the part; the faces from the cuts' y (`test_openings_are_cut_where_the_parameters_say`) | pass |
 
+## Print and assembly guide (airQ)
+
+For one airQ (95 × 55 × 51 mm). The airQ mini gets its own section here when its envelope is decided.
+Everything below comes from the design and its checks. **Nothing has been printed yet**: the owner's
+test print (section 6) is the next step.
+
+### 1. Files
+
+`export/airq-<part>.3mf` and `export/airq-<part>.step`, one file per printed part, written by
+`uv run --with pyyaml python enclosure/build.py airq` (the `PRINT_PARTS` table in `src/airq.py` sets
+each part's orientation). Each part is already in its **print orientation, sitting on the bed
+(z = 0)**, so a 3MF drops straight into Bambu Studio. A part is turned about the world origin and
+moved in z only, so its x and y are still the assembly's. Every file is far under 5 MB (R8); the
+largest is `airq-base_plate.step`, about 1 MB. Print the 3MF. The STEP is for other CAD.
+
+`shell` and `orange_dot` are one print job: import both and keep their relative place. The dot is an
+AMS colour region, flush with the shell's face.
+
+### 2. Printed parts
+
+Material: **ASA if the printer is enclosed, PETG otherwise** ("shell material"). No part needs a
+brim or a raft. Layer height, walls and infill are the owner's choice: the design does not depend
+on them.
+
+| Part (file) | Qty | Material | Print orientation | Supports |
+|---|---|---|---|---|
+| `shell` | 1 | shell material, warm white | **face down** on textured PEI: the 30° face on the bed (95 × 69 × 52.6 mm as printed) | none. Two small overhangs of about 60° are accepted (the rear boss's front disc, the HCHO window's rear edge). The adapter holder's arm hangs free and needs a support, reached from the open bottom |
+| `orange_dot` | 1 | orange, an AMS colour region of the shell job | as the shell: it prints first, on the bed, flush with the face (a 0.6 deep recess in the flexure's tip) | none |
+| `base_plate` | 1 | shell material | floor down, as designed (95 × 55 × 49) | none |
+| `zone_wall` | 1 | an **opaque** filament (black or dark: it is a light barrier) | standing on its right end: the bent profile on the bed, the drawer at the top (18 × 50 × 91 as printed) | one small support under the right boss notch's ledge (a 5 × 2 cantilever) |
+| `hcho_lid` | 1 | an opaque filament | top face down, posts up | none (the tongue pocket's floor bridges 13.3 mm) |
+| `light_guide` | 1 | **clear or natural PETG**, bare: no paint, coat or cladding on any face (R45) | proposed: on its back face, the large flat that the feet's tops lie in (29.7 × 23.5 × 5.1 as printed). The feet's entry faces, the two facets and the exit stay off the bed. **A first-print item** | none expected |
+| `gasket_out` | 1 | TPU 95A, opaque (black) | on its seat end (the end that goes into the plate): 24 × 24 × 4 | none |
+| `gasket_in` | 1 | TPU 95A, opaque | standing on its floor end: the root foot and the 55° wiper are a vertical prism, the tip's lead-in faces up (27.9 tall) | none |
+| `grommet_zone_a`, `_b` | 1 each | TPU 95A, opaque | on the large slanted end face (8.95 × 7.9 × 1.85 as printed) | none |
+| `grommet_j4_a`, `_b` | 1 each | TPU 95A, opaque | split face on the bed, the half-channel down | none |
+| `grommet_tongue_a`, `_b` | 1 each | TPU 95A, opaque | split face on the bed | none (the 0.4 barbs overhang 0.5) |
+
+TPU: dry the filament and print slowly. The TPU parts are sized with their own squeeze already in
+(`gasket_squeeze` and the others; the check design sets them to 0).
+
+**Bought, not printed:** `sen66_foam`, `sen66_pad`, `zone_seal`, `sen66_top_seal`, `crease_seal`,
+`led_mask`, `gap_stop`. They are cut and stuck on as the assembly says (sizes in "Bodies" above).
+Not exported either: the references, the FFC and cable keep-outs and the air probes, which exist only
+in the check design.
+
+**Airing.** A new print gives off VOCs, which the SEN66 and the SFA40 would read as air quality. Air
+the finished shell, base, zone wall and lid for **several days**, in a ventilated room and out of the
+sun, before you trust any VOC or formaldehyde reading. Expect the first days of readings after
+closing the case to be high.
+
+### 3. Bought parts, one airQ
+
+| Part | Qty | Notes |
+|---|---|---|
+| M2 heat-set inserts, 4.0 deep | 3 | In the shell's bosses (hole `insert_d` 3.2; the insert coupon decides it) |
+| M2 screws, pan head, head ⌀ ≤ 4.4 | 3 | Shell to base: two from under the floor (front bosses), one through the rear wall (R29). **M2 × 5**: the front hole takes at most 5.6, the rear one 5.0 (use × 4 if the rear one bottoms out). To confirm |
+| M2 × 6 self-tapping screws, pan head | 4 | Two clamp the main board and the zone wall into the standoffs' 1.7 pilots (7 deep: × 6 gives 3.6 of thread); two hold the SFA40 and the lid from under the floor (B5: not × 8) |
+| Felt feet, ⌀ 10, at least 2.0 thick | 4 | Two at the front cover the screws' heads, two at the rear corners |
+| SEN66 module | 1 | 55.2 × 25.6 × 21.3 ± 0.5 |
+| SFA40 Qwiic breakout (SparkFun SEN-31669) | 1 | It must have two Qwiic sockets (R30) |
+| E-paper panel GDEY029T94, 2.9 in | 1 | Taped into the bezel with 0.1 mm tape |
+| FPC adapter, 24-pin 0.5 mm, both ZIFs on the panel side, pins 1:1 | 1 | The model's 12 × 20 mm is a placeholder: choose one, then check it against the holder |
+| FFC, **73 mm custom length**, 24-pin 0.5 mm, Type A, 12.5 wide, 0.3 thick, foldable | 1 | ± 1 mm (R49): no stock length fits. Check all 24 conductors after the folds |
+| Boards: main and tongue | 1 each | From `hardware/` |
+| Qwiic cable, JST SH 4-pin | 2 | Tongue to the SFA40's second socket, and SFA40 to J4. Modelled ⌀ 2.4; the grommets' bores are 0.2 under it |
+| SEN66 cable, JST GH 6-pin | 1 | Modelled ⌀ 3.0; the connector's place on the module is to confirm |
+| PU foam, adhesive: `sen66_foam` 55.2 × 21.3 × 1 | 1 | Under the SEN66 |
+| PU foam, adhesive: `sen66_pad` 10 × 10 × 3.2 | 1 | **Spec:** at least 4.7 N at 26 % compression, at most 15 N at 60 % (47–150 kPa); medium microcellular |
+| Closed-cell foam, black, adhesive: `zone_seal` 77.8 × 1.6 × 1.2 and `sen66_top_seal` 3.4 × 21.3 × 0.6 | 1 + 1 | 30–100 kPa at 25 % |
+| Foam tape, black closed-cell, 0.3 thick: `crease_seal` 95 × 1.7 | 1 | On the lip's top |
+| Black closed-cell foam: `led_mask` 9.5 × 2.9 × 4.1 and `gap_stop` 1.3 × 5.0 × 5.6 | 1 + 1 | Stuck to the panel's back on 0.2 mm adhesive pad |
+| Adhesive pad, 0.2 mm | 3 | Light guide to panel (the only contact), `led_mask`, `gap_stop` |
+| Tape, double-sided, 0.1 mm | 1 | Panel into its pocket |
+
+### 4. Assembly order
+
+Keep the base and the shell separate until step 11.
+
+1. **Inserts.** Heat the three M2 inserts into the shell's bosses (4.0 deep).
+2. **Base.** Check the printed base: the slots, the pockets and the standoffs' pilots are clean.
+3. **Gaskets.** `gasket_in` down its slot, root first. `gasket_out` into its seat in the plenum plate.
+4. **SFA40.** Plug its two cables in. Lay the J4 cable in the wall's notch on `grommet_j4_a`, add
+   `grommet_j4_b`, put on `hcho_lid` (the tongue cable through its hole), then drive the two M2 × 6
+   screws from under the floor. Fit `grommet_tongue_a/_b` round the cable.
+5. **Tongue.** In its pocket in the lid, its cable plugged in.
+6. **SEN66.** Stick `sen66_foam` under it, `sen66_pad` on its connector face on the outlet's axis and
+   `sen66_top_seal` across its top at the wiper's tip. Lower it, pressed back against the ring, past
+   the seat's and the wiper's lead-ins, with its cable plugged in.
+7. **Zone wall.** With `zone_seal` stuck on its ledge's front face, onto the spigots and the key. Lay
+   the two cables into the drawer from its open end, close `grommet_zone_a/_b` round them and slide
+   the pair in together.
+8. **Main board.** Then the cables into J2 and J4, and the board's two M2 × 6 screws, which also
+   clamp the zone wall.
+9. **FFC into J7**, contacts up, latch closed. The shell is off, so J7 is open from above.
+10. **Shell, upside down on the bench.**
+    - The panel taped into its pocket, its tail folded into the adapter.
+    - `crease_seal` on the lip's top (the base's side).
+    - The bare clear `light_guide` pushed tongue-first into the LED slot from inside and stuck to the
+      panel's back with the 0.2 mm adhesive pad. It hangs by its tongue and the pad until the shell is on.
+    - `led_mask` on the panel's back in front of D3 and D4, and `gap_stop` between the D1 and D2 feet
+      (0.2 clear of each), both on a 0.2 mm adhesive pad.
+11. **Close.** Push the FFC's free end into the adapter's ZIF with the shell held 12 mm over the base.
+    Make the FFC's three 45° folds once, over a fold jig, and never flex them again (R42). Lower the
+    shell along −z: it stands on the floor, and its sides end against the rear wall. Drive the three
+    M2 screws.
+12. **Feet.** Stick the four felt feet on, the front two over the screw heads.
+
+**Before power.** Check all 24 FFC conductors for continuity after the folds. The SEN66 must not move
+when you press its connector face toward the front.
+
+### 5. Check table
+
+The check table is under "airQ enclosure" → "Check table" below. Each row gives the rule, the value,
+how it was measured (on the geometry, or arithmetic) and the result. Re-run the checks with
+`uv run --with pyyaml python enclosure/src/airq_check.py --run` and
+`uv run --with pytest --with pyyaml pytest tests/enclosure`.
+
+### 6. The owner's test print (next step, not done)
+
+Plan 3 Task 5 Step 2 (ruling R7) needs a printer and the prototype boards, so it has not happened.
+Print one airQ from the 3MF files, assemble it with the prototype boards and report. Fix any fit by
+**changing parameters only**, then rebuild (`build.py airq`) and re-export. Print the coupons first
+if their results (`clr_*`) are still pending.
+
+What to look for:
+
+- **Fits.** The shell on the base (the 0.2 parting line round the lip, the way on), the inserts, the
+  screws' lengths, the zone wall's laps, the SEN66 in its cradle, the SFA40 with its lid, every grommet.
+- **FFC.** Whether a 73 mm FFC reaches both ZIFs, how the three folds fall, whether the adapter's ZIF
+  can be reached at a 12 mm lift, and continuity afterwards.
+- **Button.** SW1 through the flexure and the dot: the push is crisp and the beam does not hold the
+  switch closed (the stop is the switch body). The face-down flexure at 30° has no coupon, so this
+  print is its test.
+- **Light guide.** Brightness and evenness along the 30 mm line. The model gives about 4 % delivery
+  and light only at x −10 … 10 mm, so expect dim ends of about 9 mm each. Keep the slot, shorten it
+  to about 20 mm, or roughen a facet. Also note the orientation it printed in and its facets.
+- **Gasket seal.** The outlet ring (smoke at the grille with the SEN66 running: nothing leaks into the
+  space beside the ring), the wiper, the pad's force, the seals.
+- **Parts list.** Confirm every row of section 3: screw lengths, the insert hole size, the pad foam,
+  the SEN66 connector and cable, the adapter, the FFC vendor.
+- **Air.** Wait several days before judging VOC readings, and check the Wi-Fi RSSI (R12).
+
 ## Sources
 
 Every dimension comes from these documents; none of them is committed (R5).
@@ -1096,7 +1250,24 @@ Every dimension comes from these documents; none of them is committed (R5).
 
 ## To confirm
 
-These values are parameters, so a correction is a parameter change and a rebuild.
+These values are parameters, so a correction is a parameter change and a rebuild. The owner's test
+print ("Print and assembly guide (airQ)", section 6) is what settles most of them.
+
+**Owner decisions and items**
+
+- **Envelope (R22).** The airQ is 95 × 55 × 51, not the plan's 48: the 15 mm lip that carries the
+  intake slots needs it. The pure single slope would be 95 × 63.5 × 50.
+- **Rear screw (R29).** One M2 screw head shows on the back (a felt dot could cover it).
+- **Tongue Qwiic (R30).** J3 cannot take a plug in the airQ, so the tongue chains through the SFA40
+  breakout's second Qwiic socket to J4. Confirm the chosen breakout has two sockets.
+- **FFC (R49).** Order a custom 73 mm ± 1 mm, 24-pin 0.5 mm, Type A, foldable FFC.
+- **Light-guide print.** Its orientation (the guide proposes its back face) and the evenness of the
+  30 mm line, as under "The light guide" below.
+- **`gap_stop`.** The 1.3 mm foam strip sits in a 1.7 mm gap between the D1 and D2 feet, 0.2 clear
+  of each: a touch kills the total internal reflection there. Check its placement on the print.
+- **Mask light.** About 2 % of D3's and D4's light passes `led_mask`'s edges into the case.
+- **Licence and repo size (R19).** `enclosure/` is CC-BY-SA 4.0; the STEP wrappers are 4.1 MB each.
+- **Mini.** Its envelope waits for an owner decision (spec section 10); see "airQ mini (Task 4)".
 
 **FFC and adapter (3b)**
 

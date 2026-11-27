@@ -49,6 +49,30 @@ from sclib import Script
 DESIGN = "airq"
 OUTPUT = "airq.sc"
 
+# Task 5: one export per PRINTED body (the bought foam and tape parts, the check design's
+# references and probes are left out), each turned into its print orientation (README "Print and
+# assembly guide"). Per part: `turns` are (axis, degrees) about the world origin, in order; `ref`
+# names the body whose bottom sets the bed height (a part printed in the same job as another
+# keeps their relative place). Only z is moved: each part sits on the bed (z = 0) and keeps its
+# x and y. `encbuild.print_exports` writes `export/airq-<part>.3mf` and `.step`.
+PRINT_PARTS = {
+    "shell": {"turns": [("x", 120)]},                      # the 30 deg face down (tilt_deg from vertical)
+    "orange_dot": {"turns": [("x", 120)], "ref": "shell"}, # same job as the shell: an AMS colour region
+    "base_plate": {"turns": []},                           # floor down, as designed
+    "zone_wall": {"turns": [("y", 90)]},                   # standing on its right end
+    "hcho_lid": {"turns": [("x", 180)]},                   # top face down, posts up
+    "light_guide": {"turns": [("x", -60)]},                # on the back face (first-print item)
+    "gasket_out": {"turns": [("x", -90)]},                 # on its seat end (the rear end)
+    "gasket_in": {"turns": []},                            # standing on its floor end
+    "grommet_zone_a": {"turns": [("x", -60)]},             # on the large slanted end face
+    "grommet_zone_b": {"turns": [("x", -60)]},
+    "grommet_j4_a": {"turns": [("x", 180)]},               # split face down
+    "grommet_j4_b": {"turns": []},
+    "grommet_tongue_a": {"turns": [("y", 90)]},
+    "grommet_tongue_b": {"turns": [("y", -90)]},
+}
+EXPORTS = [f"export/airq-{part}.{ext}" for part in PRINT_PARTS for ext in ("3mf", "step")]
+
 # R22: the study's lip layout, rounded: lip 15 fits D 55 (needs 54.62); the face needs H 50.1 in
 # the study plus about 1 mm for the zone wall's ledge between the slots and the LED slot -> H 51
 # 3b-1: the LED slot is 0.9 high and 0.3 higher (its lower edge): the wall under it must be >= 1.2 of opaque path to the crease
