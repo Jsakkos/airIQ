@@ -158,6 +158,7 @@ def test_zone_wall_is_held_down():
     assert soft["at_seal"] <= 0.1 and soft["at_plate_lap"] <= 0.05 and soft["seal_compression_left"] >= 0.3
     assert firm["seal_compression_left"] >= 0.2 and firm["at_plate_lap"] < 0.1
     assert r["drawer_floor_n"] == 0.0 and V("drawer_floor_squeeze") == 0
+    assert 3.0 < r["drawer_faces_n"][0] < r["drawer_faces_n"][1] < 7.0      # the stack's y-press on the notch's faces (round 3: 3.3-6.4 N)
 
 
 def test_opaque_walls():

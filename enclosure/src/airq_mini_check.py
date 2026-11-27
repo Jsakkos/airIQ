@@ -1004,16 +1004,18 @@ def seal_forces(s=None) -> dict:
     pushes on the zone wall and whether its holds keep it, its laps and the top seal closed.
     - loads: the top seal (foam, top_seal_t over zone_gap: its compression, TOP_SEAL_KPA at 25 % taken linear
       to its compression) pushes the zone wall up over the module's top; the zone seal pushes the lip and the
-      ledge apart horizontally (no lift); the drawer grommet's faces push the notch's front and rear faces
-      (horizontal); its bottom is at contact on the rail (`drawer_floor_squeeze` 0), so no lift there;
+      ledge apart horizontally (no lift); the drawer grommet stack (as built, round 3) is squeezed in y by the notch's
+      front and rear faces, drawer_squeeze each, so it pushes both faces apart (horizontal), E x 2 sq / its width x
+      its x-z area, the closed end's contact adding none; its bottom is at contact on the rail (`drawer_floor_squeeze` 0), so no lift there;
     - holds (`hold_supports`): H1's clamp and the shell's pads, all pushing down. Statics as a rigid plate on equal
       springs at the holds (the least-squares split): every hold's reaction must be >= 0 (downward), i.e. the
       top seal's push lies inside the holds' polygon (its distance inside, `inside_mm`);
     - flexibility, ON THE SEAL'S LINE only: the zone wall as a STRIP_W strip simply supported between the front
       pads' line and H1's line, the push at the seal's centre, PETG at ZW_E; with the foam as a spring in series,
       the lift at the seal and at the plenum plate's lap on that line, and the top seal's compression left. Away
-      from that line the rear right lifts most (H1 is the only rear hold): the reviewer's plate model (round 2)
-      gives the right rail's and the rear-wall rib's laps 0.024-0.11 (soft foam, with / without the pads'
+      from that line the rear right lifts most (H1 is the only rear hold): an external review estimate (round 2;
+      Kirchhoff plate, Morley elements, converged at h 0.5 and 0.35; not reproducible from the repo) gives the right
+      rail's and the rear-wall rib's laps 0.024-0.11 (soft foam, with / without the pads'
       rotational restraint), so those laps are first-print feeler checks (README). The zone seal's push, about
       12 mm under the flat part, tilts the front a little too."""
     s = s or airq_mini.build()
@@ -1022,7 +1024,9 @@ def seal_forces(s=None) -> dict:
     area = v("top_seal_x1 - top_seal_x0") * v("sen_d")
     top = tuple(k / 1000 * comp / 0.25 * area for k in TOP_SEAL_KPA)
     zone = tuple(k / 1000 * 2 * v("bp_x0") * v("ledge_t") for k in FOAM_KPA)
-    drawer = tuple(e * v("drawer_squeeze") / v("cab_x + inner_x") * v("dr_y1 - dr_y0") * v("zone_t") for e in A.TPU_E)
+    stack_w = v("dr_y1 - dr_y0 + 2 * drawer_squeeze")                  # the three pieces' stack across y, squeezed by the notch's faces
+    stack_l = v("dr_x1 + drawer_squeeze + inner_x - clr_remove")        # along x, from the shell's side wall's clearance to the closed end
+    drawer = tuple(e * 2 * v("drawer_squeeze") / stack_w * stack_l * v("zone_t") for e in A.TPU_E)
     px, py = v("(top_seal_x0 + top_seal_x1) / 2"), v("sen_y0 + sen_d / 2")
     sup = hold_supports(s)
     names = list(sup)

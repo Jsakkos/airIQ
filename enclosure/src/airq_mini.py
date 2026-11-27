@@ -410,8 +410,8 @@ def zone_drawer(s: Script) -> None:
     """The cable pass-through in the zone wall's flat part over the passage's rear (J2 and J4): a
     notch open to the zone wall's left end, so both cables are laid in from the side with their
     plugs on (no plug passes it). Its front and rear faces carry grooves along x for the split
-    grommet's ribs and squeeze its three pieces (round 2, M2); the pieces slide in from the left over
-    the left rail, and the shell's side wall stands clr_remove outside their outer ends."""
+    grommet's ribs and squeeze its three pieces (round 2, M2); the pieces go in as ONE closed
+    stack (round 3), slid in from the left over the left rail, and the shell's side wall stands clr_remove outside their outer ends."""
     x0 = "-inner_x + clr_remove - 1"
     s.box("Drawer notch", [x0, "dr_y0", "zw_z0 - 1"], [f"dr_x1 - ({x0})", "dr_y1 - dr_y0", "zone_t + 2"],
           operation="cut", targets=["zone_wall"])
@@ -427,12 +427,15 @@ def grommets(s: Script) -> None:
     """The drawer's split grommet, TPU 95A, in three pieces split across y through the two cables' axes, as the
     airQ's (review round 2, M2): `grommet_zone_a` (front, to the SEN66 cable's axis gh_y), `grommet_zone_b`
     (between the cables' axes) and `grommet_zone_c` (rear, from the Qwiic cable's axis qw_y). Each runs from the
-    zone wall's open end to the notch's closed end (drawer_squeeze into it). The notch's front and rear faces
+    zone wall's open end to the notch's closed end (drawer_squeeze past it: contact, not a press, since the pieces'
+    outer ends are free, clr_remove from the side wall, and hold it only by friction). The notch's front and rear faces
     squeeze the stack (drawer_squeeze each), so both splits are pressed shut by two faces of the one zone wall:
     the shell's and the zone wall's floats in x do not enter, and the cables' push in their bores (bore_squeeze)
     is taken by those faces. Ribs on a and c in the notch's grooves hold the stack in z; every piece stands on the
-    left rail's top at contact (drawer_floor_squeeze, review I1). Laid in from the open end after the cables (each
-    cable held back as its piece slides past it), with the plugs on."""
+    left rail's top at contact (drawer_floor_squeeze, review I1). Installed with the plugs on by closing the three
+    pieces round the cables outside the notch and sliding the stack in from the open end with them (round 3): the
+    notch is dr_y1 - dr_y0 wide, so b (between the cables) cannot pass a cable laid in first (b + both cables is wider
+    than the notch), nor can the pieces go in one after another past the cables."""
     sq, c = "drawer_squeeze", "clr_align"
     zm0, zm1 = f"zw_z0 + zone_t / 2 - groove_w / 2 + {c}", f"zw_z0 + zone_t / 2 + groove_w / 2 - {c}"
     rib = f"groove_d - {c}"

@@ -201,7 +201,7 @@ def test_drawer_grommet_split_is_pressed_shut():
     """Review round 2, M2: the drawer grommet is three pieces split across y through the two cables' axes (as the
     airQ's), so the notch's front and rear faces squeeze both splits (drawer_squeeze each): the press acts between
     two faces of the zone wall, and the shell's x float (+-0.2, screws in screw_d holes) and the zone wall's (+-0.15,
-    H1's spigot in its seat) do not enter it at any corner. Every piece reaches the notch's closed end, stands on the
+    H1's spigot in its seat) do not enter it at any corner. Every piece reaches the notch's closed end (contact, not a press: the outer ends are free), stands on the
     rail at contact and keeps clr_remove from the shell's side wall."""
     import airq_mini
     boxes = {piece: next(c["params"] for c in S.commands if c["params"].get("name") == f"Zone grommet {piece}") for piece in "abc"}
@@ -217,6 +217,23 @@ def test_drawer_grommet_split_is_pressed_shut():
     assert V("(screw_d - 2) / 2") > V("drawer_squeeze") and V("clr_align") > V("drawer_squeeze")
     assert [p for p, *_ in airq_mini.GROMMET_PIECES] == ["a", "b", "c"]
     assert V("drawer_floor_squeeze") == 0
+
+
+def test_drawer_grommet_goes_in_as_a_closed_stack():
+    """Review round 3, N1: the pieces cannot be laid in one at a time past cables already in the notch, so the
+    install is the three pieces closed round the cables and slid in together from the open end. Arithmetic on the
+    notch's width (y): b plus both cables is wider than the notch (b cannot pass them), a or c after the other
+    two pieces and the cables does not fit either; the closed stack is the notch plus the two squeezes, which the
+    TPU takes (0.05 each side, 1.3 % of the stack) as it slides in."""
+    notch = V("dr_y1 - dr_y0")
+    wid = {p: V(f"{yb} - ({ya})") for p, ya, yb, _ in airq_mini.GROMMET_PIECES}
+    gh, qw = V("cable_gh_d"), V("cable_qw_d")
+    assert notch == pytest.approx(7.8)
+    assert wid["b"] + gh + qw > notch + 1.0                    # b cannot be slid past both cables laid in the notch (8.9 against 7.8)
+    assert wid["b"] + gh + qw - notch == pytest.approx(1.1)
+    assert wid["a"] + wid["b"] + wid["c"] - 2 * V("drawer_squeeze") == pytest.approx(notch)   # the closed stack: the notch + 2 squeezes
+    assert wid["a"] + wid["b"] + wid["c"] - notch == pytest.approx(0.1)
+    assert 2 * V("drawer_squeeze") / (wid["a"] + wid["b"] + wid["c"]) < 0.02                  # the TPU takes it sliding in
 
 
 def test_labels_and_light_sensor_window():
