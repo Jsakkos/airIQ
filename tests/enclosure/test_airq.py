@@ -171,7 +171,6 @@ def test_distances_answered_by_the_layout():
 def test_grilles_r18_and_10_mm_rule():
     d = airq_check.distances(S)
     assert d["outlet_grille_open_mm2"] >= 660.1                                     # R18: 2 x 330.1
-    assert d["intake_open_mm2"] >= 154.5                                            # R18: 2 x 77.3
     sfa = ref_sfa40.build().v
     assert d["hcho_grille_open_mm2"] >= 2 * sfa("opening_l") * sfa("opening_w")     # 2 x the SFA40's opening
     assert min(d["hcho_grille_lower_edge_z"], d["outlet_grille_lower_edge_z"], V("slot_row1_z"),
@@ -180,6 +179,13 @@ def test_grilles_r18_and_10_mm_rule():
     assert V("exh_z0") > V("zw_z1") + 2.0                                            # the exhaust stays apart (R26)
     # N7: the intake slots (lip's outer face, y 0) and the outlet slots (rear wall's outer face, y D)
     assert d["intake_to_outlet_grille"] == V("D") >= 20
+
+
+def test_intake_rows_r18():
+    """R18: the intake rows' open area is at least 2 x the inlets' 77.3 (split from the grilles' test, R57: the
+    rows run between the boss pockets, which move with clr_remove; with in_n_l 4 (one bar fewer a row) it keeps
+    157.7 at the defaults and 157.2 at clr_remove 0.30)."""
+    assert airq_check.distances(S)["intake_open_mm2"] >= 154.5                       # R18: 2 x 77.3
 
 
 def test_r26_alternatives_worked():
@@ -225,13 +231,13 @@ def _feature(name):
 def test_shell_keeps_clr_remove_off_its_datums():
     """Review N1: the shell sits on the floor (z) and against the rear wall's front face (y); at
     the lip it keeps clr_remove: its side walls end clr_remove behind the lip's inner face, its
-    slope stops clr_remove above the lip's top, and the lip is recessed clr_remove round the bosses."""
+    slope stops crease_gap above the lip's top (a fixed gap since R57), and the lip is recessed clr_remove round the bosses."""
     lip = _feature("Lip to the base")
     y1 = V(lip["corner"][1]) + V(lip["width"])
     z1 = V(lip["corner"][2]) + V(lip["height"])
-    assert y1 == pytest.approx(V("wall") + V("clr_remove")) and z1 == pytest.approx(V("lip") + V("clr_remove"))
+    assert y1 == pytest.approx(V("wall") + V("clr_remove")) and z1 == pytest.approx(V("lip") + V("crease_gap"))
     crease = _feature("Crease seat")
-    assert V(crease["corner"][2]) + V(crease["height"]) == pytest.approx(V("lip") + V("clr_remove"))
+    assert V(crease["corner"][2]) + V(crease["height"]) == pytest.approx(V("lip") + V("crease_gap"))
     rec = _feature("Boss clearance 1")
     assert V(rec["corner"][1]) == pytest.approx(V("wall") - V("clr_remove"))           # the boss's front is at wall
     assert V("boss_y") - V("boss_d") / 2 == pytest.approx(V("wall"))
@@ -504,6 +510,8 @@ def test_ffc_route_length_and_service_lift():
     r_min, r_max = F.ffc_route_range(V)
     assert lo <= V("ffc_s_c3") <= hi
     assert hi <= V("ffc_s_b0") - V("ffc_w") / 2 + 1e-9                              # crease 3 ends before layer D's bend starts
+    win = F.ffc_len_window(V)                                                       # R57: order a length inside it
+    assert win[0] < V("ffc_len") < win[1], f"ffc_len {V('ffc_len')} is outside the jog's window {win}: set ffc_len (airq.py) inside it"
     margins = []
     for ln in (V("ffc_len") - V("ffc_len_tol"), V("ffc_len") + V("ffc_len_tol")):
         for ins in (V("ffc_insert") - V("ffc_insert_tol"), V("ffc_insert") + V("ffc_insert_tol")):
@@ -538,6 +546,20 @@ def test_ffc_route_length_and_service_lift():
     assert B.MAIN["fpc"]["pin1_x"] > B.MAIN["fpc"]["center_x"]                       # pin 1 on the viewer's right
 
 
+def test_ffc_jog_takes_one_custom_length():
+    """R57: whatever the coupons give, some nominal FFC length fits every corner of its tolerance and of the
+    insertion's (the window `ffc_len_window`: 72.81 ... 73.14 at the defaults, 73.02 ... 73.12 at clr_remove 0.15,
+    72.38 ... 73.17 at 0.30): a custom length, ordered after the coupons. The 73 mm in airq.py fits it for
+    clr_remove 0.16 ... 0.30 (`test_ffc_route_length_and_service_lift`)."""
+    lo, hi = F.ffc_len_window(V)
+    assert hi - lo > 0.05, (lo, hi)                                                  # 0.33 at the defaults, 0.10 at clr_remove 0.15
+    for ln in (lo + 1e-3, hi - 1e-3):
+        for d in (-1, 1):
+            for e in (-1, 1):
+                L_, ins = ln + d * V("ffc_len_tol"), V("ffc_insert") + e * V("ffc_insert_tol")
+                assert F.ffc_fit(V, L_, ins) is not None, (ln, L_, ins)
+
+
 def test_adapter_holder_flanks_the_board():
     assert V("hold_s0") - (V("adapter_s") + V("ad_w") / 2) == pytest.approx(V("clr_remove"))      # clr_remove over the upper edge
     assert V("hold_t0") < V("adapter_t") - V("ad_pcb_t") and V("hold_t1") < V("zw_tf")             # beside the board, short of the zone wall
@@ -557,7 +579,7 @@ def test_led_slot_and_light_guide_follow_the_leds():
     assert (V("led_face_w"), V("led_face_h")) == pytest.approx((4.0, 2.0))
     assert V("led_z") - V("board_z0") - V("board_t") == pytest.approx(1.0)                  # the face's centre, 1.0 above the board
     assert V("gd_y_e") == pytest.approx(V("board_y0") - V("gd_clr"))
-    assert V("gd_t0") >= V("bezel") + V("panel_t") + V("clr_remove") - 1e-9               # behind the panel's back face
+    assert V("gd_t0") >= V("bezel") + V("panel_t") + V("gd_pad") - 1e-9                   # behind the panel's back face and its pad
     assert V("gd_t1") - V("gd_t0") == pytest.approx(V("guide_t"))
     # R45: the feet are inside D1's and D2's faces (a line toward U4 enters their bodies); D3 and D4 are masked
     assert V("gd_l1x0") - (V("led_d1_x") - 2.0) == pytest.approx(V("gd_win_xm")) and V("gd_la_x1") <= V("led_d1_x") + 2.0
@@ -574,7 +596,7 @@ def test_led_slot_and_light_guide_follow_the_leds():
     assert V("gd_l1x1") < V("ffc_xc") - V("ffc_w") / 2 and V("ffc_xc") + V("ffc_w") / 2 < V("gd_l2x0")   # the FFC's strip is clear
     assert V("gd_l1x1") - V("gd_l1x0") < 10.0 and V("gd_l2x1") <= V("board_x0") + V("board_w")
     zmin = V("lip") + V("gd_sg") * V("cos_t") - V("gd_t0") * V("sin_t")
-    assert zmin >= V("lip") + V("clr_remove") + 0.2 - 1e-9                                  # no part of the guide lower than 0.4 over the lip's top
+    assert zmin >= V("lip") + V("crease_gap") + 0.2 - 1e-9                                  # no part of the guide lower than 0.4 over the lip's top
     assert V("gd_top_z") == pytest.approx(V("led_z") + V("led_face_h") / 2)                 # no surface sees over the LEDs
     assert V("panel_s0") - V("clr_remove") - V("led_s1") >= 0.9                                  # a bar of about 1 between slot and pocket
 
@@ -583,7 +605,7 @@ def test_guide_fits_come_from_the_clearances():
     """Review I2: the guide's fits are clr_align / clr_remove, not literals (a coupon result moves them), and the
     bar's gap to the panel (the adhesive pad that holds the guide) is clr_remove."""
     assert V("gd_tg") == V("clr_align") and V("gd_clr") == V("clr_remove")
-    assert V("gd_t0") - (V("bezel") + V("panel_t")) == pytest.approx(V("clr_remove"))
+    assert V("gd_t0") - (V("bezel") + V("panel_t")) == pytest.approx(V("gd_pad"))            # the adhesive pad (R57: not a fit)
     assert V("gd_rec") >= V("clr_remove")                                          # the tongue's face is behind the face
     assert V("led_s1") - V("led_s0") - 2 * V("gd_tg") > 0.4                         # a visible tongue
 
@@ -618,6 +640,25 @@ def test_guide_light_stays_off_the_crease_the_sensor_and_u4():
     paths = airq_check.light_paths(S)
     for name, (length, _) in paths.items():
         assert length >= 1.2 - 1e-6, (name, length)
+    # the crease seal: the lip's top to the shell's lowest plane, over 1.2 of foam
+    assert V("wall") - V("crease_y0") >= 1.2                                                 # foam tape: 1.2 or more along the line
+
+
+def test_led_mask_leaks_about_2_percent():
+    """R50 (stated, not a rule; split out, R57): about 2 % of D3's and D4's emission passes `led_mask`'s edges
+    through its gd_clr (clr_remove) gap to their faces. It grows with that gap: under 3 % to clr_remove 0.25,
+    3.8 % at 0.30 (README "Supported window per rule")."""
+    leak = airq_check.mask_leak(S)
+    for led in ("D3", "D4"):
+        assert 0.01 < leak[led]["total"] < 0.03, leak                                 # the README's "about 2 %"
+
+
+def test_ms5611_sees_no_led_or_guide_face():
+    """R13 / R50 (split from the test above, R57: its clearance window is narrower): no straight line from an
+    LED face, a foot's entry face or any exposed face of the guide (sides and ends included, fine x) reaches
+    the MS5611, and without `gap_stop` the check finds the hole it closes (the D2 foot's tail-side face,
+    through the D1-D2 gap). The lines pass behind gap_stop through the guide's gd_clr (clr_remove) slab in
+    front of the LED faces, so the rule holds to clr_remove 0.20 (README "Supported window per rule")."""
     sight = airq_check.ms5611_sight(S)
     assert sight["unblocked"] == {"led_faces": 0, "entry_windows": 0, "guide_faces": 0}, sight["unblocked"]
     assert sight["samples"]["entry_windows"] == 98 and sight["samples"]["guide_faces"] > 15000, sight["samples"]
@@ -626,11 +667,6 @@ def test_guide_light_stays_off_the_crease_the_sensor_and_u4():
     hole = airq_check.guide_surface_sight(S, stops=False)
     assert hole["all"][1] > 0 and hole["D2 foot end x 1.30"][1] > 0                  # without the stop: the R13 hole
     assert {k for k, r in hole.items() if r[1] and k != "all"} <= {"D2 foot end x 1.30", "D2 foot face 4"}
-    leak = airq_check.mask_leak(S)
-    for led in ("D3", "D4"):
-        assert 0.01 < leak[led]["total"] < 0.03, leak                                 # the README's "about 2 %"
-    # the crease seal: the lip's top to the shell's lowest plane, over 1.2 of foam
-    assert V("wall") - V("crease_y0") >= 1.2                                                 # foam tape: 1.2 or more along the line
 
 
 def test_panel_top_keeps_clr_remove_under_the_top_wall():

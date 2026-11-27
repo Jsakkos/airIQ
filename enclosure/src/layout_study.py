@@ -63,10 +63,11 @@ class Model:
     floor: float = 2.0           # plan: base plate
     zone_wall: float = 1.8       # the zone wall, a wall like any other
     zone_gap: float = 0.3        # air gap above the SEN66 and under the board
-    clr: float = 0.2             # part-to-wall gap (clr_remove)
+    clr: float = clearances.CLR_REMOVE   # part-to-wall gap (clr_remove; follows clearances.py, R57)
     foam: float = 1.0            # plan: the SEN66 sits on 1 mm foam
     bezel: float = 1.0           # airQ: window lip in front of the panel
     guide_t: float = 2.0         # airQ: light guide between the LED faces and the panel (R20 coupon bar 3 x 2)
+    guide_pad: float = 0.2       # airQ: the adhesive pad between the panel's back and the guide (a bought thickness, not a fit; R57)
     band_guide: float = 1.0      # mini: room in front of the LED faces for the guides' entry and holder
     sen_behind: float = 5.0      # behind the SEN66: cable plug (connector face) or outlet plenum
     sen_front: float = 3.0       # in front of the SEN66's port face: the inlet gasket
@@ -315,7 +316,7 @@ def constraints(m: Model, alpha_deg: float) -> list[tuple[float, float, float, s
     pts = [(offset(alpha_deg, Y, Z), kind) for Y, Z, kind in board_points()]
     if m.front == "panel":
         tpb = m.bezel + r["panel_t"]
-        need = {"guide": tpb + m.clr + m.guide_t + m.clr, "panel": tpb + m.clr}
+        need = {"guide": tpb + m.guide_pad + m.guide_t + m.clr, "panel": tpb + m.clr}
     else:
         need = {"guide": m.wall + m.clr + m.band_guide, "panel": m.wall + m.clr}
     need.update(wall=m.wall + m.clr, bottom=m.wall + m.clr, antenna=need["panel"])

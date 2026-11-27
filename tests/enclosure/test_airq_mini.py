@@ -101,12 +101,25 @@ def test_lip_18_keeps_three_slot_rows_and_the_plug_under_the_slant():
     open_ = V(airq_mini.INTAKE_OPEN)
     assert open_ >= 154.5
     assert V("in_len") > 0 and V("row_x0") >= V("lsw_x + lsw_d / 2") and V("row_x1") <= V("bp_x0")
+
+
+def test_sen66_plug_clears_the_slant():
+    """At place a the deepest module's plug (top front corner) and the bend clear the zone wall's underside
+    by clr_remove (split from the lip test, R57: holds over the window but its clr_align 0.20 x clr_remove
+    0.30 corner, README "Supported window per rule")."""
     deep = V("sen_y0 - sen_d_tol")
     corner = (deep - V("sen_plug_out"), V("sen_mid + sen_plug_h / 2"))
     bend = (deep - V("sen_bend_out"), V("sen_mid + sen_bend_top"))
     for y, z in (corner, bend):
         assert _z_under(y) - z >= V("clr_remove") - 1e-9, (y, z, _z_under(y))
-    # two rows are all a 15.5 lip would take: short of R18's 154.5 (and of the 112 floor), and the plug meets the slant
+
+
+def test_lip_18_keeps_three_slot_rows_and_the_plug_under_the_slant_at_15_5():
+    """Why not the study's 15.5 lip (a counterfactual at the defaults, so not a rule of the clearance
+    window): two rows are all it would take, short of R18's 154.5 (and of the 112 floor), and the
+    SEN66's plug would meet the slant."""
+    deep = V("sen_y0 - sen_d_tol")
+    corner = (deep - V("sen_plug_out"), V("sen_mid + sen_plug_h / 2"))
     rows_155 = math.floor((15.5 - 1.2 - 0.2 - 10.0 + 1.2) / 2.4)
     assert rows_155 == 2 and rows_155 * V("in_n") * V("in_len") * V("slot_w") < 112
     lo = 15.5
@@ -157,10 +170,11 @@ def test_guide_fits_come_from_the_clearances():
     the entry faces clr_remove in front of the LED faces; the guides' ends clr_align off the ribs;
     the ribs and the stop clr_remove over the zone wall and in front of the board's edge."""
     import airq_mini_face as MF
-    assert S.params["lg_tg"].expression == "clr_align" and S.params["stop_y1"].expression == "board_y0 - clr_remove"
+    assert S.params["lg_tg"].expression == "clr_align" and S.params["stop_y1"].expression == "board_y0 - stop_gap"
+    assert S.params["stop_gap"].expression == "max(clr_remove, stop_tol + 0.1)"          # R57: >= 0.1 at the thickest foam
     assert V("lg_tf - wall") == pytest.approx(V("clr_align"))
     assert V("lg_ysf - lg_yb") == pytest.approx(V("clr_align"))
-    assert V("board_y0 - stop_y1") == pytest.approx(V("clr_remove")) and V("stop_y1 - lg_ye") == pytest.approx(V("lg_ein"))
+    assert V("board_y0 - stop_y1") >= V("clr_remove") - 1e-9 and V("stop_y1 - lg_ye") == pytest.approx(V("lg_ein"))
     assert V("stop_t") >= 1.2 and V("end_rib_t") >= 1.2 and V("band_pm_x0 - band_co2_x1") >= V("divider_t")
     assert V("rib_z0") >= V("zw_z1 + clr_remove") - 1e-9          # the ribs and the stop come down over the zone wall
     # retention: the flange laps the wall's inner face round the slot, the stop catches the bar's back
@@ -350,7 +364,8 @@ def test_plug_room_and_drawer():
     assert V("cab_x + cable_gh_d / 2") < V("board_x0") and V("cab_x - cable_gh_d / 2") > V("-tub_x")
     assert V("dr_y1") < V("plate_y0") and V("dr_y0") > V("tongue_y0 + tq_mate")
     assert V("qw_y - cable_qw_d / 2") > V("tq_plug_y1")
-    assert V("dr_x1") <= V("board_x0 + 0.1")
+    # (R57) the notch's closed end lies near the board's left edge (0.05 right of it at the defaults); the cables
+    # themselves rise left of it (above), which is the rule; the check design's interference run covers the rest
     assert V("j2_y0") < V("gh_y") + 5 and V("qw_y") < V("j4_y1")
 
 

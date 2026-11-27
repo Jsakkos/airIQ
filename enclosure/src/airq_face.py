@@ -154,6 +154,16 @@ def ffc_route_range(v) -> tuple[float, float]:
     return ffc_geometry(v, hi)["centre_len"], ffc_geometry(v, lo)["centre_len"]
 
 
+def ffc_len_window(v) -> tuple[float, float]:
+    """R57: the nominal FFC lengths to order, (shortest, longest), whose every corner (the length +- ffc_len_tol, each
+    insertion +- ffc_insert_tol) the jog takes: the route's range less the tolerances. It moves with the clearances
+    (the board's place follows clr_remove), so the FFC is ordered after the coupons: set ffc_len inside it."""
+    r_min, r_max = ffc_route_range(v)
+    lo = r_min + v("ffc_len_tol") + 2 * (v("ffc_insert") + v("ffc_insert_tol"))
+    hi = r_max - v("ffc_len_tol") + 2 * (v("ffc_insert") - v("ffc_insert_tol"))
+    return lo, hi
+
+
 def ffc_fit(v, length: float, insert: float) -> float | None:
     """The jog centre `s_c3` that makes the seated route take an FFC of `length` inserted `insert` at each end
     (the route lengthens 2 mm per mm the jog deepens), or None if no jog inside `_jog_limits` does."""
@@ -318,7 +328,7 @@ def yz(sv: str, tv: str) -> tuple[str, str]:
 
 def guide_params(s: Script) -> None:
     """The LED line's slot, the clear light guide behind it and the foam strip that plugs the crease's
-    parting line (the shell lands at z = lip + clr_remove over the lip's top at z = lip)."""
+    parting line (the shell lands at z = lip + crease_gap over the lip's top at z = lip)."""
     leds = MAIN["leds"]["chain"]
     p = s.param
     p("led_x0", "window_xc - led_len / 2", "LED slot: tail-side end, x (the 30 mm line centred on the window)")
@@ -329,8 +339,8 @@ def guide_params(s: Script) -> None:
     p("led_face_h", B.led_body_h(), "LED light face height (interface.yaml leds comment: the LED's body height)")
     for i, led in enumerate(leds, 1):
         p(f"led_d{i}_x", f"board_x0 + {led['center_x']}", f"D{i} light face centre, x (interface.yaml leds chain)")
-    p("gd_clr", "clr_remove", "light guide: air between its entry faces and the LED faces, to the panel (the 0.2 adhesive pad that holds the guide fills it) and to the shell (clr_remove)")
-    p("gd_t0", "bezel + panel_t + clr_remove", "light guide: front face, behind the panel's back face")
+    p("gd_clr", "clr_remove", "light guide: air between its entry faces and the LED faces (it comes down with the shell past them) and to the shell (clr_remove)")
+    p("gd_t0", "bezel + panel_t + gd_pad", "light guide: front face, the adhesive pad (gd_pad) behind the panel's back face")
     p("gd_t1", "gd_t0 + guide_t", "light guide: back face (guide_t thick, the coupon's 2 mm bar)")
     p("gd_sg", "(0.4 + gd_t0 * sin_t) / cos_t", "light guide: where its bottom turning facet starts on the front face: its lowest point, 0.4 above the lip's top")
     p("gd_s0", "gd_sg + guide_t", "light guide: where the bottom 45 degree facet meets the back face (TIR: light going down the leg turns toward the slot)")
@@ -355,7 +365,7 @@ def guide_params(s: Script) -> None:
     p("gd_tg", "clr_align", "light guide: the tongue's clearance to the slot on each side (clr_align: located part)")
     p("gd_rec", "clr_remove + 0.1", "light guide: the tongue's front face is this far behind the face")
     p("crease_y0", 0.12, "crease seal: front edge, flush with the shell's outer face at its lower edge (the foam plugs the parting line over the lip's top from the outside: 1.7 of foam)")
-    p("crease_squeeze", 0.1, "crease seal: foam tape clr_remove + this thick before it is pressed (R9: the check sets 0)")
+    p("crease_squeeze", 0.1, "crease seal: foam tape crease_gap + this thick before it is pressed (R9: the check sets 0)")
 
 
 def led_slot(s: Script) -> None:
@@ -459,7 +469,7 @@ def crease_seal(s: Script) -> None:
     """`crease_seal`: black closed-cell foam tape on the lip's top, full width, that fills the 0.2 parting
     line between the shell's lower edge and the lip from crease_y0 to the lip's inner face (1.4 of
     foam): the light guide's light cannot run out along the crease."""
-    s.box("Crease seal", ["-W / 2", "crease_y0", "lip"], ["W", "wall - crease_y0", "clr_remove + crease_squeeze"], body="crease_seal")
+    s.box("Crease seal", ["-W / 2", "crease_y0", "lip"], ["W", "wall - crease_y0", "crease_gap + crease_squeeze"], body="crease_seal")
 
 
 # --- orange dot and button flexure (feature 4) -----------------------------------------------------

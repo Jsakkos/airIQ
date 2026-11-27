@@ -118,12 +118,28 @@ def test_stop_tolerance_keeps_the_light_checks():
     0.1 nearer the board) no line between the guides runs in air and none reaches U4, and its back face keeps
     0.1 from the board's edge and the LEDs; at a thinner stop the feet stand proud of its back face and lines
     pass behind it (why the spec has no minus side)."""
-    thick = 0.1
+    thick = V("stop_tol")
     g = K.guide_to_guide(S, stop_extra=thick)
     assert g["air"] == 0 and g["hull_uncovered"] == 0
     assert K.ms5611_sight(S, stop_extra=thick)["unblocked"] == 0
     assert V("board_y0") - (V("stop_y1") + thick) >= 0.1 - 1e-9
     assert K.guide_to_guide(S, stop_extra=-0.2)["air"] > 0
+
+
+def test_zone_wall_held_down_with_firm_foam():
+    """The firm foam's bound (TOP_SEAL_KPA's 100 kPa, the spec's upper end) keeps >= 20 % of the top seal's
+    compression (split from the test above, R57: at clr_remove 0.15 it is 19.99 %, README "Supported window
+    per rule"; the soft foam specified keeps >= 30 % over the whole window)."""
+    firm = K.seal_forces(S)["lift"][100.0]
+    assert firm["seal_compression_left"] >= 0.2
+
+
+def test_stop_clears_the_board_at_its_thickest():
+    """R57 (the arithmetic part of the test above, fast, so the clearance window runs it): at its thickest
+    (stop_tol over stop_t) guide_stop's back face keeps 0.1 from the board's edge, the LEDs and J7, and at
+    stop_t it keeps clr_remove (it comes down with the shell past them), whatever clr_remove is."""
+    assert V("board_y0") - (V("stop_y1") + V("stop_tol")) >= 0.1 - 1e-9
+    assert V("board_y0 - stop_y1") >= V("clr_remove") - 1e-9
 
 
 def test_light_stays_off_the_sensor_its_window_and_the_crease():
@@ -156,7 +172,7 @@ def test_zone_wall_is_held_down():
     assert all(x > 0 for x in r["share"].values()) and r["inside_mm"] > 5
     soft, firm = r["lift"][30.0], r["lift"][100.0]
     assert soft["at_seal"] <= 0.1 and soft["at_plate_lap"] <= 0.05 and soft["seal_compression_left"] >= 0.3
-    assert firm["seal_compression_left"] >= 0.2 and firm["at_plate_lap"] < 0.1
+    assert firm["at_plate_lap"] < 0.1
     assert r["drawer_floor_n"] == 0.0 and V("drawer_floor_squeeze") == 0
     assert 3.0 < r["drawer_faces_n"][0] < r["drawer_faces_n"][1] < 7.0      # the stack's y-press on the notch's faces (round 3: 3.3-6.4 N)
 

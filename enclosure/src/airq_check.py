@@ -617,7 +617,7 @@ def section_polys(s) -> dict:
     zw = [(v("wall + seal_t"), v("ledge_z0")), (v(C.yb("ledge_z0")), v("ledge_z0")), (v(C.yb("zw_z0")), v("zw_z0")),
           (v("D - wall - clr_remove"), v("zw_z0")), (v("D - wall - clr_remove"), v("zw_z1")), (v(C.yf("zw_z1")), v("zw_z1")),
           (v(C.yf("ledge_z1")), v("ledge_z1")), (v("wall + seal_t"), v("ledge_z1"))]
-    z_bot = lip + v("clr_remove")                                      # the shell's lowest plane
+    z_bot = lip + v("crease_gap")                                      # the shell's lowest plane
     s_slot0, s_slot1 = v("led_s0"), v("led_s1")
     y_out = (z_bot - lip) / c * sn                                     # the outer face at z_bot
     low_out = yz(s_slot0, 0.0)
@@ -814,7 +814,7 @@ def light_paths(s) -> dict:
     polys = list(section_polys(s).values())
     src = guide_surface_points(s) + [(v("board_y0"), v("led_z") + v("led_face_h") * (k / 4 - 0.5)) for k in range(5)]   # + the LED faces
     hz, dz = v("lsw_z"), v("lsw_d") / 2
-    lip, cr = v("lip"), v("clr_remove")
+    lip, cr = v("lip"), v("crease_gap")
     targets = {
         "sensor": [(v("tongue_y0") + 0.25, hz)],
         "lip_window": [(0.0, hz + dz * k / 4) for k in range(-4, 5)],

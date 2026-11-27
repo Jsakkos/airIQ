@@ -557,9 +557,12 @@ def _x_ranges(s, skip: list[tuple[float, float]]) -> list[tuple[float, float]]:
     return out
 
 
+EDGE_EPS = 1e-6       # mm: the face wall's band piece overlaps the pieces over and under it by this much (R57)
+
+
 def opaque_prisms(s, stop: bool = True, stop_extra: float = 0.0) -> list[dict]:
     """The opaque solids round the band, as prisms (each named by its part; `material` says what it is):
-    - the shell's face wall (t 0 ... wall, from its lower edge at the crease, z = lip + clr_remove, to the top
+    - the shell's face wall (t 0 ... wall, from its lower edge at the crease, z = lip + crease_gap, to the top
       wall's underside), less the band slots, the flexure's whole width (its U slot and thinned beam: no
       blocking counted there) and, over the labels' height, their 0.4 deboss (all x: conservative);
     - the band's ribs (shell) and `guide_stop` (black foam; `stop` False leaves it out) with its windows;
@@ -572,8 +575,8 @@ def opaque_prisms(s, stop: bool = True, stop_extra: float = 0.0) -> list[dict]:
     sn, c, lip = fr
     w = v("wall")
     out = []
-    s_b0 = v("clr_remove") / c                                       # the face wall's lower edge (z = lip + clr_remove)
-    s_b1 = (v("clr_remove") + w * sn) / c
+    s_b0 = v("crease_gap") / c                                       # the face wall's lower edge (z = lip + crease_gap)
+    s_b1 = (v("crease_gap") + w * sn) / c
     s_top0, s_top1 = v("(H - lip) / cos_t"), v("(H - wall - lip + wall * sin_t) / cos_t")
     s_l0, s_l1 = v("label_f0 - lip - label_sub_drop"), v("label_f1 - lip")
     s_g0, s_g1 = v("band_f0 - lip"), v("band_f1 - lip")
@@ -584,7 +587,9 @@ def opaque_prisms(s, stop: bool = True, stop_extra: float = 0.0) -> list[dict]:
     pieces = [("face low", [(s_b0, 0.0), (s_l0, 0.0), (s_l0, w), (s_b1, w)], full),
               ("face labels", [(s_l0, t_lab), (s_l1, t_lab), (s_l1, w), (s_l0, w)], full),
               ("face mid", [(s_l1, 0.0), (s_g0, 0.0), (s_g0, w), (s_l1, w)], full),
-              ("face band", [(s_g0, 0.0), (s_g1, 0.0), (s_g1, w), (s_g0, w)], band),
+              # R57: the band piece overlaps its neighbours by EDGE_EPS where all three are solid (between the slots), so a
+              # line lying in the plane s = s_g0 or s_g1 there is not taken for air (it fell between the pieces: gap_dark 0.0)
+              ("face band", [(s_g0 - EDGE_EPS, 0.0), (s_g1 + EDGE_EPS, 0.0), (s_g1 + EDGE_EPS, w), (s_g0 - EDGE_EPS, w)], band),
               ("face high", [(s_g1, 0.0), (s_top0, 0.0), (s_top1, w), (s_g1, w)], full)]
     for name, poly, xs in pieces:
         for k, (a, b) in enumerate(xs):
@@ -953,7 +958,7 @@ def light_paths(s, dx: float = 1.0, n_edge: int = 6, n_side: int = 6) -> dict:
     LED face (all four) to:
     - `sensor`: the tongue's VEML7700 window (its centre and 0.5 round it);
     - `lip_window`: the light-sensor window's outer face (its disc);
-    - `crease_front`: the crease's open front (y 0, z lip ... lip + clr_remove) along the band's length.
+    - `crease_front`: the crease's open front (y 0, z lip ... lip + crease_gap) along the band's length.
     Counted opaque: the shell's face wall and ribs, `guide_stop`, the LEDs, the board, the zone wall (ledge,
     slant, flat part), `zone_seal` (black foam) and the lip; the crease's 0.2 parting line counts as air.
     Returns {target: (length, (source, target))}."""
@@ -963,7 +968,7 @@ def light_paths(s, dx: float = 1.0, n_edge: int = 6, n_side: int = 6) -> dict:
     src = [p for p, _, _ in surface_samples(s, guide_prisms(s), dx, n_edge, n_side)] + [p for _, p in led_face_points(s)]
     vx, vy, vz = v("veml_wx"), v("veml_wy"), v("veml_wz")
     r, lx, lz = v("lsw_d") / 2, v("lsw_x"), v("lsw_z")
-    lip, cr = v("lip"), v("clr_remove")
+    lip, cr = v("lip"), v("crease_gap")
     targets = {
         "sensor": [(vx, vy, vz)] + [(vx, vy + dy, vz + dz) for dy, dz in ((0.5, 0), (-0.5, 0), (0, 0.5), (0, -0.5))],
         "lip_window": [(lx, 0.0, lz)] + [(lx + r * 0.95 * math.cos(a), 0.0, lz + r * 0.95 * math.sin(a)) for a in [k * math.pi / 4 for k in range(8)]],

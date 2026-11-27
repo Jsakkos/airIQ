@@ -104,19 +104,21 @@ def build() -> Script:
     p("va_far", r["va_far"], "view area to the panel's far end (ref_epd va_far)")
     p("va_w", r["va_w"], "view area length (ref_epd va_w)")
     p("guide_t", m.guide_t, f"light guide thickness between the LED faces and the panel ({C.LS}, R20)")
+    p("gd_pad", m.guide_pad, "light guide: the adhesive pad's gap between the panel's back and the guide's front (the pad that holds the guide, led_mask and gap_stop fills it): a bought thickness, not a fit, so it does not follow clr_remove (R57)")
     p("slot_bar", 1.2, "bar between the two intake slot rows on the lip, and between slots in a row")
     p("slot_row1_z", "grille_min_z", "intake slots, lower row bottom: the 10 mm line (on the lip)")
     p("slot_row2_z", "slot_row1_z + slot_w + slot_bar", "intake slots, upper row bottom (its top under the zone wall's ledge)")
     p("led_f0", 16.5, "LED slot lower edge, along the front (f): its inner edge above the ledge; 16.5 (3a: 16.2) leaves 1.2 of face wall between the slot and the crease (3b-1, light_paths)")
     p("led_h_slot", m.led_slot_h, "LED slot height on the face")
     p("led_len", 30.0, "LED line length (plan)")
-    p("panel_s0", "led_f0 + led_h_slot + 1.15 - lip", "panel's lower edge, up the slope from the crease (0.95 face bar + 0.2 pocket; 3b-1: 0.25 lower than 3a so the panel's top keeps >= clr_remove under the top wall)")
+    p("face_bar", 0.95, "the face's bar between the LED slot and the panel pocket, along the slope (R57: fixed, so the pocket's clr_remove does not thin it)")
+    p("panel_s0", "led_f0 + led_h_slot + face_bar + clr_remove - lip", "panel's lower edge, up the slope from the crease (face_bar + the pocket's clr_remove; 3b-1: 0.25 lower than 3a so the panel's top keeps >= clr_remove under the top wall)")
     p("panel_x0", "-inner_x + clr_remove + block_out", "panel's tail end (user's left), the hatched block at the wall")
     p("window_xc", "panel_x0 + panel_l - va_far - va_w / 2", "view-area centre x: the LED line centres on it")
 
     # --- SEN66, zone wall, board, bosses ---------------------------------------------------
     C.add_sen66(s, m)
-    C.add_zone_and_board(s, m, "bezel + panel_t + clr_remove + guide_t + clr_remove",
+    C.add_zone_and_board(s, m, "bezel + panel_t + gd_pad + guide_t + clr_remove",
                          "inner_x - board_clr - board_w")
     C.add_standoffs(s)
     C.add_bosses(s)
@@ -280,7 +282,7 @@ def openings(s: Script) -> None:
       0.5 chamfer on its outer edge.
     The HCHO grille is cut in `base_cuts` (3a), behind the window in the shell's side wall."""
     p = s.param
-    p("in_n_l", 5, "intake slots per row in the left span (left of the light-sensor window); whole number", unit="")
+    p("in_n_l", 4, "intake slots per row in the left span (left of the light-sensor window); whole number. 4, not 5 (R57): one bar fewer a row gives 2.9 mm2, so R18's 154.5 holds to clr_remove 0.30 (the rows run between the boss pockets, which move with it)", unit="")
     p("in_n_r", 2, "intake slots per row in the right span; whole number", unit="")
     p("in_len_l", "(lsw_gap_x0 - row_x0 - (in_n_l - 1) * slot_bar) / in_n_l", "derived: intake slot length, left span")
     p("in_len_r", "(row_x1 - lsw_gap_x1 - (in_n_r - 1) * slot_bar) / in_n_r", "derived: intake slot length, right span")
@@ -479,8 +481,10 @@ def plug_room(s: Script) -> None:
 def drawer_params(s: Script) -> None:
     """The zone wall's cable drawer and the cables' line through it (zone_drawer)."""
     p = s.param
-    p("groove_d", 0.6, "drawer grooves' depth into the notch's faces (along y)")
-    p("groove_w", 0.8, "drawer grooves' width across the zone wall (along t), centred in its thickness")
+    p("rib_proud", 0.45, "drawer grommet ribs: how far they stand proud of the grommet's printed face, into the notch's grooves (B6). Fixed: the grooves follow clr_align (R57)")
+    p("rib_w", 0.5, "drawer grommet ribs: their width across the zone wall (along t)")
+    p("groove_d", "rib_proud + clr_align", "drawer grooves' depth into the notch's faces (along y): the rib's proud height and clr_align past its tip")
+    p("groove_w", "rib_w + 2 * clr_align", "drawer grooves' width across the zone wall (along t), centred in its thickness: the rib and clr_align each side")
     p("pt_x0", "-tub_x + 0.3", "cables' riser left end (inside the left rail)")
     p("gh_x", "pt_x0 + cable_gh_d / 2", "SEN66 cable through the drawer: x")
     p("qw_x", "gh_x + cable_gh_d / 2 + 0.8 + cable_qw_d / 2", "J4 Qwiic cable through the drawer: x")

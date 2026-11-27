@@ -316,9 +316,53 @@ applies to vertical bosses only, and the shell's bosses are confirmed by the fir
 
 **Pending owner print.** Nothing below has been measured. The plan's defaults stay in force until
 the owner prints the coupons and reports: `clr_align` 0.15, `clr_remove` 0.20, `clr_snap` 0.25,
-`slot_w` 1.2, `flex_*` as in `src/clearances.py`. When results arrive (Task 2 Step 3), fill the
-table and change the defaults in `src/clearances.py`, rebuild and commit with
-`feat(enclosure): print-test coupons and results`.
+`slot_w` 1.2, `flex_*` as in `src/clearances.py`.
+
+**When the results arrive (Task 2 Step 3), in this order** (R57):
+
+1. Fill the table below and enter the values in `src/clearances.py` (`clr_snap` = `clr_remove` + 0.05).
+2. Run the fast tests: `uv run --with pytest --with pyyaml pytest tests/enclosure`. They check every
+   rule from the parameters at the new values. `test_clearance_window.py` has already run them over
+   the whole window below, so a value inside a rule's supported window passes. A value outside it
+   fails that rule's test; the table below names the parameter to change.
+3. Rebuild (`uv run --with pyyaml python enclosure/build.py all`) and run the suite again with
+   SolidCraft present, which runs the interference, probe and export checks.
+4. **Order the FFC only once `test_ffc_route_length_and_service_lift` passes.** Its 73 mm fits the
+   fold jog for `clr_remove` 0.16–0.30. Outside that, the test prints the jog's window of
+   nominal lengths (`airq_face.ffc_len_window`). Set `ffc_len` (`airq.py`) inside it, rebuild, and
+   order that length.
+5. Commit with `feat(enclosure): print-test coupons and results`.
+
+**Supported window per rule** (R57). Every rule test of both enclosures holds over `clr_align`
+0.10–0.20 × `clr_remove` 0.15–0.30, except the rows below. These are the arithmetic and analytic
+checks, from the parameters (`tests/enclosure/clearance_window.py` lists them). The rows below
+cannot be freed from the clearances by a local change. Several sizes used to follow a `clr_*` by
+accident and are now fixed parameters, so their rules hold everywhere:
+
+- `crease_gap`: the crease's parting line;
+- `gd_pad`: the guide's adhesive pad;
+- `face_bar`: the bar between the LED slot and the panel pocket;
+- `rib_proud` and `rib_w`: the airQ's drawer grommet ribs;
+- `pad_gap_max`: the SEN66 pad;
+- `tm_engage`: the mini's tongue pin;
+- `stop_gap`: the mini's `guide_stop` to the board;
+- `stop_web_lo`: the stop's lower web;
+- `cab_gap`: the mini's drawer cables.
+
+The mini's "visible gap stays dark" was a sampling hole in the check, a line lying exactly on a
+boundary between two wall pieces, and is fixed.
+The airQ's intake rows went from 5 to 4 slots in the left span (`in_n_l`), which keeps R18 to
+`clr_remove` 0.30.
+
+| Rule (test) | Holds for | At 0.30 or 0.15 | Outside the window, change |
+|---|---|---|---|
+| airQ: the 73 mm FFC fits the jog at every corner of ±1 mm and the insertion's ±0.5 (`test_ffc_route_length_and_service_lift`) | `clr_remove` 0.16–0.30 | the jog's window of nominal lengths: 72.81–73.14 at the defaults, 73.02–73.12 at 0.15, 72.38–73.17 at 0.30. Some length always fits (`test_ffc_jog_takes_one_custom_length`) | `ffc_len`: order a length inside `airq_face.ffc_len_window` |
+| airQ: guide delivery ≥ 3 % per LED, with the adhesive pad (`test_guide_delivers_light_to_the_exit`) | `clr_align` ≤ 0.15: the whole window; at 0.20: `clr_remove` ≤ 0.28 | D2 2.98 % at 0.20 / 0.30 | `led_h_slot` + 0.1 gives the tongue back what `gd_tg` takes; re-run the light tests |
+| airQ: R13, no line from the guide or the LEDs to U4 (`test_ms5611_sees_no_led_or_guide_face`) | `clr_remove` ≤ 0.20 | 1 of 21,588 samples on the D2 foot's tail-side face reaches U4 at 0.21–0.30. It passes behind `gap_stop` through the guide's entry gap `gd_clr` (= `clr_remove`) | set `gd_clr` to 0.2 if the guide slides past the LEDs at 0.2 on the first print; else extend `gap_stop` back toward the board's edge (it is soft foam) |
+| airQ: `led_mask` leaks about 2 % (stated, not a rule; `test_led_mask_leaks_about_2_percent`) | `clr_remove` ≤ 0.25 | 3.8 % at 0.30 | restate the figure, or `mask_mz` |
+| mini: the deepest SEN66's plug and bend `clr_remove` under the slant (`test_sen66_plug_clears_the_slant`) | `clr_align` ≤ 0.15: the whole window; at 0.20: `clr_remove` ≤ 0.28 | 0.24 against 0.30 at 0.20 / 0.30 | a plug pocket in the slant's underside, as the airQ's `plug_room` |
+| mini: intake throat ≥ 77.3 at its tolerance corner (R25; `test_intake_throat_keeps_r25`) | `clr_remove` ≤ 0.29 (≤ 0.28 at `clr_align` 0.20) | 76.5 at 0.15 / 0.30 (nominal 88.9) | `throat_chamfer` (0.9) |
+| mini: the firm foam's bound, top seal ≥ 20 % compressed (`test_zone_wall_held_down_with_firm_foam`) | `clr_remove` ≥ 0.18 | 19.99 % at 0.10 / 0.15 | none needed: the soft foam specified keeps ≥ 30 % everywhere (`test_zone_wall_is_held_down`) |
 
 **Rule for the three clearances.** Taken from the owner's answers, per fit type (round, rectangular),
 using the larger of the two types:
@@ -1001,11 +1045,11 @@ positions 3b needs (M6):
 - light-sensor window: `lsw_x`, `lsw_z`, `lsw_d`, and its gap in the slot rows, `lsw_gap_x0` …
   `lsw_gap_x1`;
 - intake rows: `slot_row1_z`, `slot_row2_z`, `row_x0` … `row_x1` (between the boss pockets) and
-  `slot_bar`. With 1.2 bars they give 154.8 mm² open;
+  `slot_bar`. With 1.2 bars they give 157.7 mm² open (154.8 with the 5 left-span slots before R57);
 - outlet grille: `out_gx0` … `out_gx1`, `out_gz0` … `out_gz1`, `out_pitch` 2.4, `out_n` 32;
 - upper-rear exhaust: `exh_x0` … `exh_x1`, `exh_z0` … `exh_z1`, kept apart from the outlet;
 - USB-C: `usb_x`, `usb_z`, `usb_well` (6.6), `usb_chamfer`; 3b-2 adds `usb_plug_w` / `usb_plug_h` (the overmold, 12.5 × 7, to confirm) and `usb_open_w` / `usb_open_h`;
-- 3b-2 counts: `in_n_l` 5 and `in_n_r` 2 intake slots per row in the two spans (lengths `in_len_l`, `in_len_r` derived), `exh_n` 14 exhaust slots.
+- 3b-2 counts: `in_n_l` 4 (5 until R57) and `in_n_r` 2 intake slots per row in the two spans (lengths `in_len_l`, `in_len_r` derived), `exh_n` 14 exhaust slots.
 
 The board's front edge `board_y0` is the study's binding constraint, written as an expression: the
 corner of the LED faces, with the panel and the light guide in front of it.
@@ -1031,7 +1075,7 @@ thickness; `airq_check.opening_probes`).
 
 | Opening | Where | Open area (mm²) | Lowest edge z | Source |
 |---|---|---|---|---|
-| Intake slot rows | lower front lip (y 0 … 1.8), two rows z 10.0 … 11.2 and 12.4 … 13.6, 5 + 2 slots per row either side of the window's gap, x −37.7 … 37.7 | 154.80 | 10.0 | `airq.py:294` |
+| Intake slot rows | lower front lip (y 0 … 1.8), two rows z 10.0 … 11.2 and 12.4 … 13.6, 4 + 2 slots per row either side of the window's gap, x −37.7 … 37.7 | 157.68 | 10.0 | `airq.py:294` |
 | Light-sensor window | lip, ⌀ 2.5 at x 16.4, z 11.74, in the rows' gap, in front of the tongue's VEML7700 | 4.91 | 10.49 | `airq.py:296` |
 | Outlet grille | lower rear wall, 32 slots, x −41.9 … 33.7, z 10.0 … 27.3, behind the plenum plate | 664.32 | 10.0 | `airq.py:298` |
 | Electronics exhaust | upper rear wall, 14 slots, x 9.4 … 41.8, z 37.0 … 47.0 | 168.00 | 37.0 | `airq.py:302` |
@@ -1070,12 +1114,12 @@ Every row is measured on the geometry where the check design can (probes with `i
 | Plugs through their openings (I2) | every plug fits every closed opening it passes | the lid's hole 6.4 × 3.35 passes the Qwiic plug 6.0 × 2.95 (0.2 a side); the drawer and the J4 notch are open to an edge, so no plug passes them | the plug's section swept through the lid; open-edge probes (`test_plugs_pass_their_openings`) | pass |
 | Gravity-only parts (N5) | held, not just resting | zone wall clamped by the board's screws; lid and SFA40 by two screws from below; tongue in its pocket under a pad (`clr_align`) | `test_gravity_parts_are_held` | pass |
 | HCHO window (N2) | does not open the electronics zone | each step backed by the rail and the zone wall but at its slot (fill = need: 2.80, 5.29, 7.79, 10.28, 10.22 mm³); 0 against the shell | `win_*` probes (`test_hcho_window_is_backed`) | pass |
-| Rebuild over the parameter range (`check_parameters`) | `wall` 1.6 and 2.4, each `clr_*` ±0.1: no errors | no feature errors or warnings, 21 bodies each (every opening included), volume back to the default after each. Open areas at those states, from the parameters: intake 155.8 / **151.9** (wall 1.6 / 2.4), 155.3 / **154.3** (`clr_remove` 0.1 / 0.3); outlet 664.3 and HCHO 66.1–72.8 hold | `parameters.change` + `document.inspect` walk (`test_rebuilds_over_wall_and_clearances`); areas from `airq_check.distances` with the constants moved | pass (rebuild). The intake rows' margin is 0.3 at the defaults; it is lost at wall 2.4 and `clr_remove` 0.3 (the rows run between the boss pockets, which move with both): owner item |
+| Rebuild over the parameter range (`check_parameters`) | `wall` 1.6 and 2.4, each `clr_*` ±0.1: no errors | no feature errors or warnings, 21 bodies each (every opening included), volume back to the default after each. Open areas at those states, from the parameters: intake 158.6 / 154.8 (wall 1.6 / 2.4), 158.2 / 157.2 (`clr_remove` 0.1 / 0.3); outlet 664.3 and HCHO 66.1–72.8 hold | `parameters.change` + `document.inspect` walk (`test_rebuilds_over_wall_and_clearances`); areas from `airq_check.distances` with the constants moved | pass (rebuild). The intake rows keep R18 at all four states since `in_n_l` is 4 (R57; with 5 they lost it at wall 2.4 and `clr_remove` 0.3). The other rules over the coupons' window: "Coupon results", supported window per rule |
 | Intake path (R25) | ≥ 77.3 | gap at the inlets 80.7; in front of the SEN66 114.4; over the HCHO lid 411.6 | free probe boxes, sections from `measure` (`test_air_paths_are_free_sections`) | pass |
 | Outlet path (R25) | ≥ 330.1 | ring bore 346.4; plenum branches (section / share of 330.1 by grille slots): ring to H1 235.7 / 226.9, at H1 204.6 / 185.7, right of H1 224.1 / 165.1 | as above | pass |
 | HCHO path (R25) | ≥ 27.4 (the SFA40's opening) | over the cap 35.6; window into the chimney 47.2; chimney 30.3 | as above | pass |
 | Outlet grille (R18, R26) | ≥ 660.1 (2 × 330.1), lower edge ≥ 10 | **664.32** measured (32 slots × 1.2 × 17.3, x −41.9 … 33.7, z 10.0 … 27.3, in the rear wall behind the plenum plate); 2.01 × the port | open area = (probe volume − overlap with `base_plate`) / wall, probe `op_outlet` (`test_openings_measured_open_areas`); the air behind it (probe `air_outlet_grille`, 3 mm deep over the slots) is free | pass, margin 4.2 |
-| Intake rows (R18, M6) | ≥ 154.5 (2 × 77.3), lower edge ≥ 10, only slots facing free air | **154.80** measured (14 slots in two rows, 5 + 2 per row each side of the light-sensor window, 1.2 high, 1.2 bars, z 10.0 … 13.6 under the ledge at 13.8); 2.00 × the port. The air behind all of them is free to the tongue's front edge (probe `air_slots_front`, 4.6 deep); the slots in front of the tongue (x 12.8 … 34.8) breathe through the 4.6 channel and its exits (M4: exits 48.0 ≥ 35.3) | `op_intake_l/r` probes as above; `air_slots_front` interference 0 | pass, small margin 0.3 |
+| Intake rows (R18, M6) | ≥ 154.5 (2 × 77.3), lower edge ≥ 10, only slots facing free air | **157.68** (12 slots in two rows, 4 + 2 per row each side of the light-sensor window, 1.2 high, 1.2 bars, z 10.0 … 13.6 under the ledge at 13.8); 2.04 × the port. The air behind all of them is free to the tongue's front edge (probe `air_slots_front`, 4.6 deep); the slots in front of the tongue (x 12.8 … 34.8) breathe through the 4.6 channel and its exits (M4: exits 48.0 ≥ 35.3) | `op_intake_l/r` probes as above; `air_slots_front` interference 0 | pass, margin 3.2 (R57: 2.7 at `clr_remove` 0.30) |
 | HCHO grille (R26) | ≥ 2 × the SFA40's opening (54.7), lower edge ≥ 10, aligned with the shell's window | **67.81** measured (5 slots 4.16, 9.15, 14.14, 19.13, 21.24; z from 10.0, tops follow the zone wall's underside less 1.2), 2.5 × the opening. The shell's side window covers each slot's step (N2 probes `win_0 … win_4`: 0 against the shell, rail and zone wall behind it) | `op_hcho_1 … 5` probes (cut in 3a); `test_hcho_window_is_backed` | pass |
 | Tongue's slots (M4) | the slots in front of the tongue stay open | channel exits 48.0 ≥ the slots' 35.3 | probes `air_tongue_*` | pass |
 | Antenna to SEN66 (R12) | ≥ 15 | **17.39** between the antenna strip's probe solid (`cl_antenna`, from `interface.yaml`) and the SEN66's body; 16.72 as the box arithmetic | `inspect.clearance` on the check design (`test_distances_on_the_geometry`); `airq_check.distances` | pass |
@@ -1388,7 +1432,7 @@ design, `airq_mini_check --run`), **analytic** (a model of the physics in Python
 | H2 screw | does not open the zone, does not reach the SEN66 | blind pilot 1.6 in pad + wall, 0.5 left; **M2 × 3 only** (1.4 of thread): 1 mm longer reaches the SEN66 (review M6) | **arithmetic** (`test_h2_lies_over_the_sen66_so_it_has_no_post`) | pass; screw length in the guide and BOM (5b) |
 | Clearances are parameters (review focus 1) | every fit a `clr_*` parameter | the guides' fits `clr_align` / `clr_remove` (no literal gap but `lg_ein` 0.1, a sight-line choice); the stop and ribs `clr_remove` off the board, J7 and the zone wall | **arithmetic** (`test_guide_fits_come_from_the_clearances`) | pass |
 | Rebuild (`check_parameters`) | `wall` 1.6 / 2.4, `clr_*` ±0.1 | no errors or warnings, 17 bodies, volume back to the default each time | **measured**: `parameters.change` walk (`test_rebuilds_over_wall_and_clearances`) | pass (rebuild) |
-| … at those states | the rules keep | intake 159.5 / **153.7** (wall 1.6 / 2.4), 158.8 / 157.3 (`clr_remove` 0.1 / 0.3); passage 7.3 / **5.7**; the intake throat at wall 2.4 **57.4** (47.9 at its tolerance corner), under 77.3 (review M1; the old "≈ 75 at the Qwiic turn" was not the narrowest place); J2 room 6.25 / **4.65**; collar 2.2 / 0.6; at wall 2.4 the band's slot is 0.6 deeper and the LEDs 0.6 nearer (the board follows the rear wall), so the guide's bar tops out at z 33.65 (0.95 under the LEDs' top, `lg_z1`) and the ribs sit `clr_remove` over the zone wall (`rib_z0`); `guide_stop` keeps 1.2 | **arithmetic** from the parameters | wall 2.4 loses the intake, the intake throat (R25) and the J2 margins (owner item, as the airQ's intake at wall 2.4) |
+| … at those states | the rules: which keep and which do not (R57: over the coupons' window, "Coupon results", supported window per rule) | intake 159.5 / **153.7** (wall 1.6 / 2.4), 158.8 / 157.3 (`clr_remove` 0.1 / 0.3); passage 7.3 / **5.7**; the intake throat at wall 2.4 **57.4** (47.9 at its tolerance corner), under 77.3 (review M1; the old "≈ 75 at the Qwiic turn" was not the narrowest place); J2 room 6.25 / **4.65**; collar 2.2 / 0.6; at wall 2.4 the band's slot is 0.6 deeper and the LEDs 0.6 nearer (the board follows the rear wall), so the guide's bar tops out at z 33.65 (0.95 under the LEDs' top, `lg_z1`) and the ribs sit `clr_remove` over the zone wall (`rib_z0`); `guide_stop` keeps 1.2 | **arithmetic** from the parameters | wall 2.4 loses the intake, the intake throat (R25) and the J2 margins (owner item, as the airQ's intake at wall 2.4) |
 | Felt feet | cover the heads, stay on the face | ⌀7.5 at the front screws, 2.0 thick over 1.2 of head | **arithmetic** (`test_feet_cover_the_screw_heads`) | pass (feet to confirm) |
 
 ## Print and assembly guide (airQ)
@@ -1739,7 +1783,9 @@ print ("Print and assembly guide (airQ)", section 6) is what settles most of the
 - **Rear screw (R29).** One M2 screw head shows on the back (a felt dot could cover it).
 - **Tongue Qwiic (R30).** J3 cannot take a plug in the airQ, so the tongue chains through the SFA40
   breakout's second Qwiic socket to J4. Confirm the chosen breakout has two sockets.
-- **FFC (R49).** Order a custom 73 mm ± 1 mm, 24-pin 0.5 mm, Type A, foldable FFC.
+- **FFC (R49).** A custom 73 mm ± 1 mm, 24-pin 0.5 mm, Type A, foldable FFC. **Order it only after the coupons**, once
+  `test_ffc_route_length_and_service_lift` passes with the coupon values (R57): 73 mm fits for `clr_remove` 0.16–0.30;
+  outside that, set `ffc_len` inside the window the test prints ("Coupon results", step 4).
 - **Light-guide print.** Its orientation (the guide proposes its +x end; also try it entry-plane down on a smooth plate, report brightness) and the evenness of the
   30 mm line, as under "The light guide" below.
 - **`gap_stop`.** The 1.3 mm foam strip sits in a 1.7 mm gap between the D1 and D2 feet, 0.2 clear
@@ -1787,8 +1833,10 @@ print ("Print and assembly guide (airQ)", section 6) is what settles most of the
   and 100 leave 5 and 25 mm of slack with no room for a bow);
   choose an FFC whose datasheet allows folding (three 45° direction-change folds, made once over a jig), or a
   factory-folded one; and check continuity of all 24 conductors on the prototype after the folds, before power.
-- **Owner ordering item (R49):** order the FFC as a custom length, 73 mm ±1 mm (24-pin, 0.5 mm pitch, Type A, 0.3 thick,
-  foldable), from a vendor that makes custom lengths; no stock length fits the route. If the vendor's tolerance is wider
+- **Owner ordering item (R49, R57):** after the coupons ("Coupon results", step 4), order the FFC as a custom length,
+  73 mm ±1 mm at the default clearances (24-pin, 0.5 mm pitch, Type A, 0.3 thick, foldable), from a vendor that makes
+  custom lengths; no stock length fits the route. The jog's window of nominal lengths is 72.81–73.14 at the defaults and
+  moves with `clr_remove` (`airq_face.ffc_len_window`). If the vendor's tolerance is wider
   than ±1 mm, or the insertion differs from 3.0 … 4.0, re-check the fit (`ffc_len`, `ffc_len_tol`, `ffc_insert_tol`;
   `test_ffc_route_length_and_service_lift`).
 - The light guide (R48): print it and look. The 3-D trace (`airq_check.guide_delivery`, every face bare) gives D1 4.3 %

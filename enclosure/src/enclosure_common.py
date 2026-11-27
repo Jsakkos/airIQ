@@ -86,6 +86,7 @@ def add_envelope(s: Script, m: L.Model) -> None:
     p("tilt_deg", m.tilt_deg, "front slope from vertical (plan)", unit="deg", favorite=True)
     p("lip", m.lip, f"vertical lower front lip carrying the intake slots (R15, R22; {LS})", favorite=True)
     clearances.add_params(s)          # clr_align, clr_remove, clr_snap, slot_w, wall, flex_t, flex_len, flex_gap
+    p("crease_gap", 0.2, "parting line at the crease: the slope's lower edge stops this far over the lip's top (the floor is the shell's z datum). A fixed gap, not a fit (R57): it does not follow clr_remove, so the opaque paths to it and the bought crease seal keep their sizes over the coupons' window")
     p("floor_t", m.floor, "plan: floor (base plate) 2.0; named floor_t because SolidCraft reserves floor (a function)", favorite=True)
     p("grille_min_z", m.grille_min_z, "plan: no opening's lower edge below 10 mm above z = 0 (feet not counted)", favorite=True)
     p("cos_t", "cos(tilt_deg)", "derived", unit="")
@@ -201,15 +202,15 @@ def shell(s: Script) -> None:
     s.shell("Shell walls", [[0, v("D") / 2, 0], [0, v("D"), v("H") / 2]], "wall")
     # R24: the lower front lip belongs to the base; the shell is lowered onto the base along -z.
     # Review N1: the shell's datums are the floor (z, where the screws clamp it) and the rear wall's
-    # front face (y, where the side walls end). Everywhere else it keeps clr_remove from the base:
-    # its side walls end clr_remove behind the lip's inner face, and its slope stops clr_remove
-    # above the lip's top (a 0.2 parting line at the crease, into the electronics zone above the
-    # ledge seal, not into the sensor zone)
-    s.box("Lip to the base", ["-W / 2 - wall", "-wall", "-wall"], ["W + 2 * wall", "2 * wall + clr_remove", "lip + wall + clr_remove"],
+    # front face (y, where the side walls end). Everywhere else it keeps clear of the base: its side
+    # walls end clr_remove behind the lip's inner face, and its slope stops crease_gap above the
+    # lip's top (the 0.2 parting line at the crease, into the electronics zone above the ledge
+    # seal, not into the sensor zone; a fixed gap since R57, not clr_remove)
+    s.box("Lip to the base", ["-W / 2 - wall", "-wall", "-wall"], ["W + 2 * wall", "2 * wall + clr_remove", "lip + wall + crease_gap"],
           operation="cut", targets=["shell"])
     # the slope's inner corner hangs below the crease behind the lip: trim it to the same height, so
     # it clears the lip's top and the zone wall's ledge seal
-    s.box("Crease seat", ["-inner_x", "wall - 0.1", "lip - wall"], ["2 * inner_x", "wall / cos_t - wall + 0.2 + clr_remove", "wall + clr_remove"],
+    s.box("Crease seat", ["-inner_x", "wall - 0.1", "lip - wall"], ["2 * inner_x", "wall / cos_t - wall + 0.2 + crease_gap", "wall + crease_gap"],
           operation="cut", targets=["shell"])
     s.box("Floor seat", ["-W / 2 - wall", "-wall", "-wall"], ["W + 2 * wall", "D + 2 * wall", "floor_t + wall"], operation="cut",
           targets=["shell"])
@@ -365,6 +366,15 @@ def zone_wall(s: Script, blind: tuple = ()) -> None:
                      ("D - wall - clr_remove", "zw_z0"), ("D - wall - clr_remove", "zw_z1"), (yf("zw_z1"), "zw_z1"),
                      (yf("ledge_z1"), "ledge_z1"), ("wall + seal_t", "ledge_z1")])
     s.extrude("Zone wall", "Zone wall profile", "2 * (inner_x - clr_remove)", body="zone_wall")
+    # final review M1: its ends stand clr_remove inside the shell's side walls; a shell lowered off-centre in x
+    # meets a chamfer on the end's top edges (the flat top's and the slant's), not a square edge, and slides home
+    s.param("zw_end_chamfer", 0.3, "zone wall: 45 deg chamfer on its ends' top edges (the shell's side walls slide past them; final review M1)")
+    v = s.v
+    xe = v("inner_x - clr_remove")
+    y_top = (v(yf("zw_z1")) + v("D - wall - clr_remove")) / 2
+    y_sl, z_sl = (v(yf("ledge_z1")) + v(yf("zw_z1"))) / 2, (v("ledge_z1") + v("zw_z1")) / 2
+    s.chamfer("Zone wall end chamfers", [[sx * xe, y_top, v("zw_z1")] for sx in (-1, 1)] + [[sx * xe, y_sl, z_sl] for sx in (-1, 1)],
+              "zw_end_chamfer", body="zone_wall")
     for name, (x, y) in HOLES:     # N5: the board's screws clamp it here
         s.cylinder(f"Zone wall pad {name}", [x, y, "zw_z1 - 0.5"], "standoff_d", "board_z0 - zw_z1 + 0.5",
                    operation="join", targets=["zone_wall"])
@@ -404,7 +414,8 @@ def plenum(s: Script) -> None:
           operation="join", targets=["base_plate"])
 
 
-SEAT_Y0_AIRQ = ("pt_yh + cable_gh_d / 2 + clr_align", "pad seat's front face: just behind the cables' riser and run")
+SEAT_Y0_AIRQ = ("max(pt_yh + cable_gh_d / 2 + clr_align, sen_y0 - pad_gap_max - seat_t)",
+                "pad seat's front face: just behind the cables' riser and run, and no further forward than leaves the pad pad_gap_max at the nominal module (R57: a looser clr_remove moves the module back, the seat follows)")
 SEAT_CLR_AIRQ = ("gasket_squeeze / sin_t + 0.2", "derived: the seat's top under the slant: under the drawer grommet's squeezed face, + 0.2")
 SEAT_X_AIRQ = ("-tub_x - iwall", "plug_x0 - 1.0 + tub_x + iwall")
 
@@ -430,6 +441,8 @@ def cradle(s: Script, seat_y0: tuple = SEAT_Y0_AIRQ, seat_slant_clr: tuple = SEA
     p("pad_w", 10.0, "pad width (x)")
     p("pad_h", 10.0, "pad height (z), centred on the outlet: its force passes through the ring's land")
     p("seat_t", 2.4, "pad seat thickness (B1)")
+    if "pad_gap_max" in seat_y0[0]:
+        p("pad_gap_max", 1.8, "the pad's gap at the nominal module, at most (44 %; R57): the seat follows the module back when clr_remove grows, so the pad keeps >= 25 % at 20.8 deep with the seat's give")
     p("seat_y0", seat_y0[0], seat_y0[1])
     p("pad_y0", "seat_y0 + seat_t", "derived: the pad's seat face")
     p("pad_gap", "sen_y0 - pad_y0", "derived: pad thickness at the nominal module (44 % compressed; 28 % at 20.8 deep, 60 % at 21.8)")
