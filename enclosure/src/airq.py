@@ -256,6 +256,7 @@ def build() -> Script:
     F.light_guide(s)
     F.crease_seal(s)
     F.led_mask(s)
+    F.gap_stop(s)
     F.orange_dot(s)
     # outlet grille in the lower rear wall (M6, R18, R26): 1.2 slots at a 2.4 pitch from the left
     p("out_pitch", 2.4, "outlet grille slot pitch (1.2 slots, 1.2 bars: R26 higher open fraction)")

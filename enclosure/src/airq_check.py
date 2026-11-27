@@ -46,6 +46,7 @@ CHECK_SC = encbuild.BUILD_DIR / "airq-check.sc"
 REFS = ("ref_sen66", "ref_epd", "ref_fpc_adapter", "ref_sfa40", "ref_tongue", "ref_main")
 SHELL_BORNE = ("ref_epd", "ref_fpc_adapter")     # the panel and the adapter are in the shell and come down with it
 SWEEP_DZ = (1, 2, 4, 8, 16, 32)                  # the shell's raised copies (mm along +z)
+SHELL_RIDERS = (("light_guide", "guide"), ("led_mask", "mask"), ("gap_stop", "stop"))   # bodies that come down with the shell: copies <tag>_up_<dz>
 TOUCH_SQUEEZE = 0.05                             # the gaskets overlap their seats by this much when they touch at 0
 TOUCHES = (("gasket_out", "sen66_body"), ("gasket_in", "sen66_body"), ("gasket_in", "base_plate"), ("zone_seal", "base_plate"),
            ("sen66_pad", "sen66_body"),
@@ -376,9 +377,11 @@ def sweeps(s) -> list[dict]:
     for dz in SWEEP_DZ:
         b.append({"command": "solid.move", "params": {"name": f"shell_up_{dz}", "bodies": ["shell"], "translate": [0, 0, dz],
                                                       "copy": True, "body_name": f"shell_up_{dz}"}})
-        # 3b-1: the light guide rides in the shell: its raised copies must clear the base and the cables too
-        b.append({"command": "solid.move", "params": {"name": f"guide_up_{dz}", "bodies": ["light_guide"], "translate": [0, 0, dz],
-                                                      "copy": True, "body_name": f"guide_up_{dz}"}})
+        # 3b-1: the light guide and the two foam stops ride in the shell (stuck on the panel): their raised copies must
+        # clear the base, the board and the cables too
+        for body, tag in SHELL_RIDERS:
+            b.append({"command": "solid.move", "params": {"name": f"{tag}_up_{dz}", "bodies": [body], "translate": [0, 0, dz],
+                                                          "copy": True, "body_name": f"{tag}_up_{dz}"}})
     return b
 
 
@@ -827,41 +830,22 @@ def light_paths(s) -> dict:
     return out
 
 
-def ms5611_sight(s) -> dict:
-    """R13 (arithmetic: straight lines against boxes and the zone wall, not a SolidCraft ray trace): `unblocked`
-    counts the straight lines to the MS5611's port (U4) that nothing opaque stops (0 is the pass).
+def ms5611_sight(s, stops: bool = True) -> dict:
+    """R13 / R50 (arithmetic: exact straight lines against the opaque obstacles, not a SolidCraft ray trace):
+    `unblocked` counts the straight lines to the MS5611's port (U4) that nothing opaque stops (0 is the pass).
     - LED faces (all four): each emits into -y only and U4 is behind them, so no line in the hemisphere.
-    - The guide's entry windows (the leg's entry plane in front of D1 and D2, inset gd_win_z top and bottom):
-      the LED bodies and the board stop every line.
-    - Every other bare face of the guide whose outward half-space holds U4 (`guide_surface_sight`): the zone
-      wall, the LED bodies and the board stop them; the leg stops inside D1's face by `gd_win_xm`, so a line
-      toward U4 (at -x) enters D1's body.
-    - D3 and D4: masked by `led_mask`, which has no line to U4 either (it is opaque foam)."""
+    - The guide's entry faces (each foot's entry plane in front of D1 and D2, its whole area).
+    - Every exposed face of the guide's four prisms whose outward half-space holds U4, the side and end faces
+      included, sampled at fine x (`guide_surface_sight`).
+    The obstacles (`sight_obstacles`) are the zone wall, the four LED bodies, the board, `led_mask` over D3 and D4,
+    and `gap_stop` over the gap between the D1 and D2 feet (R50: without it, lines from the D2 foot's tail-side face
+    pass between D1 and D2 to U4; `stops=False` leaves it out to show that)."""
     v = s.v
-    u4 = B.layout_part("U4")["center"]
-    ms_h = 1.0                                                      # MS5611 package height (datasheet; its port is in the lid)
-    tx = v("board_x0") + u4[0]
-    ty = v("board_y0") + v("board_d") - u4[1]
-    tz = v("board_z0") + v("board_t") + ms_h
-    w, hh, dep = v("led_face_w"), v("led_face_h"), B.led_body_d()
-    yf, zc = v("board_y0"), v("led_z")
-    boxes = [((v(f"led_d{i}_x") - w / 2, yf, zc - hh / 2), (v(f"led_d{i}_x") + w / 2, yf + dep, zc + hh / 2)) for i in range(1, 5)]
-    boxes.append(((v("board_x0"), yf, v("board_z0")), (v("board_x0") + v("board_w"), yf + v("board_d"), v("board_z0") + v("board_t"))))
-
-    def hits(p, q) -> bool:
-        for lo, hi in boxes:
-            t0, t1 = 0.0, 1.0
-            for k in range(3):
-                d = q[k] - p[k]
-                if abs(d) < 1e-12:
-                    if p[k] < lo[k] - 1e-9 or p[k] > hi[k] + 1e-9:
-                        t0, t1 = 2, 1
-                    continue
-                a, b = (lo[k] - p[k]) / d, (hi[k] - p[k]) / d
-                t0, t1 = max(t0, min(a, b)), min(t1, max(a, b))
-            if t0 <= t1 + 1e-9:
-                return True
-        return False
+    sn, c, lip = v("sin_t"), v("cos_t"), v("lip")
+    tgt = u4_port(s)
+    obst = sight_obstacles(s, stops)
+    w, hh, yf, zc = v("led_face_w"), v("led_face_h"), v("board_y0"), v("led_z")
+    prisms = {p["name"]: p for p in guide_prisms(s)}
     n = 6
     count = {"led_faces": 0, "entry_windows": 0}
     un = {"led_faces": 0, "entry_windows": 0}
@@ -869,22 +853,25 @@ def ms5611_sight(s) -> dict:
         cx = v(f"led_d{i}_x")
         for a in range(n + 1):
             for b in range(n + 1):
-                for kind, y in (("led_faces", yf), ("entry_windows", v("gd_y_e"))):
-                    if kind == "entry_windows" and i > 2:
-                        continue                                    # D3, D4: masked
-                    x0 = cx - w / 2 if kind == "led_faces" else v("gd_l1x0" if i == 1 else "gd_lb_x0")
-                    x1 = cx + w / 2 if kind == "led_faces" else v("gd_la_x1" if i == 1 else "gd_l1x1")
-                    iz = 0.0 if kind == "led_faces" else v("gd_win_z")
-                    p = (x0 + (x1 - x0) * a / n, y, zc - hh / 2 + iz + (hh - 2 * iz) * b / n)
-                    count[kind] += 1
-                    # a LED face emits into -y only: U4 is behind it, so only lines in that hemisphere count
-                    if kind == "led_faces" and ty - p[1] > 0:
-                        continue
-                    if not hits(p, (tx, ty, tz)):
-                        un[kind] += 1
-    surf = guide_surface_sight(s)
-    count["guide_faces"], un["guide_faces"] = surf
-    return {"target": (tx, ty, tz), "samples": count, "unblocked": un}
+                p = (cx - w / 2 + w * a / n, yf, zc - hh / 2 + hh * b / n)
+                count["led_faces"] += 1
+                # a LED face emits into -y only: U4 is behind it, so only lines in that hemisphere count
+                if tgt[1] - p[1] <= 0 and not _sight_blocked(s, obst, p, tgt):
+                    un["led_faces"] += 1
+    for i in (1, 2):                                                 # D3, D4: behind led_mask
+        foot = prisms[f"D{i} foot"]
+        (s0, t0), (s1, t1) = foot["poly"][2], foot["poly"][3]        # the entry face (edge 2)
+        x0, x1 = foot["x"]
+        for a in range(n + 1):
+            for b in range(n + 1):
+                sv, tv = s0 + (s1 - s0) * b / n, t0 + (t1 - t0) * b / n
+                p = (x0 + (x1 - x0) * a / n, sv * sn + tv * c, lip + sv * c - tv * sn)
+                count["entry_windows"] += 1
+                if not _sight_blocked(s, obst, p, tgt):
+                    un["entry_windows"] += 1
+    surf = guide_surface_sight(s, stops=stops)
+    count["guide_faces"], un["guide_faces"] = surf["all"][0], surf["all"][1]
+    return {"target": tgt, "samples": count, "unblocked": un, "faces": surf}
 
 
 def _inside(poly, y, z) -> bool:
@@ -896,59 +883,162 @@ def _inside(poly, y, z) -> bool:
     return c
 
 
-def guide_surface_sight(s) -> tuple[int, int]:
-    """(lines tried, unblocked) from samples on every bare face of the guide, except its exit and entry
-    faces, whose outward half-space holds U4, to U4's port: obstacles are the zone wall, the LED bodies
-    and the board (a point walk along the line). The leg's end faces use x = gd_l1x0 and gd_l1x1; the bar's
-    its own ends."""
+def _seg_box(p, q, lo, hi) -> bool:
+    """Does the segment p -> q pass through the inside of the box lo .. hi (more than touch it)?"""
+    t0, t1 = 0.0, 1.0
+    for k in range(3):
+        d = q[k] - p[k]
+        if abs(d) < 1e-12:
+            if p[k] <= lo[k] + 1e-9 or p[k] >= hi[k] - 1e-9:
+                return False
+            continue
+        a, b = (lo[k] - p[k]) / d, (hi[k] - p[k]) / d
+        t0, t1 = max(t0, min(a, b)), min(t1, max(a, b))
+    return t0 < t1 - 1e-9
+
+
+def _seg_prism(s, p, q, poly, xa, xb) -> bool:
+    """Does the segment p -> q (world) pass through the prism of the face-frame profile `poly` ((s, t)) from x xa
+    to xb (more than touch it)?"""
     v = s.v
     sn, c, lip = v("sin_t"), v("cos_t"), v("lip")
-    poly = guide_outline(s)
-    n = len(poly)
+    d = q[0] - p[0]
+    if abs(d) < 1e-12:
+        if not xa < p[0] < xb:
+            return False
+        t0, t1 = 0.0, 1.0
+    else:
+        a, b = (xa - p[0]) / d, (xb - p[0]) / d
+        t0, t1 = max(0.0, min(a, b)), min(1.0, max(a, b))
+    if t0 >= t1 - 1e-9:
+        return False
+
+    def st(f):
+        y, z = p[1] + (q[1] - p[1]) * f, p[2] + (q[2] - p[2]) * f
+        return y * sn + (z - lip) * c, y * c - (z - lip) * sn
+    return _clip_len(st(t0), st(t1), poly) > 1e-6
+
+
+def u4_port(s) -> tuple[float, float, float]:
+    """The MS5611's (U4's) port: over its centre on the board, 1.0 above the board's top (the package's height,
+    datasheet; the port is in its lid)."""
+    v = s.v
     u4 = B.layout_part("U4")["center"]
-    tgt = (v("board_x0") + u4[0], v("board_y0") + v("board_d") - u4[1], v("board_z0") + v("board_t") + 1.0)
+    return v("board_x0") + u4[0], v("board_y0") + v("board_d") - u4[1], v("board_z0") + v("board_t") + 1.0
+
+
+def sight_obstacles(s, stops: bool = True) -> list[tuple]:
+    """R13's opaque obstacles between the guide and U4: ("poly", (y, z) polygon) for the zone wall's section (it
+    runs the whole width); ("box", lo, hi) for the four LED bodies and the board; ("prism", (s, t) profile, x0, x1)
+    for the black foam `led_mask` and, with `stops`, `gap_stop` (`airq_face.foam_stops`)."""
+    v = s.v
     zw = [(v("wall + seal_t"), v("ledge_z0")), (v(C.yb("ledge_z0")), v("ledge_z0")), (v(C.yb("zw_z0")), v("zw_z0")),
           (v("D - wall - clr_remove"), v("zw_z0")), (v("D - wall - clr_remove"), v("zw_z1")), (v(C.yf("zw_z1")), v("zw_z1")),
           (v(C.yf("ledge_z1")), v("ledge_z1")), (v("wall + seal_t"), v("ledge_z1"))]
-    w, dep, yf = v("led_face_w"), B.led_body_d(), v("board_y0")
-    leds = [(v(f"led_d{i}_x") - w / 2, v(f"led_d{i}_x") + w / 2) for i in range(1, 5)]
+    w, hh, dep = v("led_face_w"), v("led_face_h"), B.led_body_d()
+    yf, zc = v("board_y0"), v("led_z")
+    out = [("poly", zw)]
+    out += [("box", (v(f"led_d{i}_x") - w / 2, yf, zc - hh / 2), (v(f"led_d{i}_x") + w / 2, yf + dep, zc + hh / 2)) for i in range(1, 5)]
+    out.append(("box", (v("board_x0"), yf, v("board_z0")), (v("board_x0") + v("board_w"), yf + v("board_d"), v("board_z0") + v("board_t"))))
+    for name, (pts, x0, x1) in F.foam_stops().items():
+        if stops or name != "gap_stop":
+            out.append(("prism", [(v(a), v(b)) for a, b in pts], v(x0), v(x1)))
+    return out
 
-    def blocked(p, q) -> bool:
-        for k in range(1, 300):
-            f = k / 300
-            x, y, z = (p[j] + (q[j] - p[j]) * f for j in range(3))
-            if _inside(zw, y, z):
-                return True
-            if any(a <= x <= b for a, b in leds) and yf <= y <= yf + dep and v("led_z") - v("led_face_h") / 2 <= z <= v("led_z") + v("led_face_h") / 2:
-                return True
-            if v("board_x0") <= x <= v("board_x0") + v("board_w") and yf <= y and v("board_z0") <= z <= v("board_z0") + v("board_t"):
-                return True
-        return False
-    tried = bad = 0
-    for i in range(1, n):
-        if i == 4:
-            continue                                                # the entry plane (the windows above)
-        (a0, b0), (a1, b1) = poly[i], poly[(i + 1) % n]
-        ex, ey = a1 - a0, b1 - b0
-        ln = math.hypot(ex, ey)
-        nx, ny = -ey / ln, ex / ln
-        if _inside(poly, (a0 + a1) / 2 + nx * 1e-3, (b0 + b1) / 2 + ny * 1e-3):
-            nx, ny = -nx, -ny
-        nwy, nwz = nx * sn + ny * c, nx * c - ny * sn
-        # the leg's faces (poly 3..7) at the leg's x range; the others at the bar's
-        xs = (v("gd_l1x0"), v("gd_la_x1"), v("gd_lb_x0"), v("gd_l1x1")) if 3 <= i <= 7 else (v("led_x0"), 0.0, v("led_x1") - v("gd_tg"))
-        for j in range(13):
-            f = j / 12
-            sp, tp = a0 + ex * f, b0 + ey * f
-            for x in xs:
-                p = (x, sp * sn + tp * c, lip + sp * c - tp * sn)
-                d = (tgt[0] - p[0], tgt[1] - p[1], tgt[2] - p[2])
-                if d[1] * nwy + d[2] * nwz <= 0:
-                    continue
-                tried += 1
-                bad += 0 if blocked(p, tgt) else 1
-    # the side faces of the leg and the bar (outward -x, +x)
-    return tried, bad
+
+def _sight_blocked(s, obst, p, q) -> bool:
+    for o in obst:
+        if o[0] == "poly" and _clip_len((p[1], p[2]), (q[1], q[2]), o[1]) > 1e-6:
+            return True
+        if o[0] == "box" and _seg_box(p, q, o[1], o[2]):
+            return True
+        if o[0] == "prism" and _seg_prism(s, p, q, o[1], o[2], o[3]):
+            return True
+    return False
+
+
+def guide_surface_sight(s, dx: float = 0.25, n_edge: int = 40, n_side: int = 60, stops: bool = True) -> dict:
+    """R13 / R50 (arithmetic, not a SolidCraft ray trace): every exposed face of the guide's four prisms as built
+    (`guide_prisms`: tongue, bar, D1 foot, D2 foot), the side and end faces included. Each profile face is sampled
+    at n_edge + 1 points along its edge and at every `dx` (or finer) along its x range; each prism's two end faces
+    (at x0 and x1) on an (n_side + 1)^2 grid inside its profile. A sample counts if it is exposed (just outside it,
+    along the face's normal, there is no guide) and U4's port is in the face's outward half-space; its straight line
+    to the port is unblocked if it passes through none of `sight_obstacles` (with `stops` False, `gap_stop` is left
+    out). Returns {face: [samples, unblocked, first unblocked (x, s, t)]}, with the totals under "all"."""
+    v = s.v
+    sn, c, lip = v("sin_t"), v("cos_t"), v("lip")
+    tgt = u4_port(s)
+    obst = sight_obstacles(s, stops)
+    prisms = guide_prisms(s)
+    res: dict[str, list] = {}
+
+    def sample(face, x, sv, tv, n3):
+        if _in_prisms(prisms, (x + n3[0] * 2e-3, sv + n3[1] * 2e-3, tv + n3[2] * 2e-3)):
+            return                                                  # inside the guide there: not an exposed face
+        p = (x, sv * sn + tv * c, lip + sv * c - tv * sn)
+        nw = (n3[0], n3[1] * sn + n3[2] * c, n3[1] * c - n3[2] * sn)
+        if sum((tgt[k] - p[k]) * nw[k] for k in range(3)) <= 0:
+            return                                                  # U4 is behind the face
+        r = res.setdefault(face, [0, 0, None])
+        r[0] += 1
+        if not _sight_blocked(s, obst, p, tgt):
+            r[1] += 1
+            r[2] = r[2] or (round(x, 3), round(sv, 3), round(tv, 3))
+    for pr in prisms:
+        poly, (xa, xb) = pr["poly"], pr["x"]
+        n = len(poly)
+        nx = max(1, math.ceil((xb - xa) / dx))
+        for i in range(n):
+            (s0, t0), (s1, t1) = poly[i], poly[(i + 1) % n]
+            ln = math.hypot(s1 - s0, t1 - t0)
+            nst = (pr["sign"] * (t1 - t0) / ln, -pr["sign"] * (s1 - s0) / ln)
+            name = f"{pr['name']} {pr['kinds'].get(i, 'face ' + str(i))}"
+            for j in range(n_edge + 1):
+                f = j / n_edge
+                for k in range(nx + 1):
+                    sample(name, xa + (xb - xa) * k / nx, s0 + (s1 - s0) * f, t0 + (t1 - t0) * f, (0.0, nst[0], nst[1]))
+        ss, ts = [q[0] for q in poly], [q[1] for q in poly]
+        for xe, sx in ((xa, -1.0), (xb, 1.0)):
+            for i in range(n_side + 1):
+                for j in range(n_side + 1):
+                    sv = min(ss) + (max(ss) - min(ss)) * i / n_side
+                    tv = min(ts) + (max(ts) - min(ts)) * j / n_side
+                    if _inside(poly, sv, tv):
+                        sample(f"{pr['name']} end x {xe:.2f}", xe, sv, tv, (sx, 0.0, 0.0))
+    res["all"] = [sum(r[0] for r in res.values()), sum(r[1] for r in res.values()), None]
+    return res
+
+
+def mask_leak(s, n_rays: int = 100000, seed: int = 3) -> dict:
+    """R50 (analytic, a Monte Carlo of straight rays): the share of D3's and D4's Lambertian emission that crosses
+    the gd_clr air gap and passes `led_mask`'s edges instead of meeting its back face (the plane y = gd_y_e), by
+    where it leaves: past the tail-side (-x) or far (+x) edge, over the top or under the bottom. That light goes
+    into the case at grazing angles, away from U4 (the faces emit into -y). Returns {D3, D4: {total, -x, +x, up,
+    down}} as fractions of the LED's emission."""
+    import random
+    v = s.v
+    rng = random.Random(seed)
+    sn, c, lip = v("sin_t"), v("cos_t"), v("lip")
+    pts, x0, x1 = F.foam_stops()["led_mask"]
+    mx0, mx1 = v(x0), v(x1)
+    mz0, mz1 = sorted(lip + v(a) * c - v(b) * sn for a, b in pts[1:3])       # the back face's z (its edge 1 -> 2)
+    ye, yf, zc, hh, hw = v("gd_y_e"), v("board_y0"), v("led_z"), v("led_face_h") / 2, v("led_face_w") / 2
+    out = {}
+    for i in (3, 4):
+        cx = v(f"led_d{i}_x")
+        n = {"-x": 0, "+x": 0, "up": 0, "down": 0}
+        for _ in range(n_rays):
+            r1, r2 = rng.random(), rng.random()
+            ph, sr = 2 * math.pi * r1, math.sqrt(r2)
+            d = (sr * math.cos(ph), -math.sqrt(1 - r2), sr * math.sin(ph))
+            p = (cx + rng.uniform(-hw, hw), yf, zc + rng.uniform(-hh, hh))
+            k = (ye - yf) / d[1]
+            x, z = p[0] + k * d[0], p[2] + k * d[2]
+            if mx0 <= x <= mx1 and mz0 <= z <= mz1:
+                continue
+            n["up" if z > mz1 else "down" if z < mz0 else "-x" if x < mx0 else "+x"] += 1
+        out[f"D{i}"] = {"total": sum(n.values()) / n_rays, **{k: q / n_rays for k, q in n.items()}}
+    return out
 
 
 EXTREME_PARTS = ("base_plate", "zone_wall", "sen66_pad", "gasket_out", "gasket_in")
@@ -1003,9 +1093,9 @@ def exclusions(names: list[str]) -> list[list[str]]:
     out = [[f"{n}:1", f"{n}:1"] for n in REFS]
     ko = [n for n in names if n.startswith("ko_")]
     out += [[a, b] for i, a in enumerate(ko) for b in ko[i + 1:]]
-    sw = [n for n in names if n.startswith(("sweep_", "shell_up_", "guide_up_"))]
+    sw = [n for n in names if n.startswith(("sweep_", "shell_up_") + tuple(f"{tag}_up_" for _, tag in SHELL_RIDERS))]
     out += [[a, b] for i, a in enumerate(sw) for b in sw[i + 1:]]
-    out += [[a, "shell"] for a in sw] + [[a, "light_guide"] for a in sw] + [[a, "orange_dot"] for a in sw]
+    out += [[a, p] for a in sw for p in ("shell", "orange_dot") + tuple(body for body, _ in SHELL_RIDERS)]
     out += [[a, f"{r}:1"] for a in sw for r in SHELL_BORNE]
     # 3b-2: the free-air probes in front of the openings share air with the paths' probes
     op = [n for n in names if n in OPENING_AIR]

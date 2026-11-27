@@ -345,13 +345,13 @@ def guide_params(s: Script) -> None:
     p("gd_l2x0", "led_d3_x - led_face_w / 2 - gd_clr", "LED mask over D3 and D4 (R45): tail-side face")
     p("gd_l2x1", "led_d4_x + led_face_w / 2 + gd_clr", "LED mask over D3 and D4: far face")
     p("mask_mz", 0.6, "LED mask: beyond the LED faces' top and lower edges")
-    p("gd_win_xm", 0.4, "light guide: the uncoated entry window starts this far inside the LED face's tail-side (-x) edge (a line to U4, at -x, drifts that way over the 0.2 gap and the LED's depth)")
-    p("gd_win_xp", 0.2, "light guide: the uncoated entry window stops this far inside the LED face's far (+x) edge")
-    p("gd_win_z", 0.2, "light guide: the uncoated entry window is this far inside the LED face's top and lower edges")
+    p("gd_win_xm", 0.4, "light guide: each foot (its bare entry face) starts this far inside its LED face's tail-side (-x) edge (a line to U4, at -x, drifts that way over the 0.2 gap and the LED's depth)")
+    p("gd_win_xp", 0.2, "light guide: each foot stops this far inside its LED face's far (+x) edge")
     p("gd_l1x0", "led_d1_x - led_face_w / 2 + gd_win_xm", "light guide: D1/D2 leg, tail-side face: inside D1's face by gd_win_xm, so a line from the leg toward U4 (at -x) enters D1's body")
     p("gd_l1x1", "led_d2_x + led_face_w / 2 - gd_win_xp", "light guide: D1/D2 leg, far face: inside D2's face by gd_win_xp")
     p("gd_la_x1", "led_d1_x + led_face_w / 2 - gd_win_xp", "light guide: D1 foot's far face")
     p("gd_lb_x0", "led_d2_x - led_face_w / 2 + gd_win_xm", "light guide: D2 foot's tail-side face (no guide face over the gap between D1 and D2, where a line to U4 would pass between the LEDs)")
+    p("stop_s0", "gd_sf - 3", "gap stop (R50): its lower end up the slope, 3 below the D2 foot's facet (the lines to U4 it stops leave the D2 foot's tail-side face above gd_sf)")
     p("gd_tg", "clr_align", "light guide: the tongue's clearance to the slot on each side (clr_align: located part)")
     p("gd_rec", "clr_remove + 0.1", "light guide: the tongue's front face is this far behind the face")
     p("crease_y0", 0.12, "crease seal: front edge, flush with the shell's outer face at its lower edge (the foam plugs the parting line over the lip's top from the outside: 1.7 of foam)")
@@ -407,24 +407,52 @@ def light_guide(s: Script) -> None:
     `airq_check.guide_delivery` (R48). The legs are the only parts in the FFC's row; the bar sits gd_clr
     behind the panel (the adhesive pad's gap). No face is coated or clad (R45): every face is bare PETG
     facing air (the pad on the bar's front is the one contact). D3 and D4 do not feed it: `led_mask`
-    covers them."""
+    covers them; `gap_stop` fills the gap between the D1 and D2 feet (R13)."""
     pc = guide_profile_pts()
     for i, (name, key, x0, x1) in enumerate(guide_pieces()):
         _guide_poly(s, name, pc[key], x0, x1, i == 0)
 
 
-def led_mask(s: Script) -> None:
-    """`led_mask` (R45): black closed-cell foam in front of D3 and D4, stuck to the panel's back (the 0.2 adhesive
-    pad's gap), gd_clr from their faces: their light is stopped there and does not reach the case, the light
-    sensor, the crease or U4. The line is lit by D1 and D2 only (firmware unchanged)."""
+def foam_stops() -> dict:
+    """The black foam stops by the LEDs, {body: ((s, t) profile, x0, x1)} as expressions, one source for the build
+    and the checks: `led_mask` over D3 and D4 (R45) and `gap_stop` over the gap between the D1 and D2 feet (R50).
+    Each is stuck on the panel's back (its front at gd_t0: the 0.2 adhesive pad's gap) and ends gd_clr in front of
+    the LED faces (its back in the entry plane y = gd_y_e)."""
     zt, zb = "(led_z + led_face_h / 2 + mask_mz)", "(led_z - led_face_h / 2 - mask_mz)"
     tt = f"((gd_y_e - ({zt} - lip) * sin_t / cos_t) * cos_t)"
     tb = f"((gd_y_e - ({zb} - lip) * sin_t / cos_t) * cos_t)"
     st = f"(({zt} - lip + {tt} * sin_t) / cos_t)"
     sb = f"(({zb} - lip + {tb} * sin_t) / cos_t)"
-    with s.sketch("LED mask profile", "YZ", offset="gd_l2x0") as sk:
-        sk.polyline([yz(sb, "gd_t0"), yz(sb, tb), yz(st, tt), yz(st, "gd_t0")])
-    s.extrude("LED mask", "LED mask profile", "gd_l2x1 - gd_l2x0", body="led_mask")
+    return {
+        "led_mask": ([(sb, "gd_t0"), (sb, tb), (st, tt), (st, "gd_t0")], "gd_l2x0", "gd_l2x1"),
+        "gap_stop": ([("stop_s0", "gd_t0"), ("gd_sf", "gd_t0"), ("gd_sb", "gd_tb"), ("gd_sc", "gd_tc"), ("gd_sc", "gd_t1"), ("stop_s0", "gd_t1")],
+                     "gd_la_x1 + gd_clr", "gd_lb_x0 - gd_clr"),
+    }
+
+
+def _foam(s: Script, body: str, feature: str) -> None:
+    pts, x0, x1 = foam_stops()[body]
+    with s.sketch(f"{feature} profile", "YZ", offset=x0) as sk:
+        sk.polyline([yz(sv, tv) for sv, tv in pts])
+    s.extrude(feature, f"{feature} profile", f"({x1}) - ({x0})", body=body)
+
+
+def led_mask(s: Script) -> None:
+    """`led_mask` (R45): black closed-cell foam in front of D3 and D4, stuck to the panel's back (the 0.2 adhesive
+    pad's gap), gd_clr from their faces: their light is stopped there. It covers the faces' outline by gd_clr
+    across and mask_mz up and down, so about 2 % of D3's and D4's emission passes its edges through the 0.2 gap
+    into the case (`airq_check.mask_leak`); no straight line from there reaches the light sensor, the lip's
+    window or the crease through less than 1.2 of opaque material (`airq_check.light_paths`), nor U4 (the faces
+    emit away from it). The line is lit by D1 and D2 only (firmware unchanged)."""
+    _foam(s, "led_mask", "LED mask")
+
+
+def gap_stop(s: Script) -> None:
+    """`gap_stop` (R50): black closed-cell foam between the D1 and D2 feet (gd_clr air to each foot's side face, so
+    their total internal reflection stays), from stop_s0 up to the entry plane, stuck to the panel's back like
+    `led_mask`. It stops every straight line from the D2 foot's tail-side face through the gap between D1 and D2
+    to U4 (R13, `airq_check.guide_surface_sight`)."""
+    _foam(s, "gap_stop", "Gap stop")
 
 
 def crease_seal(s: Script) -> None:

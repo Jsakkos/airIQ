@@ -32,7 +32,7 @@ S = airq.build()
 V = S.v
 GROMMETS = ["grommet_zone_a", "grommet_zone_b", "grommet_j4_a", "grommet_j4_b", "grommet_tongue_a", "grommet_tongue_b"]
 BODIES = ["shell", "base_plate", "zone_wall", "sen66_top_seal", "zone_seal", "sen66_foam", "gasket_out", "gasket_in", "sen66_pad", "hcho_lid",
-          *GROMMETS, "light_guide", "crease_seal", "led_mask", "orange_dot"]
+          *GROMMETS, "light_guide", "crease_seal", "led_mask", "gap_stop", "orange_dot"]
 TPU = ["gasket_out", "gasket_in", *GROMMETS]
 # positions Task 3b needs (task-3-scope, M6), fixed here as parameters
 FACE = ["panel_x0", "panel_s0", "bezel", "window_xc", "pocket_x0", "pocket_x1", "led_f0", "led_h_slot", "led_len", "led_z",
@@ -564,6 +564,13 @@ def test_led_slot_and_light_guide_follow_the_leds():
     assert V("gd_lb_x0") - (V("led_d2_x") - 2.0) == pytest.approx(V("gd_win_xm")) and V("gd_l1x1") <= V("led_d2_x") + 2.0
     assert V("gd_la_x1") < V("gd_lb_x0")                                                    # no guide face over the gap between D1 and D2
     assert V("gd_l2x0") < V("led_d3_x") - 2.0 and V("led_d4_x") + 2.0 < V("gd_l2x1")        # the mask covers D3 and D4
+    # R50: the gap stop fills the gap between the feet with gd_clr of air to each (their side faces keep TIR), over the
+    # FFC's run, its profile inside the leg's from stop_s0 up (so it keeps the leg's clearances)
+    pts, x0, x1 = F.foam_stops()["gap_stop"]
+    assert V(x0) - V("gd_la_x1") == pytest.approx(V("gd_clr")) and V("gd_lb_x0") - V(x1) == pytest.approx(V("gd_clr"))
+    leg = F.guide_profile_pts()["leg"]
+    assert pts[1:5] == leg[1:5] and V(pts[0][0]) > V(leg[0][0]) and V(pts[0][0]) < V("gd_sf")
+    assert V("ffc_t_c") - V("ffc_t") / 2 - V("gd_t1") >= 1.0 - 1e-9 and V("gd_sc") > V("ffc_s_c3") + V("ffc_w") / 2   # 1.0 in front of the FFC's C run, the foot above it
     assert V("gd_l1x1") < V("ffc_xc") - V("ffc_w") / 2 and V("ffc_xc") + V("ffc_w") / 2 < V("gd_l2x0")   # the FFC's strip is clear
     assert V("gd_l1x1") - V("gd_l1x0") < 10.0 and V("gd_l2x1") <= V("board_x0") + V("board_w")
     zmin = V("lip") + V("gd_sg") * V("cos_t") - V("gd_t0") * V("sin_t")
@@ -604,14 +611,24 @@ def test_guide_delivers_light_to_the_exit():
 def test_guide_light_stays_off_the_crease_the_sensor_and_u4():
     """3b-1 feature 3: from every non-exit surface of the guide, every straight line to the light
     sensor, to the lip's window and to the crease (the 0.2 parting line's front, which the foam tape
-    plugs) crosses at least 1.2 mm of opaque material; no line from an LED face or a guide window
-    reaches the MS5611 (R13)."""
+    plugs) crosses at least 1.2 mm of opaque material; no line from an LED face, a foot's entry face or any
+    exposed face of the guide (sides and ends included, fine x) reaches the MS5611 (R13, R50), and without
+    `gap_stop` the check finds the hole it closes (the D2 foot's tail-side face, through the D1-D2 gap). About
+    2 % of D3's and D4's emission passes `led_mask`'s edges (stated, R50)."""
     paths = airq_check.light_paths(S)
     for name, (length, _) in paths.items():
         assert length >= 1.2 - 1e-6, (name, length)
     sight = airq_check.ms5611_sight(S)
-    assert sight["unblocked"] == {"led_faces": 0, "entry_windows": 0, "guide_faces": 0}, sight
-    assert sight["samples"]["entry_windows"] > 50 and sight["samples"]["guide_faces"] > 50
+    assert sight["unblocked"] == {"led_faces": 0, "entry_windows": 0, "guide_faces": 0}, sight["unblocked"]
+    assert sight["samples"]["entry_windows"] == 98 and sight["samples"]["guide_faces"] > 15000, sight["samples"]
+    faces = sight["faces"]
+    assert {"D1 foot end x -3.80", "D2 foot end x 1.30", "D2 foot entry", "bar face 2", "tongue face 1"} <= set(faces), sorted(faces)
+    hole = airq_check.guide_surface_sight(S, stops=False)
+    assert hole["all"][1] > 0 and hole["D2 foot end x 1.30"][1] > 0                  # without the stop: the R13 hole
+    assert {k for k, r in hole.items() if r[1] and k != "all"} <= {"D2 foot end x 1.30", "D2 foot face 4"}
+    leak = airq_check.mask_leak(S)
+    for led in ("D3", "D4"):
+        assert 0.01 < leak[led]["total"] < 0.03, leak                                 # the README's "about 2 %"
     # the crease seal: the lip's top to the shell's lowest plane, over 1.2 of foam
     assert V("wall") - V("crease_y0") >= 1.2                                                 # foam tape: 1.2 or more along the line
 
@@ -815,9 +832,12 @@ def test_light_guide_and_crease_seal_on_the_geometry(check):
     assert lo[2] >= V("lip") + V("clr_remove") + 0.0 - 1e-6                                      # off the parting line
     assert check["interference"]["count"] == 0
     names = {b["name"] for b in check["measure"]["bodies"]}
-    assert {"guide_up_1", "guide_up_32", "ref_ffc", "crease_seal", "led_mask"} <= names
+    assert {"guide_up_1", "guide_up_32", "mask_up_1", "mask_up_32", "stop_up_1", "stop_up_32", "ref_ffc", "crease_seal", "led_mask", "gap_stop"} <= names
     mk = bodies["led_mask"]["bbox"]
     assert mk["max"][1] == pytest.approx(V("gd_y_e"), abs=0.02) and mk["min"][0] == pytest.approx(V("gd_l2x0"), abs=0.01)   # 0.2 in front of the LEDs
+    gs = bodies["gap_stop"]["bbox"]
+    assert gs["max"][1] == pytest.approx(V("gd_y_e"), abs=0.02) and gs["max"][2] == pytest.approx(V("gd_top_z"), abs=0.01)
+    assert gs["min"][0] == pytest.approx(V("gd_la_x1 + gd_clr"), abs=0.01) and gs["max"][0] == pytest.approx(V("gd_lb_x0 - gd_clr"), abs=0.01)
     vols = airq_check.touch_volumes(check["touch"])
     expect = V("W") * (V("wall") - V("crease_y0")) * airq_check.TOUCH_SQUEEZE
     assert vols[("crease_seal", "shell")] == pytest.approx(expect, rel=0.08)
