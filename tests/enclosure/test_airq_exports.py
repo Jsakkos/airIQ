@@ -195,6 +195,8 @@ def test_build_writes_the_committed_exports(cli):
     for e in r["exports"]:
         if e["parts"] is not None:
             assert len(e["parts"]) == 1
+        # final review M6: a fresh build writes the committed file byte for byte (as test_coupons.py does)
+        assert e["committed"] is False and e["file"].read_bytes() == (EXPORT / e["file"].name).read_bytes(), e["file"].name
 
 
 def test_file_prefix_comes_from_the_design():

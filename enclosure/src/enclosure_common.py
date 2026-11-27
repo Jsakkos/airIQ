@@ -80,11 +80,14 @@ def zt(y: str, t: str) -> str:
 def add_envelope(s: Script, m: L.Model) -> None:
     """The envelope and printing parameters every enclosure shares (the names the plan fixes)."""
     p = s.param
-    p("W", m.W, f"outer width ({LS}; plan)", favorite=True)
-    p("D", m.D, f"outer depth ({LS}; R22)", favorite=True)
-    p("H", m.H, f"outer height ({LS}; R22)", favorite=True)
-    p("tilt_deg", m.tilt_deg, "front slope from vertical (plan)", unit="deg", favorite=True)
-    p("lip", m.lip, f"vertical lower front lip carrying the intake slots (R15, R22; {LS})", favorite=True)
+    # final review M2: W, D, H, tilt_deg and lip are not favourites. Some geometry is fixed when the script is
+    # generated (the panel pocket's sketch plane from sin_t, the profiles' knees, the slot loops' counts), so
+    # change them in the generator and rebuild, not in SolidCraft's table (README "Building")
+    p("W", m.W, f"outer width ({LS}; plan). Build-time: change in the generator")
+    p("D", m.D, f"outer depth ({LS}; R22). Build-time: change in the generator")
+    p("H", m.H, f"outer height ({LS}; R22). Build-time: change in the generator")
+    p("tilt_deg", m.tilt_deg, "front slope from vertical (plan). Build-time: change in the generator", unit="deg")
+    p("lip", m.lip, f"vertical lower front lip carrying the intake slots (R15, R22; {LS}). Build-time: change in the generator")
     clearances.add_params(s)          # clr_align, clr_remove, clr_snap, slot_w, wall, flex_t, flex_len, flex_gap
     p("crease_gap", 0.2, "parting line at the crease: the slope's lower edge stops this far over the lip's top (the floor is the shell's z datum). A fixed gap, not a fit (R57): it does not follow clr_remove, so the opaque paths to it and the bought crease seal keep their sizes over the coupons' window")
     p("floor_t", m.floor, "plan: floor (base plate) 2.0; named floor_t because SolidCraft reserves floor (a function)", favorite=True)
@@ -183,7 +186,7 @@ def add_bosses(s: Script) -> None:
     p("bp_x0", "boss_x - boss_d / 2 - clr_remove - iwall", "derived: |x| of the boss pocket's inner wall (base)")
     p("bp_y1", "boss_y + boss_d / 2 + clr_remove + iwall", "derived: y of the boss pocket's back wall's rear face; the side rails start here")
     p("rear_boss_len", 6.0, "rear insert boss length along y")
-    p("rear_boss_x", "-(inner_x - boss_d / 2 + 0.5)", "rear boss x (rear left, 69 mm from the antenna; R29)")
+    p("rear_boss_x", "-(inner_x - boss_d / 2 + 0.5)", "rear boss x (rear left, at the far end from the antenna: 69 mm on the airQ, 41.25 on the mini; R29)")
     p("rear_boss_z", "H - wall - boss_d / 2 + 0.5", "rear boss z, under the top wall")
 
 
