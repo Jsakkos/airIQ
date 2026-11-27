@@ -110,6 +110,9 @@ AIR = {   # probe -> (path, R25 minimum, the probe's face that is the section)
 }
 
 
+OPENING_AIR = ("air_outlet_grille",)     # the free air in front of an opening shares air with the paths' probes
+
+
 def air_probes(s) -> list[dict]:
     """The free sections of the internal air paths (R25), from the parameters. Each must touch and
     not overlap anything; its section is its face in the flow."""
@@ -195,7 +198,7 @@ def check_script(save=CHECK_SC, budget_s: float = 900) -> dict:
     names = check_bodies(s)
     mark = {"interference": len(steps)}
     steps.append({"command": "inspect.interference", "params": {
-        "budget_s": budget_s, "exclude_pairs": A.exclusions(names, refs=REFS, riders=(), shell_parts=SHELL_PARTS, borne=(), opening_air=())}})
+        "budget_s": budget_s, "exclude_pairs": A.exclusions(names, refs=REFS, riders=(), shell_parts=SHELL_PARTS, borne=(), opening_air=OPENING_AIR)}})
     mark["measure"] = len(steps)
     steps.append({"command": "inspect.measure", "params": {"summary": True}})
     # N1: the shell nudged each way meets the base only on its datums

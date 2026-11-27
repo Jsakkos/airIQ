@@ -169,7 +169,7 @@ def build() -> Script:
     p("pad_gap_nom", 1.8, "the pad's thickness at the nominal module: 44 % of pad_t, as the airQ's")
     C.cradle(s, seat_y0=("sen_y0 - pad_gap_nom - seat_t", "pad seat's front face: the pad at 44 % at the nominal module (as the airQ's)"),
              seat_slant_clr=("clr_remove", "derived: the seat's top clr_remove under the slant"),
-             seat_x=("plug_x1 + 1.0", "tub_x + iwall - plug_x1 - 1.0"), front_rail=False)
+             seat_x=("plug_x1 + 1.0", "bp_x0 + iwall - plug_x1 - 1.0"), front_rail=False)
     s.box("Left stop", ["sen_x0 - clr_remove - iwall", "sen_y1 - stop_l", "floor_t - 0.5"], ["iwall", "stop_l", "stop_h + 0.5"],
           operation="join", targets=["base_plate"])
     C.standoff_pilots(s, ("H1",))
