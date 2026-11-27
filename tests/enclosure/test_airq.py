@@ -781,3 +781,122 @@ def test_flexure_beam_stop_and_pad_on_the_geometry(check):
     assert (d["min"][0] + d["max"][0]) / 2 == pytest.approx(V("sw_x"), abs=0.01)
     assert bodies["orange_dot"]["volume_mm3"] == pytest.approx(3.14159 / 4 * V("dot_d") ** 2 * V("dot_depth"), rel=0.03)
     assert check["interference"]["count"] == 0
+
+
+# --- Task 3b-2: the base openings and the Step 4 checks -----------------------------------
+
+def _cuts(prefix):
+    return [c["params"] for c in S.commands if str(c["params"].get("name", "")).startswith(prefix)]
+
+
+def _lower_edge(q):
+    """z of a cut's lowest point: a box's corner, a cylinder along y's centre less its radius."""
+    if "length" in q:
+        return V(q["corner"][2])
+    return V(q["base"][2]) - V(q["diameter"]) / 2
+
+
+def test_openings_are_cut_where_the_parameters_say():
+    """3b-2: each opening is a cut in base_plate at its parameters, with its lower edge on or
+    above the 10 mm line; the slots' count and sizes follow their parameters."""
+    cuts = {k: _cuts(k) for k in ("Intake slot", "Outlet slot", "Exhaust slot", "HCHO grille slot", "Light-sensor window", "USB-C opening")}
+    assert [len(cuts[k]) for k in ("Intake slot", "Outlet slot", "Exhaust slot", "HCHO grille slot")] == \
+        [2 * int(V("in_n_l") + V("in_n_r")), int(V("out_n")), int(V("exh_n")), 5]
+    for k, qs in cuts.items():
+        assert qs, k
+        for q in qs:
+            assert q["operation"] == "cut" and q["targets"] == ["base_plate"], (k, q)
+            assert _lower_edge(q) >= V("grille_min_z") - 1e-9, (k, q)
+    # intake: both rows end to end with slot_bar bars, between row_x0 and row_x1 round the window's gap
+    for q in cuts["Intake slot"]:
+        x0, x1 = V(q["corner"][0]), V(q["corner"][0]) + V(q["length"])
+        assert (V("row_x0") - 1e-9 <= x0 and x1 <= V("lsw_gap_x0") + 1e-9) or (V("lsw_gap_x1") - 1e-9 <= x0 and x1 <= V("row_x1") + 1e-9)
+        assert V(q["corner"][2]) in (pytest.approx(V("slot_row1_z")), pytest.approx(V("slot_row2_z")))
+        assert V(q["height"]) == V("slot_w") and V(q["corner"][1]) < 0 < V("wall") < V(q["corner"][1]) + V(q["width"])   # through the lip
+    assert V("slot_row2_z") + V("slot_w") <= V("ledge_z0")                              # under the zone wall's ledge
+    assert V("in_len_l") > 5 and V("in_len_r") > 5
+    # light-sensor window: on the tongue's VEML7700 (R27), through the lip, in the rows' gap
+    q = cuts["Light-sensor window"][0]
+    assert (V(q["base"][0]), V(q["base"][2]), V(q["diameter"])) == pytest.approx((V("lsw_x"), V("lsw_z"), V("lsw_d")))
+    assert V("lsw_gap_x0") < V("lsw_x") - V("lsw_d") / 2 and V("lsw_x") + V("lsw_d") / 2 < V("lsw_gap_x1")
+    # outlet and exhaust: whole slots in their ranges, through the rear wall, apart (R26)
+    last = cuts["Outlet slot"][-1]
+    assert V(last["corner"][0]) + V("slot_w") == pytest.approx(V("out_gx1"))
+    assert V("exh_x0") + (V("exh_n") - 1) * V("out_pitch") + V("slot_w") <= V("exh_x1")
+    assert V("out_gz1") < V("exh_z0") - 5                                              # the grilles are 9.7 apart in z, though they overlap in x
+    assert V("exh_z0") >= V("zw_z1") + 2 and V("exh_z1") <= V("H") - V("wall")
+    # USB-C: on J1's plug axis, the plug's overmold passes, 0.5 chamfer on the outer face
+    q = cuts["USB-C opening"][0]
+    assert V(q["corner"][0]) + V(q["length"]) / 2 == pytest.approx(V("usb_x"))
+    assert V(q["corner"][2]) + V(q["height"]) / 2 == pytest.approx(V("usb_z"))
+    assert V("usb_open_w") >= V("usb_plug_w") and V("usb_open_h") >= V("usb_plug_h") and V("usb_open_w") > V("usb_sw")
+    assert V(q["corner"][2]) >= V("zw_z1") - 2 * V("clr_remove")                          # at most the zone wall's slit lower
+    ch = _feature("USB-C chamfer")
+    assert V(ch["distance"]) == 0.5 and len(ch["edges"]) == 4 and all(abs(e[1] - V("D")) < 1e-6 for e in ch["edges"])
+    # the openings in the rear wall keep apart, and the intake and outlet face opposite ways
+    assert V("exh_x0") - (V("usb_x") + V("usb_open_w") / 2) >= 1.2
+    assert max(V(q["corner"][1]) for q in cuts["Intake slot"]) < V("D") / 2 < min(V(q["corner"][1]) for q in cuts["Outlet slot"] + cuts["Exhaust slot"])
+
+
+def test_openings_measured_open_areas(check):
+    """R18 on the geometry: each opening's open area is its probe's volume less the base's
+    overlap, over the wall's thickness; it equals the parameters' area and meets 2 x its port."""
+    areas = airq_check.opening_areas(S, check["openings"])
+    for name, (got, want) in areas.items():
+        assert got == pytest.approx(want, rel=2e-3), name
+    intake = areas["op_intake_l"][0] + areas["op_intake_r"][0]
+    hcho = sum(a[0] for n, a in areas.items() if n.startswith("op_hcho_"))
+    sfa = ref_sfa40.build().v
+    assert intake >= 154.5 and areas["op_outlet"][0] >= 660.1                                    # 2 x 77.3, 2 x 330.1
+    assert hcho >= 2 * sfa("opening_l") * sfa("opening_w")                                       # 2 x the SFA40's opening
+    assert areas["op_exhaust"][0] > 100 and areas["op_lsw"][0] == pytest.approx(math.pi / 4 * V("lsw_d") ** 2, rel=2e-3)
+
+
+def test_nothing_opens_below_the_10_mm_line(check):
+    """Every opening's lower edge is at least 10 above z = 0 (no feet): a slab from z 0 to the
+    line over the lip, the rear wall, the rail and the shell's right wall is all material."""
+    got = {}
+    for p in check["openings"]["interferences"]:
+        n, other = (p["a"], p["b"]) if p["a"].startswith("low_") else (p["b"], p["a"])
+        if n.startswith("low_"):
+            got[(n, other)] = got.get((n, other), 0.0) + p["volume_mm3"]
+    for c in airq_check.low_probes(S):
+        n = c["params"]["body_name"]
+        assert got[(n, airq_check.LOW_PARTS[n])] == pytest.approx(airq_check._volume(c, S), rel=1e-6), n
+
+
+def test_usb_opening_fit_and_chamfer(check):
+    """The USB-C opening within 0.05 of J1's axis and the overmold's size, with the 0.5 chamfer:
+    the probe 0.05 under the opening meets nothing, the one 0.05 over meets the wall's ring, and
+    over the chamfer's depth the wall keeps the box less the chamfer's frustum."""
+    got = {}
+    for p in check["openings"]["interferences"]:
+        n = p["a"] if p["a"].startswith("usb_") else p["b"]
+        if n.startswith("usb_"):
+            got[n] = got.get(n, 0.0) + p["volume_mm3"]
+    want = airq_check.usb_expect(S)
+    assert got.get("usb_in", 0.0) == 0.0
+    assert got["usb_out"] == pytest.approx(want["usb_out"], rel=0.01)
+    assert got["usb_cham"] == pytest.approx(want["usb_cham"], rel=0.01)
+
+
+def test_the_air_in_front_of_every_opening_is_free(check):
+    """The intake slots, the light-sensor window, the outlet and exhaust grilles and J1's plug axis
+    face free air: their probes meet no reference (interference 0), and the tongue stays 4.5 behind the slots."""
+    names = {b["name"] for b in check["measure"]["bodies"]}
+    assert set(airq_check.OPENING_AIR) <= names
+    assert check["interference"]["count"] == 0
+    assert V("tongue_y0") - V("wall") >= 4.5
+
+
+def test_distances_on_the_geometry(check):
+    """R12 and the tongue's distances as exact distances between solids (`inspect.clearance`):
+    never under the arithmetic of `distances()` (its boxes enclose), and over the rules."""
+    d, c = airq_check.distances(S), check["clearance"]
+    assert c["antenna_to_sen66"] >= d["antenna_to_sen66"] - 1e-3 and c["antenna_to_sen66"] >= 15
+    assert c["antenna_to_usb_plug"] == pytest.approx(d["antenna_to_usb_plug"], abs=0.01) and c["antenna_to_usb_plug"] >= 15
+    assert c["antenna_to_inserts"] == pytest.approx(d["antenna_to_bosses_and_screws"], abs=0.01) and c["antenna_to_inserts"] >= 15
+    assert c["antenna_to_screws"] >= 15
+    assert c["tongue_to_u3"] == pytest.approx(d["tongue_to_u3"], abs=0.01) and c["tongue_to_u3"] >= 20
+    assert c["tongue_to_u2"] == pytest.approx(d["tongue_to_u2"], abs=0.01) and c["tongue_to_u2"] >= 20
+    assert c["intake_to_outlet"] == pytest.approx(V("D") - 2 * V("wall"), abs=1e-3) and c["intake_to_outlet"] >= 20   # inner face to inner face

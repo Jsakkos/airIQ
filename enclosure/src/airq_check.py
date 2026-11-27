@@ -355,13 +355,14 @@ def clear_probes(s) -> list[dict]:
     return b
 
 
-CLEAR_PAIRS = {   # distance label -> (probe, the bodies it is measured against)
-    "antenna_to_sen66": ("cl_antenna", ("sen66_body",)),
-    "antenna_to_usb_plug": ("cl_antenna", ("cl_usb_plug",)),
-    "antenna_to_inserts": ("cl_antenna", ("cl_boss_1", "cl_boss_2", "cl_boss_3")),
-    "antenna_to_screws": ("cl_antenna", ("cl_screw_1", "cl_screw_2")),
-    "tongue_to_u3": ("cl_tongue", ("cl_u3",)),
-    "tongue_to_u2": ("cl_tongue", ("cl_u2",)),
+CLEAR_PAIRS = {   # distance label -> (the probes, the bodies they are measured against)
+    "antenna_to_sen66": (("cl_antenna",), ("sen66_body",)),
+    "antenna_to_usb_plug": (("cl_antenna",), ("cl_usb_plug",)),
+    "antenna_to_inserts": (("cl_antenna",), ("cl_boss_1", "cl_boss_2", "cl_boss_3")),
+    "antenna_to_screws": (("cl_antenna",), ("cl_screw_1", "cl_screw_2")),
+    "tongue_to_u3": (("cl_tongue",), ("cl_u3",)),
+    "tongue_to_u2": (("cl_tongue",), ("cl_u2",)),
+    "intake_to_outlet": (("op_intake_l", "op_intake_r"), ("op_outlet",)),     # the openings' inner faces (the probes)
 }
 
 
@@ -846,8 +847,8 @@ def check_script(save: Path = CHECK_SC, budget_s: float = 900) -> dict:
     # 3b-2: R12, the tongue's distances and the grilles' separation as exact distances between solids
     steps += clear_probes(s)
     mark["clearance"] = len(steps)
-    for probe, against in CLEAR_PAIRS.values():
-        steps.append({"command": "inspect.clearance", "params": {"bodies": [probe], "against": list(against), "clearance": 200}})
+    for probes, against in CLEAR_PAIRS.values():
+        steps.append({"command": "inspect.clearance", "params": {"bodies": list(probes), "against": list(against), "clearance": 200}})
     steps.append({"command": "parameters.change", "params": {"changes": {n: f"{TOUCH_SQUEEZE} mm" for n in SQUEEZES}}})
     mark["touch"] = len(steps)
     steps.append({"command": "inspect.interference", "params": {"budget_s": 120, "bodies": sorted({b for p in TOUCHES for b in p})}})
