@@ -45,6 +45,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+import airq_face as F
 import airq_mini_face as MF
 import board_sources as B
 import enclosure_common as C
@@ -193,6 +194,10 @@ def build() -> Script:
     MF.guide_stop(s)
     MF.label_params(s)
     MF.labels(s)
+    # the dot on SW1's push axis and its flexure: the airQ's (airq_face), on the mini's sw_x, sw_z, dot_f
+    F.flex_params(s)
+    F.flexure(s)
+    F.orange_dot(s)
     openings(s)
     return s
 

@@ -22,7 +22,7 @@ from sclib import evaluate
 S = airq_mini.build()
 V = S.v
 BODIES = ["shell", "base_plate", "zone_wall", "zone_seal", "sen66_foam", "gasket_out", "gasket_in", "sen66_pad", "sen66_top_seal",
-          "tongue_mount", "grommet_zone_a", "grommet_zone_b", "light_guide_co2", "light_guide_pm", "guide_stop"]
+          "tongue_mount", "grommet_zone_a", "grommet_zone_b", "light_guide_co2", "light_guide_pm", "guide_stop", "orange_dot"]
 STUDY = L.mini_recheck(L.MINI_WAY_OUT, inlet_end="left")
 # positions Task 4b needs (task-4-scope "Split light band", "Rules and checks"), fixed here as parameters
 FACE_4B = ["d1_x", "d2_x", "d3_x", "d4_x", "div_x0", "div_x1", "led_z", "led_f", "band_half", "band_h", "band_co2_x0", "band_co2_x1",
@@ -198,6 +198,26 @@ def test_labels_and_light_sensor_window():
     z_at = vw[1] + (ww[1] - vw[1]) * (vw[0] - y_seal) / (vw[0] - ww[0])
     assert z_at < V("ledge_z0")
     assert min(V("veml_wx"), V("lsw_x")) > V("-bp_x0") and V("lsw_x - lsw_d / 2") > V("-bp_x0")
+
+
+def test_dot_and_flexure_on_sw1s_axis():
+    """Task 4b: the airQ's flexure (airq_face) on the mini's SW1: the dot top right, on SW1's push
+    axis (x and z of the actuator), a beam of the wall's skin (the coupon's flex_t x flex_w x flex_len),
+    the pad rod's end flex_gap in front of the actuator's tip; the hard stop is SW1's own body (the rod
+    bottoms on it 0.04 after the switch has bottomed), no printed stop gap. Printable face down: the
+    rod's axis (+y) is tilt_deg (24) from the face's normal, the beam is the first layers on the bed."""
+    assert V("dot_s") == pytest.approx(V("dot_f - lip"))
+    assert V("flex_x0 + flex_x1") / 2 == pytest.approx(V("sw_x"))
+    assert V("y_pad") == pytest.approx(V("sw_tip - flex_gap"))
+    assert V("flex_stop") == pytest.approx(V("board_y0 - y_pad")) and V("flex_over") > 0
+    assert V("flex_stop") > V("flex_gap + sw_travel")
+    assert math.degrees(V("tilt_deg")) <= 45
+    assert V("sw_x - dot_d / 2") > V("band_pm_x1 + end_rib_t")          # right of the PM2.5 half and its end rib
+    assert V("flex_x1 + flex_slot") < V("inner_x")                      # the U slot stays inside the side wall
+    # the U slot's lowest inner edge over the 10 mm line
+    assert V("lip + flex_s0 * cos_t - wall * sin_t") >= V("grille_min_z")
+    names = {c["params"].get("name") for c in S.commands}
+    assert {"Flex thin", "Flex slot", "Pad rod", "Flex trim", "Dot recess", "Orange dot"} <= names
 
 
 def test_h2_lies_over_the_sen66_so_it_has_no_post():
