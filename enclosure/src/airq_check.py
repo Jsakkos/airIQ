@@ -10,7 +10,8 @@
   - `air_*` probes: one free section per internal air path (R25). A probe that touches but does
     not overlap anything proves its section is free air; the section is the probe's size;
   - `sweep_*` and `shell_up_*`: the shell's insertion path along -z (review I1): the swept
-    columns of its bosses, and copies of the shell raised in steps;
+    columns of its bosses, and copies of the shell raised in steps, with copies of what rides in
+    it (`guide_up_*`, `mask_up_*`, `stop_up_*`: SHELL_RIDERS);
 - runs the interference check (R9: touching is fine, shared volume is not);
 - measures the bodies (the probes' sections);
 - sets gasket_squeeze to a small value and checks that each gasket now overlaps what it seals:
@@ -370,7 +371,8 @@ CLEAR_PAIRS = {   # distance label -> (the probes, the bodies they are measured 
 def sweeps(s) -> list[dict]:
     """The shell's way on (I1): it is lowered along -z onto the assembled base. Its bosses are the
     parts that reach into the case, so their swept columns (from where they end up to above the
-    case) must clear everything on the base; and the whole shell is copied at raised steps."""
+    case) must clear everything on the base; and the whole shell is copied at raised steps, with the
+    parts that ride in it (SHELL_RIDERS: the light guide, `led_mask`, `gap_stop`)."""
     b = [_cyl(f"sweep_boss_{i}", [sx, "boss_y", "floor_t"], "boss_d", "H + 5 - floor_t") for i, sx in enumerate(("-boss_x", "boss_x"), 1)]
     b.append(_box("sweep_rear_boss", "rear_boss_x - boss_d / 2", "D - wall - clr_remove - rear_boss_len", "rear_boss_z - boss_d / 2",
                   "rear_boss_x + boss_d / 2", "D - wall - clr_remove", "H + 5"))

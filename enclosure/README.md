@@ -893,7 +893,8 @@ corner of the LED faces, with the panel and the light guide in front of it.
 
 **Check design.** `uv run --with pyyaml python enclosure/src/airq_check.py --run` builds
 `.build/airq-check.sc` (`ref_main` only there, R8). It holds the six references, the cable
-keep-outs (`ko_*`), the air probes (`air_*`) and the shell's sweep (`sweep_*`, `shell_up_*`), at
+keep-outs (`ko_*`), the air probes (`air_*`) and the shell's sweep (`sweep_*`, `shell_up_*`, and the raised
+copies of what rides in it, `guide_up_*`, `mask_up_*`, `stop_up_*`), at
 `gasket_squeeze` 0. The script then:
 1. runs the interference check;
 2. measures the probes' sections;
