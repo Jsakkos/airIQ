@@ -282,8 +282,9 @@ EXTREME_PARTS = ("base_plate", "zone_wall", "sen66_pad", "gasket_out", "gasket_i
 
 def extremes(s) -> list[dict]:
     """I3(b): the front of the SEN66 at its depth tolerance's ends, its port face on the ring (the
-    datum): `ext_max_*` 21.8 deep (its plinth, inset plinth_in, and a slice of the block behind
-    it), `ext_min_plinth` 20.8 deep. Only the pad may meet them."""
+    datum): `ext_max_*` 21.8 deep (its plinth, inset plinth_in, a slice of the block behind it,
+    and, B2, its plug and the cable's bend, the keep-outs moved with its connector face),
+    `ext_min_plinth` 20.8 deep. Only the pad may meet them."""
     pin = _SEN("plinth_inset")
     ph = _SEN("H") - _SEN("block_h")
     fx = ("sen_x0", "sen_x1")
@@ -293,6 +294,11 @@ def extremes(s) -> list[dict]:
         y = f"sen_y0 {dy}"
         out.append(_box(f"ext_{tag}_plinth", f"{fx[0]} + {pin}", y, f"{z0} + {pin}", f"{fx[1]} - {pin}", f"{y} + {ph}", f"{z1} - {pin}"))
     out.append(_box("ext_max_block", fx[0], f"sen_y0 - sen_d_tol + {ph}", z0, fx[1], f"sen_y0 - sen_d_tol + {ph} + 0.5", z1))
+    # B2: what moves with a 21.8 module's connector face: its plug and the cable's bend
+    mid = "sen_top - sen_up / 2"
+    f = "sen_y0 - sen_d_tol"
+    out.append(_box("ext_max_plug", "plug_x0", f"{f} - 6.0", f"{mid} - 2.5", "plug_x1", f, f"{mid} + 2.5"))
+    out.append(_box("ext_max_bend", "plug_x0", f"{f} - 6.94", "floor_t", "plug_x1", f"{f} - 6.0", f"{mid} + 0.7"))
     return out
 
 

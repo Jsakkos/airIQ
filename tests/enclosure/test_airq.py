@@ -367,6 +367,20 @@ def test_pad_seat_is_stiff_and_tied():
     assert under == pytest.approx(V("seat_slant_clr")) and V("seat_slant_clr") > V("gasket_squeeze") / V("sin_t")
 
 
+def test_plug_room_at_the_deepest_module():
+    """Review round 3, B2: a 21.8 module's plug and cable bend (their keep-outs moved sen_d_tol
+    forward with its connector face) stay clr_remove clear of the zone wall's slant, in the pocket
+    over them; the slant keeps 1.3 there."""
+    tb = V("zw_tf + zone_t")
+    mid = V("sen_top - sen_up / 2")
+    front = V("sen_y0 - sen_d_tol")
+    for y, z in ((front - 6.0, mid + 2.5), (front - 6.94, mid + 0.7)):        # the plug's and the bend's top front corners
+        depth = y * V("cos_t") - (z - V("lip")) * V("sin_t")                  # t of the corner
+        assert depth >= tb - V("plug_room_d") + V("clr_remove") - 1e-9, (y, z, depth)
+        assert V("plug_room_z0") < z < V("plug_room_z1")
+    assert V("zone_t") - V("plug_room_d") >= 1.2
+
+
 def test_inlet_seal_root_and_lead_in():
     """Review round 3, B3: the inlet seal's root is a root_w foot squeezed root_squeeze into its
     slot's sides and back (no bypass round it, no travel to eat the preload). B4: its tip has a
@@ -455,6 +469,10 @@ def test_sen66_at_its_depth_extremes(check):
     front still meets the free pad, by pad_t - pad_gap - tol."""
     reach = airq_check.extreme_reach(check["extremes"])
     assert set(reach) == {("ext_max_plinth", "sen66_pad"), ("ext_min_plinth", "sen66_pad")}, reach
+    # B2: the plug and the cable's bend, moved with a 21.8 module's connector face, were in the run
+    names = [c["params"]["body_name"] for c in airq_check.extremes(S)]
+    assert {"ext_max_plug", "ext_max_bend"} <= set(names)
+    assert check["extremes"]["checked"] == len(names) + len(airq_check.EXTREME_PARTS)
     assert reach[("ext_max_plinth", "sen66_pad")] == pytest.approx(V("pad_t - pad_gap + sen_d_tol"), abs=0.01)
     assert reach[("ext_min_plinth", "sen66_pad")] == pytest.approx(V("pad_t - pad_gap - sen_d_tol"), abs=0.01)
 

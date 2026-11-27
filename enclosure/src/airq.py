@@ -231,6 +231,7 @@ def build() -> Script:
     base_cuts(s)
     C.zone_wall(s)
     zone_drawer(s)
+    plug_room(s)
     tongue_capture(s)
     C.zone_seal(s)
     s.box("SEN66 foam", ["sen_x0", "sen_y0", "floor_t"], ["sen_l", "sen_d", "foam"], body="sen66_foam")
@@ -457,6 +458,24 @@ def cable_params(s: Script) -> None:
       "Qwiic plug thickness envelope: the taller Qwiic body (interface.yaml comments); to confirm")
     p("gh_plug_w", j2[1][1] - j2[0][1], "SEN66 plug (JST GH 6) width envelope: J2's body width (interface.yaml); to confirm")
     p("gh_plug_t", B.connector_h("j_sen66"), "SEN66 plug thickness envelope: J2's body height (interface.yaml); to confirm")
+
+
+def plug_room(s: Script) -> None:
+    """Review round 3, B2: a shallow pocket in the slant's underside over the SEN66's plug and its
+    cable's bend, so the plug of a 21.8 deep module (its connector face sen_d_tol further forward,
+    the port face on the ring) still clears the zone wall by clr_remove. The slant keeps
+    zone_t - plug_room_d there."""
+    p = s.param
+    p("plug_room_d", 0.6, "pocket depth into the slant's underside over the SEN66's plug (B2)")
+    p("plug_room_z0", "sen_top - sen_up / 2 - 0.3", "pocket's lower edge (on the slant's underside)")
+    p("plug_room_z1", "sen_top - sen_up / 2 + 3.2", "pocket's upper edge, over the plug's envelope")
+    tb = "zw_tf + zone_t"
+    y = lambda tt, z: f"(({tt}) + ({z} - lip) * sin_t) / cos_t"     # noqa: E731
+    pts = [(y(f"{tb} + 0.5", "plug_room_z0"), "plug_room_z0"), (y(f"{tb} + 0.5", "plug_room_z1"), "plug_room_z1"),
+           (y(f"{tb} - plug_room_d", "plug_room_z1"), "plug_room_z1"), (y(f"{tb} - plug_room_d", "plug_room_z0"), "plug_room_z0")]
+    with s.sketch("Plug room profile", "YZ", offset="plug_x0 - 0.5") as sk:
+        sk.polyline(pts)
+    s.extrude("Plug room", "Plug room profile", "plug_x1 - plug_x0 + 1", operation="cut", targets=["zone_wall"])
 
 
 def drawer_params(s: Script) -> None:
