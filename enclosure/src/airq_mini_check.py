@@ -1067,6 +1067,71 @@ def _inside_distance(px, py, pts) -> float:
     return d
 
 
+def values_at(s, **over):
+    """An evaluator of the design's parameters with some changed (`wall=2.4`): every parameter re-evaluated in
+    order from its expression (angles as the design gives them)."""
+    from sclib import evaluate
+    vals = {}
+    for n, p in s.params.items():
+        if n in over:
+            vals[n] = over[n]
+            continue
+        try:
+            vals[n] = evaluate(p.expression, vals)
+        except ValueError:
+            vals[n] = s.v(n)
+    return lambda e: evaluate(e, vals)
+
+
+def intake_throat(s, v=None, dx: float = 0.0, deep: float = 0.0) -> dict:
+    """Review M1 (R25, arithmetic): the intake's turn into the passage. All the intake air passes between the
+    left boss pocket's inner-back corner (chamfered, `throat_chamfer`: its vertical face) and the SEN66's front-left (its
+    foam, its block's left end receding in its corner fillets, its plinth inset), from the floor to the zone
+    wall's underside. Per z (0.01 steps), the least distance in plan from the corner to the module's outline;
+    the section is its integral over z, less the SEN66 cable, which lies across the whole throat over its own
+    height (the cable keep-out's box: the gap counted 0 there). `dx` moves the module along x (-clr_remove: on
+    its left stop), `deep` its front forward (sen_d_tol: a 21.8 module). Returns {section, need, by_z}."""
+    import ref_sen66
+    v = v or s.v
+    r = ref_sen66.build().v
+    ch = v("throat_chamfer")
+    seg = ((-v("bp_x0"), v("bp_y1") - ch), (-v("bp_x0") - ch, v("bp_y1")))      # the pocket's chamfered corner
+    zf, zt_ = v("floor_t"), v("zw_z0")
+    zb, top = v("floor_t + foam"), v("sen_top")
+    pin, ra = r("plinth_inset"), r("r_inlet_end")
+    x0 = v("sen_x0") + dx
+    yf, yblk = v("sen_y0") - deep, v("sen_y1") - r("block_h")
+    c0, c1 = zf, zf + v("cable_gh_d")
+
+    def gap(z):
+        if c0 <= z <= c1:
+            return 0.0
+        zz = min(z, top - 1e-6)
+        rects = []
+        if zz < zb:
+            rects.append((x0, yf))
+        else:
+            d = min(zz - zb, top - zz)
+            rec = ra - math.sqrt(max(0.0, ra * ra - (ra - d) ** 2)) if d < ra else 0.0
+            rects.append((x0 + rec, yblk))
+            if zb + pin <= zz <= top - pin:
+                rp = ra - pin
+                dp = min(zz - zb - pin, top - pin - zz)
+                recp = rp - math.sqrt(max(0.0, rp * rp - (rp - dp) ** 2)) if dp < rp else 0.0
+                rects.append((x0 + pin + recp, yf))
+        return min(_seg_quadrant(seg, xa, ya) for xa, ya in rects)
+    n = int((zt_ - zf) / 0.01)
+    dz = (zt_ - zf) / n
+    area = sum(gap(zf + (i + 0.5) * dz) for i in range(n)) * dz
+    return {"section": area, "need": 77.3}
+
+
+def _seg_quadrant(seg, xa, ya, n: int = 50) -> float:
+    """The least distance in plan from the segment `seg` to the quarter-plane x >= xa, y >= ya."""
+    (x0, y0), (x1, y1) = seg
+    return min(math.hypot(max(0.0, xa - (x0 + (x1 - x0) * i / n)), max(0.0, ya - (y0 + (y1 - y0) * i / n))) for i in range(n + 1))
+
+
 def walls(s) -> dict:
     """The opaque walls' thicknesses (arithmetic): the divider (the visible gap, a rib of the shell), the end
     ribs, `guide_stop`, the face between the PM2.5 half and the flexure's slot."""

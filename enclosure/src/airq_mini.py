@@ -367,6 +367,12 @@ def base_cuts(s: Script) -> None:
     with s.sketch("Inlet seal floor groove outline", "XY", offset="floor_t - seat_d") as sk:
         sk.polyline(C.wiper_profile("clr_align", hand=HAND))
     s.extrude("Inlet seal floor groove", "Inlet seal floor groove outline", "seat_d", operation="cut", targets=["base_plate"])
+    # review M1: the intake turns into the passage round the left boss pocket's outer corner (all of it passes
+    # between that corner and the SEN66's front-left): a chamfer there widens the turn; the walls keep iwall normal to it
+    s.param("throat_chamfer", 0.9, "legs of the chamfer on the left boss pocket's outer (inner-back) corner: iwall x sqrt(2) - 0.9 / sqrt(2) = 1.63 of wall stays across it (review M1)")
+    with s.sketch("Throat chamfer outline", "XY", offset="floor_t - 1") as sk:
+        sk.polyline([("-bp_x0 + 0.5", "bp_y1 - throat_chamfer - 0.5"), ("-bp_x0 + 0.5", "bp_y1 + 0.5"), ("-bp_x0 - throat_chamfer - 0.5", "bp_y1 + 0.5")])
+    s.extrude("Throat chamfer", "Throat chamfer outline", "zw_z0 + 1 - floor_t", operation="cut", targets=["base_plate"])
     s.cylinder("Tongue pin hole", ["-tub_x - tm_hole_depth", "tm_y", "tm_z"], "tm_pin_d + 2 * clr_align", "tm_hole_depth + 0.5",
                axis="X", operation="cut", targets=["base_plate"])
 

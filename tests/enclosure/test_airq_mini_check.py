@@ -122,6 +122,17 @@ def test_light_stays_off_the_sensor_its_window_and_the_crease():
         assert ln >= 1.2, (name, lp[name])
 
 
+def test_intake_throat_keeps_r25():
+    """Review M1 (arithmetic): the turn into the passage round the left boss pocket's chamfered corner keeps
+    >= 77.3 at nominal and at the tolerance corner (the module on its left stop and 21.8 deep), the SEN66 cable
+    counted as blocking its whole height; at wall 2.4 it does not (recorded: owner item, as the intake rows)."""
+    nom = K.intake_throat(S)["section"]
+    corner = K.intake_throat(S, dx=-V("clr_remove"), deep=V("sen_d_tol"))["section"]
+    assert nom >= 77.3 and corner >= 77.3, (nom, corner)
+    assert K.intake_throat(S, v=K.values_at(S, wall=2.4))["section"] < 77.3
+    assert K.values_at(S)("bp_x0") == pytest.approx(V("bp_x0"))
+
+
 def test_zone_wall_is_held_down():
     """Review I1 (analytic): the board's one clamp (H1) and the shell's four hold-down pads hold the zone wall
     against the top seal's push: every hold pushes down (the push lies 8 mm inside their polygon); as a 20 mm
