@@ -49,9 +49,10 @@ TOUCHES = (("gasket_out", "sen66_body"), ("gasket_in", "sen66_body"), ("gasket_i
            ("sen66_pad", "sen66_body"),
            ("grommet_zone_a", "zone_wall"), ("grommet_zone_b", "zone_wall"), ("grommet_zone_a", "base_plate"),
            ("grommet_zone_b", "base_plate"), ("grommet_j4_a", "base_plate"), ("grommet_j4_b", "base_plate"),
-           ("grommet_j4_b", "hcho_lid"), ("grommet_tongue_a", "hcho_lid"), ("grommet_tongue_b", "hcho_lid"))
+           ("grommet_tongue_a", "hcho_lid"), ("grommet_tongue_b", "hcho_lid"), ("sen66_top_seal", "zone_wall"))
 # every squeeze and preload: 0 in the check (R9: faces touch), TOUCH_SQUEEZE in the touch run
-SQUEEZES = ("gasket_squeeze", "wiper_squeeze", "pad_squeeze", "ring_preload", "root_squeeze")
+SQUEEZES = ("gasket_squeeze", "wiper_squeeze", "pad_squeeze", "ring_preload", "root_squeeze", "grommet_squeeze",
+            "drawer_squeeze", "bore_squeeze", "seal_squeeze", "top_seal_squeeze")
 
 
 def _rows(rot, t):
@@ -607,6 +608,34 @@ def sen66_hold(s=None) -> dict:
             "pad_pressure_kpa_max": PAD_FORCE_MAX / (v("pad_w") * v("pad_h")) * 1000,
             "seat_k": k, "seat_give": (spec / k, PAD_FORCE_MAX / k), "pad_compression_with_give": comp_give,
             "seat_stress": stress}
+
+
+FOAM_KPA = (30.0, 100.0)    # closed-cell PU foam at 25 % compression, kPa (soft to firm; to confirm)
+
+
+def seal_forces(s=None) -> dict:
+    """Round 3, B6 and the zone seal: what the seals push on their parts at their squeeze (TPU
+    95A at TPU_E, foam at FOAM_KPA), with the stresses that matter.
+    - zone_seal: foam on the lip, between the boss pockets (the lip's top must not bow);
+    - drawer_front: the drawer grommet's front half on the notch's front face, and the share on
+      the sliver at the boss notch, carried by the key: its root bending stress;
+    - j4_lid: the J4 grommet's push on the lid (its stack meets the lid at contact: 0);
+    - top_seal: the foam strip over the SEN66 pushing the zone wall up (H1's clamp takes it)."""
+    s = s or airq.build()
+    v = s.v
+    zone = tuple(k / 1000 * 2 * v("bp_x0") * v("ledge_t") for k in FOAM_KPA)
+    half = v("pt_yh") - v("pt_y0")
+    band_h = v("zone_t") / v("sin_t")
+    length = v("pt_x1") + v("inner_x") - v("clr_remove")
+    drawer = tuple(e * v("drawer_squeeze") / half * length * band_h for e in TPU_E)
+    sliver_len = v("-bp_x0 - 1.5") - v("-tub_x - iwall + 0.5")
+    on_sliver = tuple(f * (v("-boss_x + boss_d / 2 + clr_remove") + v("inner_x") - v("clr_remove")) / length for f in drawer)
+    key_z = sliver_len * v("key_w") ** 2 / 6
+    key_stress = tuple(f * v("key_h") / 2 / key_z for f in on_sliver)
+    top = tuple(k / 1000 * (1 + 1) * (v("top_seal_x1") - v("top_seal_x0")) * v("sen_d") for k in FOAM_KPA)   # x2: 50 % vs 25 %
+    return {"zone_seal_n": zone, "zone_seal_compression": v("seal_squeeze") / (v("seal_t") + v("seal_squeeze")),
+            "drawer_front_n": drawer, "drawer_on_sliver_n": on_sliver, "key_stress_mpa": key_stress,
+            "j4_lid_n": 0.0, "top_seal_n": top}
 
 
 def intake_open(s) -> float:

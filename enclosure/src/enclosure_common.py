@@ -94,7 +94,8 @@ def add_zone_and_board(s: Script, m: L.Model, front_t_need: str, board_x0: str) 
     p("ledge_t", 1.2, "zone wall ledge thickness")
     p("ledge_z1", "lip", "ledge top: at the crease, under the LED slot's inner edge")
     p("ledge_z0", "ledge_z1 - ledge_t", "derived: ledge underside, above the top slot row")
-    p("seal_t", 1.2, "TPU strip between the ledge's front face and the lip (zone_seal)")
+    p("seal_t", 1.2, "gap between the ledge's front face and the lip, closed by zone_seal")
+    p("seal_squeeze", 0.4, "zone_seal: closed-cell foam, seal_t + 0.4 free, 25 % compressed (round 3: TPU 95A at 20 % would push hundreds of N on the lip; R9: the check sets 0)")
     p("board_w", MAIN["outline"][0], "main board width (interface.yaml)")
     p("board_d", MAIN["outline"][1], "main board depth (interface.yaml)")
     p("board_t", MAIN["thickness"], "main board thickness (interface.yaml)")
@@ -310,8 +311,9 @@ def zone_wall(s: Script) -> None:
 
 
 def zone_seal(s: Script) -> None:
-    """`zone_seal` (TPU 95A): the strip between the ledge's front face and the lip's inner face,
-    between the boss pockets. The intake slots leave no room for a lap there. R9: at
-    gasket_squeeze 0 it touches both."""
-    s.box("Zone seal", ["-bp_x0", "wall - gasket_squeeze", "ledge_z0"], ["2 * bp_x0", "seal_t + gasket_squeeze", "ledge_t"],
+    """`zone_seal` (closed-cell foam, black, adhesive-backed): the strip between the ledge's front
+    face and the lip's inner face, between the boss pockets. The intake slots leave no room for a
+    lap there. It is foam, 25 % compressed, so it pushes the slotted lip with a few N (round 3).
+    R9: at seal_squeeze 0 it touches both."""
+    s.box("Zone seal", ["-bp_x0", "wall - seal_squeeze", "ledge_z0"], ["2 * bp_x0", "seal_t + seal_squeeze", "ledge_t"],
           body="zone_seal")

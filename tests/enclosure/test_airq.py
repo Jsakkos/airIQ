@@ -30,9 +30,9 @@ from sclib import ENCLOSURE, REPO, interface
 S = airq.build()
 V = S.v
 GROMMETS = ["grommet_zone_a", "grommet_zone_b", "grommet_j4_a", "grommet_j4_b", "grommet_tongue_a", "grommet_tongue_b"]
-BODIES = ["shell", "base_plate", "zone_wall", "zone_seal", "sen66_foam", "gasket_out", "gasket_in", "sen66_pad", "hcho_lid",
+BODIES = ["shell", "base_plate", "zone_wall", "sen66_top_seal", "zone_seal", "sen66_foam", "gasket_out", "gasket_in", "sen66_pad", "hcho_lid",
           *GROMMETS]
-TPU = ["gasket_out", "gasket_in", "zone_seal", *GROMMETS]
+TPU = ["gasket_out", "gasket_in", *GROMMETS]
 # positions Task 3b needs (task-3-scope, M6), fixed here as parameters
 FACE = ["panel_x0", "panel_s0", "bezel", "window_xc", "pocket_x0", "pocket_x1", "led_f0", "led_h_slot", "led_len", "led_z",
         "guide_t", "adapter_x", "adapter_s", "adapter_t", "ffc_len", "j7_x0", "j7_x1", "sw_x", "sw_z", "dot_f", "dot_d",
@@ -282,6 +282,10 @@ def test_grommets_squeeze_and_are_held():
     assert V("groove_w") < V("zone_t") - 0.8                                           # the zone wall keeps 0.5 a side
     assert V("pt_y0") - V("groove_d") >= V(airq.C.yb("ledge_z0")) - 1e-9              # the front groove stays in the slant
     assert V("j4_fl") > 0 and V("tg_fl") > 0 and V("tg_barb") > 0
+    # round 3, B6: the ribs stand groove_d - clr_align proud of the printed face at any squeeze
+    rib = _feature("Zone grommet a")
+    assert "drawer_squeeze + groove_d" in json.dumps(S.commands)
+    assert V("groove_d") - V("clr_align") >= 0.4 and V("bore_squeeze") > 0 and V("grommet_squeeze") <= 0.1
     sfa_top = V("floor_t") + V("sfa_bt") + airq_check._SFA("qwiic_h")                 # the SFA40's Qwiic plugs' top
     assert V("lid_z0") - V("tg_barb_t") > sfa_top                                       # the barbs pass over the rear plug
     pairs = {frozenset(p) for p in airq_check.TOUCHES}
@@ -381,6 +385,51 @@ def test_plug_room_at_the_deepest_module():
     assert V("zone_t") - V("plug_room_d") >= 1.2
 
 
+def test_sfa40_screws_and_feet():
+    """Review round 3, B5: the SFA40's screws are M2 x 6: from the counterbore's floor their tips
+    stay in the posts' pilots (2 mm of thread or more), under the tongue's pocket; their heads stand
+    head_h - head_depth under the floor, less than the felt feet, which they do not sit under (the
+    front feet cover the shell's screws)."""
+    tip = V("head_depth") + V("sfa_screw_l")
+    pilot_top = V("floor_t + sfa_bt - 0.5 + lid_pilot_depth + 0.5")
+    assert V("floor_t + sfa_bt") + 2.0 <= tip <= pilot_top - 0.5
+    assert pilot_top + 0.5 <= V("lid_z0 + lid_t - tongue_recess")                    # material over the pilot, under the tongue
+    assert V("head_h") - V("head_depth") <= V("foot_t") - 0.5
+    feet = [(sx * V("boss_x"), V("boss_y")) for sx in (-1, 1)] + [(sx * V("foot_rx"), V("foot_ry")) for sx in (-1, 1)]
+    for dx, dy in airq.SFA_SCREWS:
+        hx = V(f"sfa_x0 + sfa_hole_in + {dx} * (sfa_w - 2 * sfa_hole_in)")
+        hy = V(f"sfa_y0 + sfa_hole_in + {dy} * (sfa_w - 2 * sfa_hole_in)")
+        assert all(math.hypot(hx - fx, hy - fy) > V("foot_d") / 2 + V("head_d") / 2 for fx, fy in feet)
+    assert V("foot_d") >= V("head_d") + 4                                            # the front feet cover the shell's screw heads
+
+
+def test_seal_forces_stay_small():
+    """Review round 3: the zone seal is closed-cell foam 25 % compressed (TPU 95A at 20 % would push
+    hundreds of N and bow the slotted lip); the drawer grommet's push on the zone wall's sliver is
+    carried by the key on the boss pocket; the J4 grommet's stack meets the lid at contact (it no
+    longer lifts it); the foam strip over the SEN66 pushes the zone wall a few N near H1."""
+    f = airq_check.seal_forces(S)
+    assert 0.2 <= f["zone_seal_compression"] <= 0.3 and max(f["zone_seal_n"]) <= 15
+    assert max(f["key_stress_mpa"]) <= 8 and max(f["drawer_front_n"]) <= 60
+    assert f["j4_lid_n"] == 0 and max(f["top_seal_n"]) <= 15
+    j4b = _feature("J4 grommet b")
+    assert V(j4b["corner"][2]) + V(j4b["height"]) == pytest.approx(V("lid_z0"))     # at contact with the lid
+
+
+def test_space_beside_the_ring_is_closed():
+    """Review round 3: the 0.3 gap over the SEN66 joined the space left of the inlet wiper to the
+    inlets' side round the wiper's tip (a 5 mm path). sen66_top_seal closes it across the module's
+    top at the wiper's tip, from the port face to the connector face, so that space reaches only the
+    front plenum, through slits 21 mm long, far from the inlets."""
+    tip0 = V("wiper_x1 - wiper_lean - wiper_w")
+    tip1 = V("wiper_x1 - wiper_lean")
+    assert V("top_seal_x0") <= tip0 - 1.0 + 1e-9 and V("top_seal_x1") >= tip1 + 1.0 - 1e-9
+    seal = _feature("SEN66 top seal")
+    assert V(seal["corner"][1]) == pytest.approx(V("sen_y0")) and V(seal["width"]) == pytest.approx(V("sen_d"))
+    gaps = (V("zone_gap") - 0.1, V("zone_gap") + 0.2)                              # the module's height +0.1 / -0.2
+    assert all(0.15 <= 1 - g / V("top_seal_t") <= 0.7 for g in gaps)
+
+
 def test_inlet_seal_root_and_lead_in():
     """Review round 3, B3: the inlet seal's root is a root_w foot squeezed root_squeeze into its
     slot's sides and back (no bypass round it, no travel to eat the preload). B4: its tip has a
@@ -457,6 +506,9 @@ def test_gaskets_touch_what_they_seal(check):
     strip = V("wiper_w") * (V("zw_z0") - V("wiper_lead") - V("floor_t") - V("foam")) * q   # under the tip's lead-in
     lip = 2 * V("bp_x0") * V("ledge_t") * q
     pad = V("pad_w") * V("pad_h") * q
+    top = (V("top_seal_x1") - V("top_seal_x0")) * V("sen_d") * q
+    assert vols[("sen66_top_seal", "zone_wall")] == pytest.approx(top, rel=0.05)
+    assert vols[("gasket_in", "base_plate")] > 0                                       # B3: the root squeezed in its slot
     assert vols[("gasket_out", "sen66_body")] == pytest.approx(ring, rel=0.05)
     assert vols[("gasket_in", "sen66_body")] == pytest.approx(strip, rel=0.05)
     assert vols[("zone_seal", "base_plate")] == pytest.approx(lip, rel=0.05)
