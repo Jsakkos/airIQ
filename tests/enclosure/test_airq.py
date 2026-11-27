@@ -374,9 +374,13 @@ def test_pad_seat_is_stiff_and_tied():
     assert seat["distance"] == "plug_x0 - 1.0 + tub_x + iwall"                    # from the side rail's outer face
     assert V("seat_t") >= 2.4 and h["seat_k"] >= 50 and h["seat_give"][1] <= 0.25 and h["seat_stress"] <= 8.0
     assert V("seat_y0") >= V("pt_yh + cable_gh_d / 2") + V("clr_align") - 1e-9       # behind the cables' riser
-    # the lead-in: the pad's front face (free) meets the inclined top for every module depth
-    entry = [V("sen_y1") - d - V("pad_t") for d in (V("sen_d") + V("sen_d_tol"), V("sen_d") - V("sen_d_tol"))]
-    assert V("seat_y0") < min(entry) and max(entry) < V("pad_y0")
+    # the lead-in: the pad's front face (free) meets the inclined top for the nominal and shallower modules; a module
+    # deeper than sen_y1 - pad_t - seat_apex_y (21.37) puts it in front of the apex (final review I2, deferred B4):
+    # the pad then meets the seat's top first, a first-print item (README)
+    entry = [V("sen_y1") - d - V("pad_t") for d in (V("sen_d") + V("sen_d_tol"), V("sen_d"), V("sen_d") - V("sen_d_tol"))]
+    assert V("seat_apex_y") < min(entry[1:]) and max(entry) < V("pad_y0")
+    d_lead = V("sen_y1 - pad_t - seat_apex_y")
+    assert V("sen_d") <= d_lead < V("sen_d + sen_d_tol"), d_lead
     assert V("seat_y0") < V("seat_apex_y") < V("pad_y0") and V("seat_apex_z") > V("seat_lead_z") > V("outlet_z") + V("pad_h") / 2
     # its top stays seat_slant_clr under the zone wall's slant (and the drawer grommet's squeezed face)
     under = V(airq.zt("seat_apex_y", "zw_tf + zone_t")) - V("seat_apex_z")
@@ -412,13 +416,17 @@ def test_sfa40_screws_and_feet():
         hx = V(f"sfa_x0 + sfa_hole_in + {dx} * (sfa_w - 2 * sfa_hole_in)")
         hy = V(f"sfa_y0 + sfa_hole_in + {dy} * (sfa_w - 2 * sfa_hole_in)")
         assert all(math.hypot(hx - fx, hy - fy) > V("foot_d") / 2 + V("head_d") / 2 for fx, fy in feet)
-    assert V("foot_d") >= V("head_d") + 4                                            # the front feet cover the shell's screw heads
+    assert V("foot_d") >= V("head_d") + 1.0                                          # the front feet cover the shell's screw heads
+    r = V("foot_d") / 2                                                              # final review I2: and stay on the bottom face
+    assert V("boss_x") + r <= V("W / 2") and V("boss_y") - r >= 0
+    assert V("foot_rx") + r <= V("W / 2") and V("foot_ry") + r <= V("D")
 
 
 def test_seal_forces_stay_small():
     """Review round 3: the zone seal is closed-cell foam 25 % compressed (TPU 95A at 20 % would push
     hundreds of N and bow the slotted lip); the drawer grommet's push on the zone wall's sliver is
-    carried by the key on the boss pocket; the J4 grommet's stack meets the lid at contact (it no
+    small (the key on the boss pocket would carry it at <= 8 MPa, but as built it is clr_align short of
+    bearing, so the sliver takes it: final review I2); the J4 grommet's stack meets the lid at contact (it no
     longer lifts it); the foam strip over the SEN66 pushes the zone wall a few N near H1."""
     f = airq_check.seal_forces(S)
     assert 0.2 <= f["zone_seal_compression"] <= 0.3 and max(f["zone_seal_n"]) <= 15

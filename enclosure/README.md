@@ -84,7 +84,9 @@ A design with a `PRINT_PARTS` table (the airQ and the airQ mini) exports one fil
 (`encbuild.print_exports`): after the design is saved, each part is turned into its print orientation
 and set on the bed, and written alone, so the saved design is not touched. The build fails unless each
 3MF reopens with exactly one part. `tests/enclosure/test_airq_exports.py` (and `test_airq_mini_exports.py`) also
-check every file's box and volume against the design's body. The file prefix comes from the module
+check every file's box against the design's body turned into its print orientation, the bed contact and the
+hanging faces on the committed meshes, and (SolidCraft present) that a fresh build writes every committed file
+byte for byte. The file prefix comes from the module
 (`airq-` or `airq-mini-`).
 
 **Toolchain.** The committed designs were built with SolidCraft 0.50.0 (save format `solidcraft/69`)
@@ -778,8 +780,10 @@ z 3.0 … 28.6.
     stress across the layers at 15 N is 6.6 MPa.
   - Its top follows the zone wall's slant, 0.8 under it, so it stays clear of the drawer grommet's
     squeezed face.
-  - A 45° lead-in on its back edge (B4) meets the pad's free front face at every module depth, so
-    the pad is squeezed gradually as the module goes down.
+  - A 45° lead-in on its back edge (B4) meets the pad's free front face for modules up to 21.37 deep
+    (the nominal 21.3 and shallower), so the pad is squeezed gradually as the module goes down. A
+    deeper module (to 21.8) puts the pad's front 0.43 in front of the lead-in's apex (y 15.17), so
+    the pad meets the seat's top first: a first-print item ("To confirm"; final review I2).
 - **No tipping or yaw, the land loaded all round (round 3).** The pad's force passes through the
   ring's centre. `gasket_in` is a soft 55° wiper (0.8 thick, 6.1 long, 0.5 preload): it pushes
   0.28–0.54 N (TPU 95A at 26–50 MPa), 25.5 mm from the ring's axis. The ring's reaction must stay
@@ -855,8 +859,9 @@ opening up. Two pins (front right, rear left) go through its holes.
     3, B5).
   - Their heads sit in 0.4 counterbores, with 1.6 of floor left, so they stand 1.2 under the
     floor.
-  - The felt feet (`foot_t` 2.0, ⌀10) are thicker than that and are not over them. The front feet
-    cover the shell's screws, the rear feet sit at the rear corners
+  - The felt feet (`foot_t` 2.0, ⌀7.5) are thicker than that and are not over them. The front feet
+    cover the shell's screws (⌀4.4 heads) and stay inside the side and front faces (⌀10 overhung the
+    side by 1.2 and the front by 0.2: final review I2), the rear feet sit at the rear corners
     (`test_sfa40_screws_and_feet`).
 - **Grille.** A chimney in front of H2 takes the air to the HCHO grille: five slots in the right
   rail, behind a window in the shell's right side wall, from the 10 mm line up (67.8 mm² open,
@@ -906,8 +911,10 @@ they enter (`interface.yaml`): Qwiic 6.0 × 2.95, GH 10.75 × 4.25, to confirm.
     - They bear on the rail and the notch's end with `drawer_squeeze` 0.05 (18–35 N on the front
       face).
     - Where the boss notch leaves the zone wall a 2.3 mm sliver, a key on the left boss pocket's
-      back wall (a 1.4 × 0.5 ridge in a groove in the sliver) takes their push. It carries 10–20 N
-      at 1.7–3.3 MPa (`airq_check.seal_forces`).
+      back wall (a 1.4 × 0.5 ridge in a groove in the sliver) locates the sliver. It does not take the
+      push as built: the groove leaves `clr_align` (0.15) behind the key's rear face and `drawer_squeeze`
+      is 0.05, so the sliver takes the 10–20 N itself (the key would see 1.7–3.3 MPa if it bore it,
+      `airq_check.seal_forces`; final review I2, B6(c)).
     - The shell's side wall stops them sliding out.
   - The grommets' bores are 0.2 under the cables' diameters (`bore_squeeze`), so they hug the
     cables. Sleeve the GH cable's six wires with heat-shrink through the drawer so they are round.
@@ -1105,10 +1112,10 @@ Every row is measured on the geometry where the check design can (probes with `i
 | Shell clearance (N1, review focus 1) | `clr_remove` off the datums | nudged 0.05: forward, sideways and up 0; back 8.46 mm³ only at y 53.20–53.25 (the rear wall's face); down 10.93 mm³ only at z 1.95–2.00 (the floor) | shell copies moved ±0.05 against the base, the zone wall and the seal (`test_shell_nudged_meets_the_base_only_on_its_datums`) | pass |
 | Gaskets touch the SEN66 and the lip | zero gap, zero overlap (R9) | 0 at squeeze 0; at 0.05: ring 5.30, wiper 1.75, ledge seal 4.67, pad 5.00, top seal 3.62 mm³ (contact area × 0.05) | interference at every squeeze 0 and 0.05 (`test_gaskets_touch_what_they_seal`) | pass |
 | Seal over the SEN66's depth (I3(b)) | the seals hold at 21.3 ± 0.5, no tipping, the land loaded all round | port face on the ring at every depth; pad 28 / 44 / 60 % compressed (26–53 % with the seat's give); a 21.8 front (plinth, block, plug, bend) meets only the pad (1.9 free), a 20.8 front still meets it (0.9); 0.15 to the guide rail, 0.39 to the slant, the plug 0.29 under the slant's pocket; wiper 0.28–0.54 N, so the ring's reaction stays in the land's kern (5.3) for a pad ≥ 3.1 N; spec 4.7 N at 26 %, ≤ 15 N at 60 % | `ext_*` probes; `sen66_hold` (`test_sen66_at_its_depth_extremes`, `test_sen66_held_over_its_depth_tolerance`, `test_plug_room_at_the_deepest_module`) | pass; the pad's foam to confirm (47–150 kPa) |
-| Pad seat (B1) | stiff, tied, not creeping | 2.4 plate joined to the side rail: about 77 N/mm, 0.19 give and 6.6 MPa across the layers at 15 N; 45° lead-in met by the pad at every depth; top 0.8 under the slant | `sen66_hold` (`test_pad_seat_is_stiff_and_tied`) | pass (beam estimate) |
+| Pad seat (B1) | stiff, tied, not creeping | 2.4 plate joined to the side rail: about 77 N/mm, 0.19 give and 6.6 MPa across the layers at 15 N; 45° lead-in met by the pad's free face to 21.37 deep (a 21.8 module meets the seat's top first, first-print item); top 0.8 under the slant | `sen66_hold` (`test_pad_seat_is_stiff_and_tied`) | pass (beam estimate) |
 | Inlet seal (B3, B4) | root squeezed, tip lead-in | 2.0 root, 0.05 a side and back (touch 5.51 mm³ at 0.05); 0.8 lead-in at the tip's top > 0.5 preload | `test_inlet_seal_root_and_lead_in`, touch run | pass |
 | SFA40 screws and feet (B5) | the screws stay in the posts, the heads clear the desk | M2 × 6: tip z 6.4 in pilots to 7.1, 2.8 of thread, 1.8 under the tongue's pocket; heads 1.2 under the floor, feet 2.0, not over them | `test_sfa40_screws_and_feet` | pass (feet to confirm) |
-| Seal forces (round 3) | nothing bows or cracks | zone seal (foam, 25 %) 3–9 N; drawer front 18–35 N, 10–20 N on the sliver, key at 1.7–3.3 MPa; J4 grommet on the lid 0 (contact); top seal 4–15 N | `airq_check.seal_forces` (`test_seal_forces_stay_small`) | pass (estimates) |
+| Seal forces (round 3) | nothing bows or cracks | zone seal (foam, 25 %) 3–9 N; drawer front 18–35 N, 10–20 N on the sliver, which takes it (the key, `clr_align` short of bearing, carries none; 1.7–3.3 MPa if it did); J4 grommet on the lid 0 (contact); top seal 4–15 N | `airq_check.seal_forces` (`test_seal_forces_stay_small`) | pass (estimates) |
 | Space beside the ring (round 3) | no short way from it to the inlets | the gap over the module is closed at the wiper's tip; the space reaches only the front plenum, 21 mm through 5.1 + 11 mm² of slits, ≥ 80 mm of intake stream from the inlets | `test_space_beside_the_ring_is_closed` | pass |
 | Grommets (I2, N4, B6) | split, squeezed, held | six halves; each touches its opening at 0 and overlaps it at its squeeze (0.32–1.34 mm³ at 0.05); drawer ribs 0.45 proud of the printed face; bores 0.2 under the cables | touch run (`test_grommets_touch_what_they_seal`, `test_grommets_squeeze_and_are_held`) | pass |
 | Plugs through their openings (I2) | every plug fits every closed opening it passes | the lid's hole 6.4 × 3.35 passes the Qwiic plug 6.0 × 2.95 (0.2 a side); the drawer and the J4 notch are open to an edge, so no plug passes them | the plug's section swept through the lid; open-edge probes (`test_plugs_pass_their_openings`) | pass |
@@ -1237,8 +1244,8 @@ Build it with `uv run --with pyyaml python enclosure/build.py airq-mini`, and ch
   - The seat's top is its 45° lead-in. It ends 0.9 under the slant.
   - There is no front guide rail: the SEN66 cable runs there.
   - A left stop (1.6 × 2 × 4) at the module's rear-left corner locates its inlet end.
-- **Felt feet are ⌀7.5, not the airQ's ⌀10.** They cover the ⌀4.4 heads and stay inside the side
-  and front faces. The airQ's ⌀10 overhang is its deferred R35 minor.
+- **Felt feet are ⌀7.5, as the airQ's.** They cover the ⌀4.4 heads and stay inside the side and
+  front faces (the airQ's were ⌀10 and overhung until the final review, I2).
 
 ### Face and openings (Task 4b)
 
@@ -1495,8 +1502,8 @@ closing the case to be high.
 |---|---|---|
 | M2 heat-set inserts, 4.0 deep | 3 | In the shell's bosses (hole `insert_d` 3.2; the insert coupon decides it) |
 | M2 screws, pan head, head ⌀ ≤ 4.4 | 3 | Shell to base: two from under the floor (front bosses), one through the rear wall (R29). **M2 × 5**: the front hole takes at most 5.6, the rear one 5.0 (use × 4 if the rear one bottoms out). To confirm |
-| M2 × 6 self-tapping screws, pan head | 4 | Two clamp the main board and the zone wall into the standoffs' 1.7 pilots (7 deep: × 6 gives 3.6 of thread); two hold the SFA40 and the lid from under the floor (B5: not × 8) |
-| Felt feet, ⌀ 10, at least 2.0 thick | 4 | Two at the front cover the screws' heads, two at the rear corners |
+| M2 × 6 self-tapping screws, pan head | 4 | Two clamp the main board and the zone wall into the standoffs' 1.7 pilots (6 deep). An M2 × 6's tip ends at z 26.6, 2.3 under the zone wall's underside: 3.3 of thread in the standoff counting its 1.0 spigot (the mini's H1 is the same stack); two hold the SFA40 and the lid from under the floor (B5: not × 8) |
+| Felt feet, ⌀ 7.5, at least 2.0 thick | 4 | Two at the front cover the screws' heads, two at the rear corners |
 | SEN66 module | 1 | 55.2 × 25.6 × 21.3 ± 0.5 |
 | SFA40 Qwiic breakout (SparkFun SEN-31669) | 1 | It must have two Qwiic sockets (R30) |
 | E-paper panel GDEY029T94, 2.9 in | 1 | Taped into the bezel with 0.1 mm tape |
@@ -1551,7 +1558,7 @@ when you press its connector face toward the front.
 
 ### 5. Check table
 
-The check table is under "airQ enclosure" → "Check table" below. Each row gives the rule, the value,
+The check table is under "airQ enclosure" → "Check table" above. Each row gives the rule, the value,
 how it was measured (on the geometry, or arithmetic) and the result. Re-run the checks with
 `uv run --with pyyaml python enclosure/src/airq_check.py --run` and
 `uv run --with pytest --with pyyaml pytest tests/enclosure`.
@@ -1598,7 +1605,7 @@ differs on purpose, this guide says so.
 
 ### 1. Files
 
-`export/airq-mini-<part>.3mf` and `export/airq-mini-<part>.step`, one file per printed part (11 parts, 22 files),
+`export/airq-mini-<part>.3mf` and `export/airq-mini-<part>.step`, one file per printed part (12 parts, 24 files),
 written by `uv run --with pyyaml python enclosure/build.py airq-mini` (the `PRINT_PARTS` table in `src/airq_mini.py`
 sets each part's orientation). Each part is already in its **print orientation, sitting on the bed (z = 0)**, so a
 3MF drops straight into Bambu Studio. A part is turned about the world origin and moved in z only, so its x and y
@@ -1608,7 +1615,7 @@ the 3MF. The STEP is for other CAD.
 `shell` and `orange_dot` are one print job: import both and keep their relative place. The dot is an AMS colour
 region, flush with the shell's face. Everything else prints alone.
 
-The bodies of `airq-mini.sc` are 16: 11 printed (the files above) and 5 bought (`zone_seal`, `sen66_foam`,
+The bodies of `airq-mini.sc` are 17: 12 printed (the files above) and 5 bought (`zone_seal`, `sen66_foam`,
 `sen66_pad`, `sen66_top_seal`, `guide_stop`). `tests/enclosure/test_airq_mini_exports.py` fails if a body is in
 neither list.
 
@@ -1616,7 +1623,7 @@ neither list.
 
 Material: **ASA if the printer is enclosed, PETG otherwise** ("shell material"). No part needs a raft. Layer height,
 walls and infill are the owner's choice: the design does not depend on them. Sizes are as printed (x × y × z).
-"Hangs" means a face steeper than 45° from the bed over the bed; the numbers are measured on each committed 3MF
+"Hangs" means a downward-facing face within 45° of horizontal (an overhang more than 45° past vertical), which a slicer supports; the numbers are measured on each committed 3MF
 (`tests/enclosure/test_airq_mini_exports.py`).
 
 | Part (file `airq-mini-…`) | Qty | Material | Print orientation | Supports |
@@ -1625,7 +1632,7 @@ walls and infill are the owner's choice: the design does not depend on them. Siz
 | `orange_dot` | 1 | orange, an AMS colour region of the shell job | as the shell: it prints first, on the bed, flush with the face (a 0.6 deep recess in the flexure's tip). 4.0 × 4.0 × 0.6 | none |
 | `base_plate` | 1 | shell material | floor down, as designed (69.5 × 50 × 40). 3,445 mm² on the bed | none, but it bridges (517 mm² of flat or shallow ceilings above the bed): the intake rows' slots (3 rows × 4 slots, 10.98 mm wide, 1.8 deep in the lip: 237 mm²), the outlet grille's 24 slots (151 mm², 1.2 wide, in the rear wall at z 27.3), the exhaust's 13 slots (28 mm², z 39.0), the USB-C opening's ceiling (12.9 mm wide at z 37.9, 17 mm²: the longest bridge), the two screw counterbores (2 × 10.6 mm², 0.4 up), a 7.4 × 6.0 flat ceiling in the plenum (22 mm², z 27.7, x −22.4 … −15) and the outlet ring seat's lead-in (about 29 mm², 43° from the vertical, z 23 … 28). Use bridge settings; the 12.9 mm one is a first-print item |
 | `zone_wall` | 1 | an **opaque** filament (black or dark: it is a light barrier, review M5) | **on its slanted face** (the face that hugs the shell's; turn x +114; 65.5 × 31.0 × 37.4). 772 mm² on the bed. Not the airQ's end-standing (73 mm² under a 65 mm wall) and not flat top down (that floats 2,555 mm² 0.3 over its 31.0 rises) | none. 125 mm² hangs, all shallow ceilings 24° above horizontal and within 1.8 of the bed: the ledge tip (67 mm², the seat of `zone_seal`), the boss notches' ledges (2 × 20 mm²), plus the drawer notch's three groove faces (10 mm², z 23 … 24) and slivers. The flat top (the pads' face) and the underside (the top seal's face) print as steps on walls 24° off the vertical: check their flatness with the feeler at the first print |
-| `light_guide_co2`, `light_guide_pm` | 1 each | **clear or natural PETG**, bare: no paint, coat or cladding on any face (R40, R48) | **exit face down on a smooth plate** (turn x +114; 20.2 × 4.1 × 4.4 mm). The exit face is the first layer: 34.3 mm² on the bed. Every TIR face is a vertical wall or a wall leaning up | **Supports only under the two flange fronts** (34.6 mm² in all: 22.5 over the slot and 12.1 under it, parallel to the exit face and 1.6 above it; 0.6 … 1.1 mm wide ledges that may print without any). They carry **none of the light**: of the 5,081 rays each half delivers, 0 touch them (`test_supports_touch_none_of_the_light`). No support touches the exit, an entry face or a TIR face. The faces that do carry light are printed as layer steps, not supported: the entry faces (all 5,081 delivered rays cross them; they face up at 24° from the bed, so they print as shallow steps: the roughest optical faces, a look item), the tongue's lower side (16 %), the feet's bottoms (13 % and 11 %), the feet's ends (3 % each) and the tongue's upper side (1 %). No brim needed (34 mm² contact); a brim of 3 lines helps if the 4 mm tall part lifts. First-print item: the best orientation is decided at the first print (section 6) |
+| `light_guide_co2`, `light_guide_pm` | 1 each | **clear or natural PETG**, bare: no paint, coat or cladding on any face (R40, R48) | **exit face down on a smooth plate** (turn x +114; 20.2 × 4.1 × 4.4 mm). The exit face is the first layer: 34.3 mm² on the bed. The TIR faces are vertical walls or lean up, but for the bar's lower slope, which faces down 24° past vertical (normal z −0.41), within the 45° rule | **Supports only under the two flange fronts** (34.6 mm² in all: 22.5 over the slot and 12.1 under it, parallel to the exit face and 1.6 above it; 0.6 … 1.1 mm wide ledges that may print without any). They carry **none of the light**: of the 5,081 rays each half delivers, 0 touch them (`test_supports_touch_none_of_the_light`). No support touches the exit, an entry face or a TIR face. The faces that do carry light are printed as layer steps, not supported: the entry faces (all 5,081 delivered rays cross them; they face up at 24° from the bed, so they print as shallow steps: the roughest optical faces, a look item), the tongue's lower side (16 %), the feet's bottoms (13 % and 11 %), the feet's ends (3 % each) and the tongue's upper side (1 %). No brim needed (34 mm² contact). If the 4 mm tall part lifts, use mouse ears placed off the TIR faces (on the bar's ends), not a brim: a brim bonds to the tongue's side walls, which carry light. First-print item: the best orientation is decided at the first print (section 6) |
 | `gasket_out` | 1 | TPU 95A, opaque (black) | on its seat end (the end that goes into the plate): 24 × 24 × 4 | none |
 | `gasket_in` | 1 | TPU 95A, opaque | **on its side** (turn y −90): 27.9 × 4.55 × 6.44, 29.3 mm² on the bed, the 55° wiper lying flat | none (nothing hangs). The airQ's identical part stands on 7.1 mm²; this is easier |
 | `grommet_zone_a`, `grommet_zone_c` | 1 each | TPU 95A, opaque | flat as designed: 5.6 × 2.8 / 2.5 × 1.8, the half-bores vertical, 10.1 / 9.6 mm² on the bed | none (each rib's underside, 2.5 mm², 0.7 up) |
@@ -1649,7 +1656,7 @@ Expect the first days of readings after closing the case to be high.
 |---|---|---|
 | M2 heat-set inserts, 4.0 deep | 3 | In the shell's bosses: two at the front, one at the rear (hole `insert_d` 3.2; the insert coupon decides it) |
 | M2 screws, pan head, head ⌀ ≤ 4.4 | 3 | Shell to base: two from under the floor (front bosses), one through the rear wall (R29). **M2 × 5**, as the airQ's identical bosses (the front hole takes at most 5.6, the rear one 5.0). To confirm |
-| M2 × 6 self-tapping screw, pan head | 1 | **H1**: the board, the zone wall and its pad into the standoff's 6.0 deep pilot (board 1.6 + pad 0.3 + wall 1.8, so 2.3 of thread in the post). It also clamps the zone wall |
+| M2 × 6 self-tapping screw, pan head | 1 | **H1**: the board, the zone wall and its pad into the standoff's 6.0 deep pilot (its tip ends at z 26.6, 2.3 under the zone wall's underside: 3.3 of thread in the standoff counting its 1.0 spigot, the airQ's stack). It also clamps the zone wall |
 | M2 × **3** screw, pan head, self-tapping | 1 | **H2**: into a blind pilot, 1.6 deep, in the pad and the zone wall (0.5 of wall left under it). **M2 × 3 only, 1.4 of thread.** An M2 × 4, or the airQ's M2 × 6, goes through the 0.5 skin and the 0.3 gap into the SEN66's housing (review M6) |
 | Felt feet, ⌀ 7.5, at least 2.0 thick | 4 | Two at the front cover the screws' heads, two at the rear corners (the airQ's are ⌀ 10) |
 | SEN66 module | 1 | 55.2 × 25.6 × 21.3 ± 0.5, standing, ports to the rear, inlet end left |
@@ -1682,7 +1689,9 @@ Keep the base and the shell separate until step 9.
    `sen66_top_seal` across its top at the wiper's tip. Plug the GH cable into it, then lower it, pressed back against
    the ring, past the seat's and the wiper's lead-ins. Lay both cables toward the drawer (the SEN66 cable over the
    tongue).
-6. **Zone wall.** With `zone_seal` stuck on its ledge's front face, onto the standoff's spigot and the key. Lay the
+6. **Zone wall.** With `zone_seal` stuck on its ledge's front face, onto H1's standoff spigot (the mini has no key: the
+   zone wall is located by that one spigot; it and the board can turn about H1 by about 0.3° until the shell squares
+   them, final review M1). Lay the
    two cables toward the drawer with slack (the SEN66 cable in front), then close the three grommet pieces round
    them outside the notch: `grommet_zone_a` in front of the SEN66 cable, `_b` between the cables, `_c` behind the
    Qwiic, the half-bores on the cables. Slide the closed stack and the cables in together from the open end over the
@@ -1736,9 +1745,9 @@ What to look for:
   19.9 of 4.95 … 25.45), so each half's last 4 mm get no direct light and **the dark ends** will look dim. The gap
   between the halves must stay dark (6.8 mm; at warm-white 1.2 its middle is 4.4, at the coupon's 2.0 only 2.8) and no
   light should show across it. Print both guides and report how the exit faces look (smooth plate: clear; textured:
-  diffuse). **Best orientation:** the export is exit face down; also try **entry faces down** (10.2 mm² on the bed,
-  supports under the back face, 63 mm², which carries none of the light) and **on an end** (12.2 mm², no support at
-  all), and report which is brightest.
+  diffuse). **Best orientation:** the export is exit face down; also try **entry faces down** (10.2 mm² on the bed; the back hangs, 52.7 mm²,
+  which carries none of the light) and **on an end** (7.9 mm² on the bed; the feet's end faces hang, 4 mm² each, about
+  3 % of the delivered light each), and report which is brightest.
 - **Labels.** "CO₂" and "PM2.5" read at 5 mm, and the **CO₂ subscript (a 4.0 mm "2", strokes about 0.54)**, which is
   under the coupon's 5 mm finding (review M7).
 - **Sensor window.** The VEML7700 sees the desk through the ⌀2.0 window, about 30° off its axis (review M8): the lux
@@ -1791,7 +1800,7 @@ print ("Print and assembly guide (airQ)", section 6) is what settles most of the
 - **`gap_stop`.** The 1.3 mm foam strip sits in a 1.7 mm gap between the D1 and D2 feet, 0.2 clear
   of each: a touch kills the total internal reflection there. Check its placement on the print.
 - **Mask light.** About 2 % of D3's and D4's light passes `led_mask`'s edges into the case.
-- **Licence and repo size (R19).** `enclosure/` is CC-BY-SA 4.0; the STEP wrappers are 4.1 MB each.
+- **Licence and repo size (R19).** `enclosure/` is CC-BY-SA 4.0; the STEP wrappers are 3.6 + 0.5 = 4.1 MB together.
 - **Mini.**
   - Envelope 69.5 × 50 × 42 (R51).
   - Lip 18.0, a look item.

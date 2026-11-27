@@ -449,7 +449,9 @@ def cable_params(s: Script) -> None:
 def sliver_key(s: Script) -> None:
     """Review round 3, B6: between the left boss notch and the drawer the zone wall is a 2.3 mm
     sliver, which the drawer grommet's front half pushes forward. A ridge on the left boss pocket's
-    back wall top sits in a groove in the sliver's underside and takes that push."""
+    back wall top sits in a groove in the sliver's underside. The groove leaves clr_align behind the
+    ridge's rear face, more than the grommet's drawer_squeeze (0.05) can close, so the ridge locates the
+    sliver but carries no push as built (final review I2, B6(c)): the sliver itself takes it."""
     p = s.param
     p("key_w", 1.4, "sliver key ridge width along y (on the left boss pocket's back wall top)")
     p("key_h", 0.5, "sliver key ridge height")
@@ -527,7 +529,7 @@ def hcho_lid(s: Script) -> None:
     p("sfa_screw_l", 6.0, "SFA40 screws: M2 x 6 self-tapping pan head, from the counterbore's floor (B5: x 8 would come through the lid)")
     p("head_h", 1.6, "M2 pan head height (ISO 7045): it stands head_h - head_depth under the floor")
     p("foot_t", 2.0, "felt feet thickness (bought; to confirm): more than the screw heads stand out")
-    p("foot_d", 10.0, "felt feet diameter: the front two cover the shell's screws")
+    p("foot_d", 7.5, "felt feet diameter: the front two cover the shell's 4.4 screw heads and stay inside the side and front faces (W / 2 - boss_x = 3.8, boss_y 4.8; final review I2: 10 overhung, as the mini's 7.5)")
     p("foot_rx", "W / 2 - foot_d / 2 - 1.0", "rear feet |x|")
     p("foot_ry", "D - foot_d / 2 - 1.0", "rear feet y")
     with s.sketch("HCHO lid outline", "XY", offset="lid_z0") as sk:

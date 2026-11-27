@@ -1443,7 +1443,9 @@ def seal_forces(s=None) -> dict:
     95A at TPU_E, foam at FOAM_KPA), with the stresses that matter.
     - zone_seal: foam on the lip, between the boss pockets (the lip's top must not bow);
     - drawer_front: the drawer grommet's front half on the notch's front face, and the share on
-      the sliver at the boss notch, carried by the key: its root bending stress;
+      the sliver at the boss notch; `key_stress_mpa` is the key's root bending stress IF it bore that
+      share, a bound: as built the groove leaves clr_align behind the key's rear face, more than
+      drawer_squeeze closes, so the key carries nothing and the sliver takes the share (final review I2);
     - j4_lid: the J4 grommet's push on the lid (its stack meets the lid at contact: 0);
     - top_seal: the foam strip over the SEN66 pushing the zone wall up (H1's clamp takes it)."""
     s = s or airq.build()

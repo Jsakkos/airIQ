@@ -80,7 +80,8 @@ PRINT_PARTS = {
     # floats 2,555 mm2 of the plate 0.3 over its 31.0 rises, and standing on an end (y 90, the airQ's) is 73 mm2 on 65 tall
     "zone_wall": {"turns": [("x", 114)]},
     # exit face down (the face's own plane): the only faces that hang are the flange fronts, which carry none of the
-    # delivered rays (airq_mini_check.guide_delivery, per-face trace); every TIR face is vertical or leans up
+    # delivered rays (airq_mini_check.guide_delivery, per-face trace); the TIR faces are vertical walls or lean up,
+    # but the bar's lower slope, which faces down at 24 deg past vertical (normal z -0.41), within the 45 deg rule
     "light_guide_co2": {"turns": [("x", 114)]},
     "light_guide_pm": {"turns": [("x", 114)]},
     "gasket_out": {"turns": [("x", -90)]},                 # on its seat end (the rear end, into the plenum plate)
