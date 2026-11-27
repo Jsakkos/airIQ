@@ -522,11 +522,7 @@ def face_probes(s) -> list[dict]:
     # adapter holder: clr_remove over the board's upper edge, the arm's lower face 0.05 in
     b += sbox(s, "fp_hold", "adapter_x - ad_l / 2", "adapter_x + ad_l / 2", "adapter_s + ad_w / 2", "hold_s0 + 0.05", "hold_t0", "hold_t1")
     # 3b-1 feature 4: the flexure's beam, its hard stop and the pad rod's end
-    st0 = "dot_s - flex_stop_back - flex_stop_w / 2"
-    st1 = "dot_s - flex_stop_back + flex_stop_w / 2"
     b += sbox(s, "fp_beam", "flex_x0 + 0.5", "flex_x1 - 0.5", "flex_s0 + 1", "flex_s0 + 2", "0", "wall + 0.3")
-    b += sbox(s, "fp_stop_gap", "flex_x0", "flex_x1", st0, st1, "flex_t", "flex_t + flex_stop_gap")
-    b += sbox(s, "fp_stop_over", "flex_x0", "flex_x1", st0, st1, "flex_t + flex_stop_gap", "flex_t + flex_stop_gap + 0.1")
     b.append(_box("fp_pad_end", "sw_x - 0.5", "y_pad - 0.1", "sw_z - 0.5", "sw_x + 0.5", "y_pad", "sw_z + 0.5"))
     b.append(_box("fp_pad_gap", "sw_x - 0.5", "y_pad", "sw_z - 0.5", "sw_x + 0.5", "sw_tip", "sw_z + 0.5"))
     return b
@@ -613,28 +609,95 @@ def section_polys(s) -> dict:
     }
 
 
+def guide_outline(s) -> list[tuple[float, float]]:
+    """The guide's cross-section as one simple polygon in (s, t): tongue, bar and leg joined
+    (the build's `guide_profile_pts` pieces, as they overlap)."""
+    v = s.v
+    return [(v("led_s0") + v("gd_tg"), v("gd_rec")), (v("led_s1") - v("gd_tg"), v("gd_rec")),
+            (v("led_s1") - v("gd_tg"), v("gd_t0")), (v("gd_sf"), v("gd_t0")), (v("gd_sb"), v("gd_tb")),
+            (v("gd_sc"), v("gd_tc")), (v("gd_sc"), v("gd_t1")), (v("gd_s0"), v("gd_t1")), (v("gd_sg"), v("gd_t0"))]
+
+
 def guide_surface_points(s, n: int = 12) -> list[tuple[float, float]]:
     """Sample points (y, z) on the light guide's surfaces in the section, except the exit face (the
-    light is meant to leave there, outside): the tongue, the neck and the bar outlines."""
+    light is meant to leave there, outside): every edge of `guide_outline` but the first."""
     v = s.v
     sn, c, lip = v("sin_t"), v("cos_t"), v("lip")
     yz = lambda sv, tv: (sv * sn + tv * c, lip + sv * c - tv * sn)   # noqa: E731
-    g = v("gd_tg")
-    boxes = [(v("led_s0") + g, v("led_s1") - g, 0.3, v("wall")),                              # tongue
-             (v("led_s0") + g + 0.5, v("gd_s0") + 0.1, v("wall"), v("wall") + v("gd_nk_t")),  # neck
-             (v("gd_s0"), v("gd_s0") + v("gd_bar"), v("gd_t0"), v("gd_t1"))]                  # bar
+    poly = guide_outline(s)
     pts = []
-    for k, (s0, s1, t0, t1) in enumerate(boxes):
-        corners = [(s0, t0), (s1, t0), (s1, t1), (s0, t1)]
-        for i in range(4):
-            (a0, b0), (a1, b1) = corners[i], corners[(i + 1) % 4]
-            for j in range(n + 1):
-                f = j / n
-                sv, tv = a0 + (a1 - a0) * f, b0 + (b1 - b0) * f
-                if k == 0 and abs(tv - 0.3) < 1e-9:                                           # the exit face
-                    continue
-                pts.append(yz(sv, tv))
+    for i in range(1, len(poly)):                                    # edge 0 is the exit face
+        (a0, b0), (a1, b1) = poly[i], poly[(i + 1) % len(poly)]
+        for j in range(n + 1):
+            f = j / n
+            pts.append(yz(a0 + (a1 - a0) * f, b0 + (b1 - b0) * f))
     return pts
+
+
+CRIT_DEG = 39.6                  # PETG (n 1.57) against air, the critical angle
+
+
+def guide_delivery(s, n_pts: int = 9, n_dir: int = 41, cone_deg: float = 50.0, max_hit: int = 8) -> dict:
+    """R40: does light from the entry windows reach the exit face? A 2-D trace in the guide's (s, t)
+    section: rays start across the entry plane, in the LED's cone (+-cone_deg about the LED's axis, -y,
+    in the plane of the section), reflect specularly off each face where the angle of incidence is at
+    least the critical angle (TIR) and leave the guide (lost) where it is less; a ray that reaches the
+    exit face counts as delivered; the entry plane (back toward the LED) and the faces' edges lose it.
+    Returns {fraction of rays delivered, rays traced, delivered, bounces: histogram, entry points reaching}."""
+    v = s.v
+    poly = guide_outline(s)
+    n = len(poly)
+    sn, c = v("sin_t"), v("cos_t")
+    entry = (4, 5)                                                   # the edge from the foot's top to its lower corner is poly[4] -> poly[5]
+    exit_edge = 0
+    total = ok = 0
+    hist: dict[int, int] = {}
+    pts_ok = 0
+    for ip in range(n_pts):
+        f = (ip + 0.5) / n_pts
+        p0, p1 = poly[4], poly[5]
+        pos0 = (p0[0] + (p1[0] - p0[0]) * f, p0[1] + (p1[1] - p0[1]) * f)
+        got = 0
+        for jd in range(n_dir):
+            phi = math.radians(-cone_deg + 2 * cone_deg * jd / (n_dir - 1))      # in the (y, z) plane from -y
+            dy, dz = -math.cos(phi), math.sin(phi)
+            d = [dy * sn + dz * c, dy * c - dz * sn]                             # (s, t) components
+            pos = [pos0[0] + d[0] * 1e-6, pos0[1] + d[1] * 1e-6]
+            total += 1
+            edge_from = 4
+            for hit in range(max_hit + 1):
+                best = None
+                for i in range(n):
+                    if i == edge_from:
+                        continue
+                    (ax, ay), (bx, by) = poly[i], poly[(i + 1) % n]
+                    ex, ey = bx - ax, by - ay
+                    den = d[0] * ey - d[1] * ex
+                    if abs(den) < 1e-12:
+                        continue
+                    t = ((ax - pos[0]) * ey - (ay - pos[1]) * ex) / den
+                    u = ((ax - pos[0]) * d[1] - (ay - pos[1]) * d[0]) / den
+                    if t > 1e-9 and -1e-9 <= u <= 1 + 1e-9 and (best is None or t < best[0]):
+                        best = (t, i, ex, ey)
+                if best is None:
+                    break
+                t, i, ex, ey = best
+                if i == exit_edge:
+                    ok += 1
+                    got += 1
+                    hist[hit] = hist.get(hit, 0) + 1
+                    break
+                ln = math.hypot(ex, ey)
+                nx, ny = -ey / ln, ex / ln                                     # the edge's normal
+                dot = d[0] * nx + d[1] * ny
+                if math.degrees(math.acos(min(1.0, abs(dot)))) < CRIT_DEG:
+                    break                                                      # escapes: lost
+                pos = [pos[0] + t * d[0], pos[1] + t * d[1]]
+                d = [d[0] - 2 * dot * nx, d[1] - 2 * dot * ny]
+                edge_from = i
+        if got:
+            pts_ok += 1
+    return {"traced": total, "delivered": ok, "fraction": ok / total, "bounces": dict(sorted(hist.items())), "entry_points_reaching": pts_ok, "entry_points": n_pts}
 
 
 def light_paths(s) -> dict:
@@ -644,7 +707,7 @@ def light_paths(s) -> dict:
     Returns {target: (length, (source, target point))}."""
     v = s.v
     polys = list(section_polys(s).values())
-    src = guide_surface_points(s)
+    src = guide_surface_points(s) + [(v("board_y0"), v("led_z") + v("led_face_h") * (k / 4 - 0.5)) for k in range(5)]   # + the LED faces
     hz, dz = v("lsw_z"), v("lsw_d") / 2
     lip, cr = v("lip"), v("clr_remove")
     targets = {
@@ -709,6 +772,9 @@ def ms5611_sight(s) -> dict:
                     x0, x1 = cx - w / 2 + im, cx + w / 2 - ip
                     p = (x0 + (x1 - x0) * a / n, y, zc - hh / 2 + iz + (hh - 2 * iz) * b / n)
                     count[kind] += 1
+                    # a LED face emits into -y only: U4 is behind it, so only lines in that hemisphere count
+                    if kind == "led_faces" and ty - p[1] > 0:
+                        continue
                     if not hits(p, (tx, ty, tz)):
                         un[kind] += 1
     return {"target": (tx, ty, tz), "samples": count, "unblocked": un}

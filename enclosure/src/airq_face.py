@@ -303,16 +303,17 @@ def guide_params(s: Script) -> None:
     p("led_face_h", B.led_body_h(), "LED light face height (interface.yaml leds comment: the LED's body height)")
     for i, led in enumerate(leds, 1):
         p(f"led_d{i}_x", f"board_x0 + {led['center_x']}", f"D{i} light face centre, x (interface.yaml leds chain)")
-    p("gd_clr", 0.2, "light guide: air between its entry faces and the LED faces, and to the panel and the slot's edges (clr_remove)")
+    p("gd_clr", "clr_remove", "light guide: air between its entry faces and the LED faces, to the panel (the 0.2 adhesive pad that holds the guide fills it) and to the shell (clr_remove)")
     p("gd_t0", "bezel + panel_t + clr_remove", "light guide: front face, behind the panel's back face")
     p("gd_t1", "gd_t0 + guide_t", "light guide: back face (guide_t thick, the coupon's 2 mm bar)")
-    p("gd_s0", "(0.4 + gd_t1 * sin_t) / cos_t", "light guide: lower edge up the slope: its lowest point is 0.4 above the lip's top over the crease seal")
+    p("gd_sg", "(0.4 + gd_t0 * sin_t) / cos_t", "light guide: where its bottom turning facet starts on the front face: its lowest point, 0.4 above the lip's top")
+    p("gd_s0", "gd_sg + guide_t", "light guide: where the bottom 45 degree facet meets the back face (TIR: light going down the leg turns toward the slot)")
     p("gd_top_z", "led_z + led_face_h / 2", "light guide: its top, at the LED faces' top edge (no surface above it sees over the LEDs)")
-    p("gd_bar", 4.0, "light guide: the bar behind the slot, up the slope")
+    p("gd_s_up", 7.0, "light guide: the bar's top; the legs go on from here")
     p("gd_y_e", "board_y0 - gd_clr", "light guide: entry faces' plane, gd_clr in front of the LED faces")
     p("gd_tb", "(gd_y_e - (gd_top_z - lip) * sin_t / cos_t) * cos_t", "light guide foot: depth of the entry plane at the faces' top edge")
     p("gd_sb", "(gd_top_z - lip + gd_tb * sin_t) / cos_t", "light guide foot: slope position there")
-    p("gd_sa", "(gd_top_z - lip + gd_t0 * sin_t) / cos_t", "light guide leg: slope position where its front meets the top plane")
+    p("gd_sf", "gd_sb - (gd_tb - gd_t0) * cos_t / sin_t", "light guide foot: where the front face turns into the turning facet (a plane at the tilt to the slope: light from the LED, going -t and -s, meets it at 60 degrees, over PETG's 39.6 critical angle, and turns down the leg)")
     p("gd_tc", "(gd_y_e - (led_z - led_face_h / 2 - lip) * sin_t / cos_t) * cos_t", "light guide foot: depth of the entry plane at the faces' lower edge")
     p("gd_sc", "(led_z - led_face_h / 2 - lip + gd_tc * sin_t) / cos_t", "light guide foot: slope position there")
     p("gd_l1x0", "led_d1_x - led_face_w / 2 - gd_clr", "light guide: D1/D2 leg, tail-side face")
@@ -322,8 +323,8 @@ def guide_params(s: Script) -> None:
     p("gd_win_xm", 0.4, "light guide: the uncoated entry window starts this far inside the LED face's tail-side (-x) edge (a line to U4, at -x, drifts that way over the 0.2 gap and the LED's depth)")
     p("gd_win_xp", 0.2, "light guide: the uncoated entry window stops this far inside the LED face's far (+x) edge")
     p("gd_win_z", 0.2, "light guide: the uncoated entry window is this far inside the LED face's top and lower edges")
-    p("gd_tg", 0.05, "light guide: the tongue's clearance to the slot on each side")
-    p("gd_nk_t", 0.9, "light guide: neck thickness behind the face wall")
+    p("gd_tg", "clr_align", "light guide: the tongue's clearance to the slot on each side (clr_align: located part)")
+    p("gd_rec", "clr_remove + 0.1", "light guide: the tongue's front face is this far behind the face")
     p("crease_y0", 0.12, "crease seal: front edge, flush with the shell's outer face at its lower edge (the foam plugs the parting line over the lip's top from the outside: 1.7 of foam)")
     p("crease_squeeze", 0.1, "crease seal: foam tape clr_remove + this thick before it is pressed (R9: the check sets 0)")
 
@@ -335,32 +336,44 @@ def led_slot(s: Script) -> None:
     s.extrude("LED slot", "LED slot outline", "wall + 1 + 0.2", operation="cut", targets=["shell"], direction="negative")
 
 
-def _slope_piece(s: Script, name: str, x0: str, x1: str, s0: str, s1: str, t0: str, t1: str, first: bool) -> None:
-    with s.sketch(f"{name} outline", slope_plane(s), offset=toff(t0)) as sk:
-        sk.rect(x0, ys(s0), x1, ys(s1))
+def _guide_poly(s: Script, name: str, pts, x0: str, x1: str, first: bool) -> None:
+    """A guide piece: a polygon in the face's (s, t) plane (expressions), extruded along x from x0 to x1."""
+    with s.sketch(f"{name} profile", "YZ", offset=x0) as sk:
+        sk.polyline([yz(sv, tv) for sv, tv in pts])
     if first:
-        s.extrude(name, f"{name} outline", f"({t1}) - ({t0})", body="light_guide", direction="negative")
+        s.extrude(name, f"{name} profile", f"({x1}) - ({x0})", body="light_guide")
     else:
-        s.extrude(name, f"{name} outline", f"({t1}) - ({t0})", operation="join", targets=["light_guide"], direction="negative")
+        s.extrude(name, f"{name} profile", f"({x1}) - ({x0})", operation="join", targets=["light_guide"])
+
+
+def guide_profile_pts() -> dict:
+    """The guide's cross-section pieces in (s, t) as expressions, one source for the build and the
+    checks: `tongue` (in the slot, continuous with the bar's bottom), `low` (the bar with its bottom
+    turning facet), `leg` (up to the foot with its turning facet and the entry plane)."""
+    tr, tl = "led_s1 - gd_tg", "led_s0 + gd_tg"
+    return {
+        "tongue": [(tl, "gd_rec"), (tr, "gd_rec"), (tr, "gd_t0 + 0.1"), ("gd_sg", "gd_t0 + 0.1")],
+        "low": [("gd_sg", "gd_t0"), ("gd_s_up", "gd_t0"), ("gd_s_up", "gd_t1"), ("gd_s0", "gd_t1")],
+        "leg": [("gd_s_up - 0.1", "gd_t0"), ("gd_sf", "gd_t0"), ("gd_sb", "gd_tb"), ("gd_sc", "gd_tc"), ("gd_sc", "gd_t1"), ("gd_s_up - 0.1", "gd_t1")],
+    }
 
 
 def light_guide(s: Script) -> None:
-    """`light_guide`: clear PETG, one part. Its exit tongue sits in the LED slot (recessed 0.3, gd_clr
-    round it, its back face before the wall's inner face so it stays off the crease), a neck behind the
-    wall, a bar behind the panel (guide_t thick, the coupon bar) that spreads the light along the line,
-    and two legs up behind the panel to feet in front of the LED faces: D1/D2 and D3/D4. Each foot is a
-    wedge whose entry face is the plane gd_clr in front of the LED faces and covers exactly their
-    height; the legs end at the faces' top edge. The strip between the legs is free for the FFC."""
-    g = "gd_tg"
-    x0, x1 = f"led_x0 + {g}", f"led_x1 - {g}"
-    _slope_piece(s, "Guide tongue", x0, x1, f"led_s0 + {g}", f"led_s1 - {g}", "0.3", "wall", True)
-    _slope_piece(s, "Guide neck", x0, x1, f"led_s0 + {g} + 0.5", "gd_s0 + 0.1", "wall", "wall + gd_nk_t", False)
-    _slope_piece(s, "Guide bar", x0, "gd_l2x1", "gd_s0", "gd_s0 + gd_bar", "gd_t0", "gd_t1", False)
+    """`light_guide`: clear PETG, one part, every fit from clr_align / clr_remove. Light from a LED
+    enters a foot's entry plane (gd_clr in front of the LED face, its height) going toward the panel
+    and down the slope, meets the foot's front facet at 60 degrees (total internal reflection, PETG's
+    critical angle 39.6) and runs straight down the leg (parallel to its faces), along the bar, and
+    meets the bar's bottom 45 degree facet (TIR) which turns it toward the slot; the tongue, continuous
+    with the bar's bottom, fills the slot (clr_align each side) and shows the line. The legs are the
+    only parts in the FFC's row; the bar sits gd_clr behind the panel (the adhesive pad's gap).
+    The facets stay uncoated and face air; the other faces take a white layer then black (a coat in
+    optical contact would kill TIR)."""
+    pc = guide_profile_pts()
+    x0, x1 = "led_x0 + gd_tg", "led_x1 - gd_tg"
+    _guide_poly(s, "Guide tongue", pc["tongue"], x0, x1, True)
+    _guide_poly(s, "Guide low", pc["low"], x0, "gd_l2x1", False)
     for k, (lx0, lx1) in enumerate((("gd_l1x0", "gd_l1x1"), ("gd_l2x0", "gd_l2x1")), 1):
-        pts = [("gd_s0", "gd_t0"), ("gd_sa", "gd_t0"), ("gd_sb", "gd_tb"), ("gd_sc", "gd_tc"), ("gd_sc", "gd_t1"), ("gd_s0", "gd_t1")]
-        with s.sketch(f"Guide leg {k} profile", "YZ", offset=lx0) as sk:
-            sk.polyline([yz(sv, tv) for sv, tv in pts])
-        s.extrude(f"Guide leg {k}", f"Guide leg {k} profile", f"{lx1} - {lx0}", operation="join", targets=["light_guide"])
+        _guide_poly(s, f"Guide leg {k}", pc["leg"], lx0, lx1, False)
 
 
 def crease_seal(s: Script) -> None:
@@ -391,39 +404,30 @@ def flex_params(s: Script) -> None:
     p("flex_s1", "dot_s + dot_d / 2 + 0.5", "flexure beam: its free end")
     p("flex_x0", "sw_x - flex_w / 2", "flexure beam: tail-side edge")
     p("flex_x1", "sw_x + flex_w / 2", "flexure beam: far edge")
-    p("flex_stop_back", 3.5, "hard stop: the strap over the beam is this far down the slope from the dot")
-    p("flex_stop_w", 1.2, "hard stop: the strap's width up the slope")
-    p("flex_ratio", "(flex_len - flex_stop_back) * (flex_len - flex_stop_back) * (3 * flex_len - (flex_len - flex_stop_back)) / (2 * flex_len * flex_len * flex_len)",
-      "cantilever: the beam's deflection under the strap over its deflection at the dot (load point) = x^2 (3L - x) / (2 L^3)", unit="")
-    p("flex_stop_gap", "(flex_gap + sw_travel) / cos_t * flex_ratio",
-      "hard stop: the beam can move this far at the strap when the dot has moved flex_gap + the switch's full travel (along the push axis, on the face's normal)")
+    p("y_pad", "sw_tip - flex_gap", "pad rod: its end face, flex_gap in front of the actuator's tip")
+    p("flex_stop", "board_y0 - y_pad", "hard stop: the pad rod's end bottoms on SW1's body face (flush with the board's front edge) after this much travel along y; no printed stop gap (review I4)")
+    p("flex_over", "flex_stop - flex_gap - sw_travel", "hard stop: the rod can still move this far after the switch has bottomed: the switch's own stop takes the push, the beam is soft (about 1.5 N/mm)")
     p("rod_d", 2.4, "pad rod diameter (the actuator is 2.0 wide)")
     p("rod_y0", "(sw_z - lip) * sin_t / cos_t + 0.3", "pad rod: where it starts, 0.3 behind the face's outer surface on the axis (the rod's front corner is trimmed flush)")
-    p("y_pad", "sw_tip - flex_gap", "pad rod: its end face, flex_gap in front of the actuator's tip")
 
 
 def flexure(s: Script) -> None:
     """The button flexure in the shell's face wall (clearances.py `flex_*`): a beam of the wall's skin (flex_t
-    thick, flex_len long from its root up the slope to the dot), cut free by a U slot, with the wall's
-    inner part cut away over it, except a strap across it (the hard stop, flex_stop_gap over the beam). A
-    rod from the beam's inner face carries the push to the actuator. The face-wall skin keeps its
-    outer surface: the dot's colour region is cut in it by `orange_dot`."""
+    thick, flex_len long from its root up the slope to the dot), cut free by a U slot, the wall's inner
+    part cut away over it. A rod from the beam's inner face carries the push to the actuator and its end
+    bottoms on SW1's body (the hard stop: a bed-plane-free stop, no printed gap). The face-wall skin
+    keeps its outer surface: the dot's colour region is cut in it by `orange_dot`."""
     sl = "flex_slot"
     x0, x1 = f"flex_x0 - {sl}", f"flex_x1 + {sl}"
-    st0 = "dot_s - flex_stop_back - flex_stop_w / 2"
-    st1 = "dot_s - flex_stop_back + flex_stop_w / 2"
     top = "flex_s1 + flex_slot"
-    deep = "wall - flex_t + 0.3"
-    for name, s0, s1, t_off, dist in (("Flex thin A", "flex_s0", st0, "flex_t", deep), ("Flex thin B", st1, top, "flex_t", deep),
-                                      ("Flex thin C", st0, st1, "flex_t", "flex_stop_gap")):
-        with s.sketch(f"{name} outline", slope_plane(s), offset=toff(t_off)) as sk:
-            sk.rect(x0, ys(s0), x1, ys(s1))
-        s.extrude(name, f"{name} outline", dist, operation="cut", targets=["shell"], direction="negative")
+    with s.sketch("Flex thin outline", slope_plane(s), offset=toff("flex_t")) as sk:
+        sk.rect(x0, ys("flex_s0"), x1, ys(top))
+    s.extrude("Flex thin", "Flex thin outline", "wall - flex_t + 0.3", operation="cut", targets=["shell"], direction="negative")
     pts = [(x0, "flex_s0"), ("flex_x0", "flex_s0"), ("flex_x0", "flex_s1"), ("flex_x1", "flex_s1"), ("flex_x1", "flex_s0"),
            (x1, "flex_s0"), (x1, top), (x0, top)]
     with s.sketch("Flex slot outline", slope_plane(s), offset=toff("-1")) as sk:
         sk.polyline([(x, ys(y)) for x, y in pts])
-    s.extrude("Flex slot", "Flex slot outline", "1 + flex_t + flex_stop_gap", operation="cut", targets=["shell"], direction="negative")
+    s.extrude("Flex slot", "Flex slot outline", "1 + flex_t + 0.2", operation="cut", targets=["shell"], direction="negative")
     s.cylinder("Pad rod", ["sw_x", "rod_y0", "sw_z"], "rod_d", "y_pad - rod_y0", axis="Y", operation="join", targets=["shell"])
     # the rod's front corner would stand proud of the face: trim everything in front of the face over the beam
     with s.sketch("Flex trim outline", slope_plane(s), offset=toff("0")) as sk:
