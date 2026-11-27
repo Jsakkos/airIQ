@@ -157,10 +157,10 @@ def test_guide_fits_come_from_the_clearances():
     the entry faces clr_remove in front of the LED faces; the guides' ends clr_align off the ribs;
     the ribs and the stop clr_remove over the zone wall and in front of the board's edge."""
     import airq_mini_face as MF
-    assert S.params["lg_tg"].expression == "clr_align" and S.params["lg_ye"].expression == "board_y0 - clr_remove"
+    assert S.params["lg_tg"].expression == "clr_align" and S.params["stop_y1"].expression == "board_y0 - clr_remove"
     assert V("lg_tf - wall") == pytest.approx(V("clr_align"))
     assert V("lg_ysf - lg_yb") == pytest.approx(V("clr_align"))
-    assert V("board_y0 - lg_ye") == pytest.approx(V("clr_remove"))
+    assert V("board_y0 - stop_y1") == pytest.approx(V("clr_remove")) and V("stop_y1 - lg_ye") == pytest.approx(V("lg_ein"))
     assert V("stop_t") >= 1.2 and V("end_rib_t") >= 1.2 and V("band_pm_x0 - band_co2_x1") >= V("divider_t")
     assert V("rib_z0") >= V("zw_z1 + clr_remove") - 1e-9          # the ribs and the stop come down over the zone wall
     # retention: the flange laps the wall's inner face round the slot, the stop catches the bar's back

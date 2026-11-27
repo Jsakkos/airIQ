@@ -31,7 +31,9 @@ import sys
 
 import airq_check as A
 import airq_mini
+import airq_mini_face as MF
 import board_sources as B
+import enclosure_common as C
 import encbuild
 from airq_check import _box, _box_gap, _cyl, _near, _rows
 from sclib import ENCLOSURE
@@ -39,7 +41,10 @@ from sclib import ENCLOSURE
 REF = ENCLOSURE / "reference"
 CHECK_SC = encbuild.BUILD_DIR / "airq-mini-check.sc"
 REFS = ("ref_sen66", "ref_tongue", "ref_main")
-SHELL_PARTS = ("shell",)
+SHELL_PARTS = ("shell", "orange_dot")
+# Task 4b: the parts that ride in the shell (the guides in their slots, the stop on the ribs): their raised copies
+# <tag>_up_<dz> are swept with the shell
+RIDERS = (("light_guide_co2", "gco2"), ("light_guide_pm", "gpm"), ("guide_stop", "gstop"))
 SQUEEZES = ("gasket_squeeze", "wiper_squeeze", "pad_squeeze", "ring_preload", "root_squeeze", "drawer_squeeze", "bore_squeeze",
             "seal_squeeze", "top_seal_squeeze")
 TOUCHES = (("gasket_out", "sen66_body"), ("gasket_in", "sen66_body"), ("gasket_in", "base_plate"), ("zone_seal", "base_plate"),
@@ -107,10 +112,16 @@ AIR = {   # probe -> (path, R25 minimum, the probe's face that is the section)
     "air_outlet_left_top": ("outlet: the plenum left of the ring, in front of the rib", None, "x"),
     "air_outlet_h1": ("outlet: the plenum behind H1's post", None, "x"),
     "air_outlet_grille": ("outlet grille: the free air behind its slots, in the plenum", None, "y"),
+    "air_slots_front": ("intake rows: the free air behind every slot, to 0.1 in front of the SEN66 cable bend's keep-out (only slots facing free air count)", None, "y"),
+    "air_exhaust_left": ("exhaust: the free air behind its slots left of the antenna strip", None, "y"),
+    "air_exhaust_top": ("exhaust: the free air behind its slots over the antenna strip", None, "y"),
+    "air_usb_axis": ("USB-C: J1's shell axis out through the opening", None, "y"),
 }
+LSW_STEPS = 12          # the light-sensor window's line to the VEML7700, as small free boxes along it
 
 
-OPENING_AIR = ("air_outlet_grille",)     # the free air in front of an opening shares air with the paths' probes
+OPENING_AIR = ("air_outlet_grille", "air_slots_front", "air_exhaust_left", "air_exhaust_top", "air_usb_axis") + tuple(
+    f"air_lsw_{k}" for k in range(LSW_STEPS))     # the free air in front of an opening shares air with the paths' probes
 
 
 def air_probes(s) -> list[dict]:
@@ -126,7 +137,37 @@ def air_probes(s) -> list[dict]:
         _box("air_outlet_left_top", f"{x_l} - 0.9", "plate_y1", "zw_z0 - rib_d", f"{x_l} - 0.5", "D - wall - rib_d", "zw_z0"),
         _box("air_outlet_h1", "h1_x - 0.2", "h1_y + standoff_d / 2", "floor_t", "h1_x + 0.2", "D - wall", "zw_z0 - rib_d"),
         _box("air_outlet_grille", "out_gx0", "D - wall - 3.0", "out_gz0", "out_gx1", "D - wall", "out_gz1"),
-    ]
+        # Task 4b: behind the openings
+        _box("air_slots_front", "row_x0", "wall", "slot_row1_z", "row_x1", "sen_y0 - sen_bend_out - 0.1", "slot_row3_z + slot_w"),
+        _box("air_exhaust_left", "exh_x0", "D - wall - 3.0", "exh_z0", f"{ANT_X0} - clr_align", "D - wall", "exh_z1"),
+        _box("air_exhaust_top", ANT_X0, "D - wall - 3.0", f"{ANT_TOP} + clr_align", "exh_gx1", "D - wall", "exh_z1"),
+        _box("air_usb_axis", "usb_x - usb_sw / 2", "D - wall", "usb_z - usb_sh / 2", "usb_x + usb_sw / 2", "D", "usb_z + usb_sh / 2"),
+    ] + lsw_probes(s)
+
+
+ANT_X0 = f"(board_x0 + {B.MAIN['antenna']['module_body'][0][0]})"          # the antenna strip's left end (interface.yaml)
+ANT_TOP = f"(board_z0 + board_t + {B.module_h()})"                           # its top (the module's height)
+
+
+def lsw_line(s, f: float) -> tuple:
+    """The point a fraction f along the light-sensor window's line, from the window's inner face (lip,
+    y = wall) to the VEML7700's window on the tongue, as expressions."""
+    def at(a, b):
+        return f"({a}) + (({b}) - ({a})) * {f:.6f}"
+    return at("lsw_x", "veml_wx"), at("wall", "veml_wy"), at("lsw_z", "veml_wz")
+
+
+def lsw_probes(s) -> list[dict]:
+    """Small free boxes (0.4 a side) along the window's line to the VEML7700: the first 0.3 behind the
+    lip's inner face, the last 0.9 short of the sensor's window (the tongue's board is not air)."""
+    out = []
+    v = s.v
+    ln = math.dist((v("lsw_x"), v("wall"), v("lsw_z")), (v("veml_wx"), v("veml_wy"), v("veml_wz")))
+    for k in range(LSW_STEPS):
+        f = (0.3 + (ln - 1.2) * k / (LSW_STEPS - 1)) / ln
+        x, y, z = lsw_line(s, f)
+        out.append(_box(f"air_lsw_{k}", f"{x} - 0.2", f"{y} - 0.2", f"{z} - 0.2", f"{x} + 0.2", f"{y} + 0.2", f"{z} + 0.2"))
+    return out
 
 
 BRANCHES = {   # plenum branch -> (its probes, the x it is cut at); the ring is at the right, the flow goes left
@@ -183,22 +224,94 @@ CLEAR_PAIRS = {
     "antenna_to_screws": (("cl_antenna",), ("cl_screw_1", "cl_screw_2")),
     "tongue_to_u3": (("cl_tongue",), ("cl_u3",)),
     "tongue_to_u2": (("cl_tongue",), ("cl_u2",)),
+    "intake_to_outlet": (("op_intake",), ("op_outlet",)),       # the openings' inner faces (the probes), Task 4b
 }
 
 
 def check_bodies(s) -> list[str]:
-    return [c["params"]["body_name"] for c in keepouts(s) + air_probes(s) + A.sweeps(s, riders=()) if c["params"].get("body_name")]
+    return [c["params"]["body_name"] for c in keepouts(s) + air_probes(s) + A.sweeps(s, riders=RIDERS) if c["params"].get("body_name")]
+
+
+# --- Task 4b: probes over the openings and the face (they overlap their part by design: a run of their own) ---
+def opening_probes(s) -> list[tuple[dict, str, str, str]]:
+    """(probe, part, thickness, expected open area) per opening, as airq_check.opening_probes: the open
+    area is (probe volume - its overlap with the part) / the thickness."""
+    sp = "slot_w"
+    return [
+        (_box("op_intake", "row_x0 - 0.6", "0", "slot_row1_z - 0.6", "row_x1 + 0.6", "wall", f"slot_row3_z + {sp} + 0.4"), "base_plate", "wall",
+         f"3 * in_n * in_len * {sp}"),
+        (_cyl("op_lsw", ["lsw_x", "0", "lsw_z"], "lsw_d + 1.0", "wall", axis="Y"), "base_plate", "wall", "3.141592653589793 * lsw_d * lsw_d / 4"),
+        (_box("op_outlet", "out_gx0", "D - wall", "out_gz0", "out_gx1", "D", "out_gz1"), "base_plate", "wall", f"out_n * {sp} * (out_gz1 - out_gz0)"),
+        (_box("op_exhaust", "exh_x0", "D - wall", "exh_z0", "exh_gx1", "D", "exh_z1"), "base_plate", "wall", f"exh_n * {sp} * (exh_z1 - exh_z0)"),
+    ]
+
+
+def opening_areas(s, res: dict) -> dict:
+    """{probe: (open area measured, expected)} from the openings run (airq_check.opening_areas)."""
+    got = {}
+    for p in res["interferences"]:
+        a, b = (p["a"], p["b"]) if p["a"].startswith(("op_", "usb_", "low_")) else (p["b"], p["a"])
+        got[(a, b)] = got.get((a, b), 0.0) + p["volume_mm3"]
+    out = {}
+    for c, part, th, exp in opening_probes(s):
+        n = c["params"]["body_name"]
+        out[n] = ((A._volume(c, s) - got.get((n, part), 0.0)) / s.v(th), s.v(exp))
+    return out
+
+
+def low_probes(s) -> list[dict]:
+    """Nothing opens below grille_min_z: slabs z 0 ... 10 over the lip, the rear wall, both rails and both
+    of the shell's side walls must be all material (airq_check.low_probes, both sides)."""
+    z = "grille_min_z"
+    return [_box("low_lip", "-W / 2", "0", "0", "W / 2", "wall - clr_remove", z),
+            _box("low_rear", "-W / 2", "D - wall", "0", "W / 2", "D", z),
+            _box("low_rail_r", "tub_x", "bp_y1", "floor_t", "tub_x + iwall", "D - wall", z),
+            _box("low_rail_l", "-tub_x - iwall", "bp_y1", "floor_t", "-tub_x", "D - wall", z),
+            _box("low_side_r", "inner_x", "wall + clr_remove", "floor_t", "W / 2", "D - wall", z),
+            _box("low_side_l", "-W / 2", "wall + clr_remove", "floor_t", "-inner_x", "D - wall", z)]
+
+
+LOW_PARTS = {"low_lip": "base_plate", "low_rear": "base_plate", "low_rail_r": "base_plate", "low_rail_l": "base_plate",
+             "low_side_r": "shell", "low_side_l": "shell"}
+
+
+def face_probes(s) -> list[dict]:
+    """Probes in the face frame (airq_check.sbox): each band slot open over its length and height, and a
+    0.05 ring round it in the wall; each label's deboss (its box less the shell in it is the letters'
+    volume) and the solid 0.05 under it; the flexure's beam, the pad rod's end and its gap to SW1."""
+    b = []
+    for h in ("co2", "pm"):
+        b += A.sbox(s, f"fp_slot_{h}", f"band_{h}_x0 + 0.05", f"band_{h}_x1 - 0.05", "band_f0 - lip + 0.05", "band_f1 - lip - 0.05", "0", "wall")
+        b += A.sbox(s, f"fp_ring_{h}", f"band_{h}_x0 - 0.05", f"band_{h}_x1 + 0.05", "band_f0 - lip - 0.05", "band_f1 - lip + 0.05",
+                    "0.05", "wall - 0.05")
+    for h, x0, x1 in LABEL_BOXES:
+        b += A.sbox(s, f"fp_label_{h}", x0, x1, "label_f0 - lip - label_sub_drop - 1", "label_f1 - lip + 1", "0", "label_depth")
+        b += A.sbox(s, f"fp_label_{h}_floor", x0, x1, "label_f0 - lip - label_sub_drop - 1", "label_f1 - lip + 1", "label_depth + 0.01",
+                    "label_depth + 0.06")
+    b += A.sbox(s, "fp_beam", "flex_x0 + 0.5", "flex_x1 - 0.5", "flex_s0 + 1", "flex_s0 + 2", "0", "wall + 0.3")
+    b.append(_box("fp_pad_end", "sw_x - 0.5", "y_pad - 0.1", "sw_z - 0.5", "sw_x + 0.5", "y_pad", "sw_z + 0.5"))
+    b.append(_box("fp_pad_gap", "sw_x - 0.5", "y_pad", "sw_z - 0.5", "sw_x + 0.5", "sw_tip", "sw_z + 0.5"))
+    return b
+
+
+LABEL_BOXES = (("co2", "label_co_x - label_co_w / 2 - 1", "label_sub_x + label_sub_w / 2 + 1"),
+               ("pm", "label_pm_x - 2.01 * label_h - 1", "label_pm_x + 2.01 * label_h + 1"))
+
+
+def _names(cmds) -> list[str]:
+    return [c["params"]["body_name"] for c in cmds if c["params"].get("body_name")]
 
 
 def check_script(save=CHECK_SC, budget_s: float = 900) -> dict:
     s = airq_mini.build()
     steps = [{"command": "component.insert_design", "params": {"path": str(pl["path"]), "matrix": pl["matrix"]}} for pl in placements(s)]
     steps.append({"command": "parameters.change", "params": {"changes": {n: "0 mm" for n in SQUEEZES}}})
-    steps += keepouts(s) + air_probes(s) + A.sweeps(s, riders=())
+    steps += keepouts(s) + air_probes(s) + A.sweeps(s, riders=RIDERS)
     names = check_bodies(s)
     mark = {"interference": len(steps)}
     steps.append({"command": "inspect.interference", "params": {
-        "budget_s": budget_s, "exclude_pairs": A.exclusions(names, refs=REFS, riders=(), shell_parts=SHELL_PARTS, borne=(), opening_air=OPENING_AIR)}})
+        "budget_s": budget_s, "exclude_pairs": A.exclusions(names, refs=REFS, riders=RIDERS, shell_parts=SHELL_PARTS, borne=(),
+                                                            opening_air=OPENING_AIR)}})
     mark["measure"] = len(steps)
     steps.append({"command": "inspect.measure", "params": {"summary": True}})
     # N1: the shell nudged each way meets the base only on its datums
@@ -223,6 +336,21 @@ def check_script(save=CHECK_SC, budget_s: float = 900) -> dict:
         "budget_s": 120, "bodies": [*names_e, *EXTREME_PARTS],
         "exclude_pairs": [[a, b] for i, a in enumerate(names_e) for b in names_e[i + 1:]]}})
     steps.append({"command": "parameters.change", "params": {"changes": {"pad_squeeze": "0 mm"}}})
+    # Task 4b: the face (band slots, labels, flexure) against its probes
+    fprobes = face_probes(s)
+    steps += fprobes
+    names_f = _names(fprobes)
+    mark["face"] = len(steps)
+    steps.append({"command": "inspect.interference", "params": {
+        "budget_s": 120, "bodies": [*names_f, *SHELL_PARTS], "exclude_pairs": [[a, b] for i, a in enumerate(names_f) for b in names_f[i + 1:]]}})
+    # Task 4b: the openings' open area, lower edges and the USB-C fit (probes that overlap the base by design)
+    oprobes = [c for c, *_ in opening_probes(s)] + A.usb_probes(s) + low_probes(s)
+    steps += oprobes
+    names_o = _names(oprobes)
+    mark["openings"] = len(steps)
+    steps.append({"command": "inspect.interference", "params": {
+        "budget_s": 120, "bodies": [*names_o, "base_plate", "shell"],
+        "exclude_pairs": [[a, b] for i, a in enumerate(names_o) for b in names_o[i + 1:]] + [["base_plate", "shell"]]}})
     # R12 and the tongue's distances as exact distances between solids
     steps += clear_probes(s)
     mark["clearance"] = len(steps)
@@ -297,6 +425,7 @@ def run(cli: str | None = None) -> dict:
     m = sc["mark"]
     out = {"inserted": res[:len(REFS)], "interference": res[m["interference"]], "measure": res[m["measure"]],
            "touch": res[m["touch"]], "nudge": res[m["nudge"]], "plugs": res[m["plugs"]], "extremes": res[m["extremes"]],
+           "face": res[m["face"]], "openings": res[m["openings"]],
            "clearance": {k: _near(res[m["clearance"] + i]) for i, k in enumerate(CLEAR_PAIRS)}}
     near = passage_near(s, out["measure"])
     pres = A.run_commands(passage_script(s, near), "airq-mini-passage", CHECK_SC, cli)
@@ -348,6 +477,496 @@ def distances(s=None) -> dict:
     }
 
 
+# --- Task 4b: the band's light (analytic and arithmetic, in Python: not a SolidCraft ray trace) -------------
+# Every solid here is a prism along x: a polygon in the face frame (s, t) between x0 and x1 (airq_face: s up the
+# slope from the crease, t into the case). World (y, z) <-> (s, t) is a rotation, so lengths carry over.
+
+def _fr(s) -> tuple[float, float, float]:
+    v = s.v
+    return v("sin_t"), v("cos_t"), v("lip")
+
+
+def _world(fr, x, sv, tv) -> tuple[float, float, float]:
+    sn, c, lip = fr
+    return x, sv * sn + tv * c, lip + sv * c - tv * sn
+
+
+def _to_st(fr, y, z) -> tuple[float, float]:
+    sn, c, lip = fr
+    return y * sn + (z - lip) * c, y * c - (z - lip) * sn
+
+
+def _prism(name, poly, x0, x1, kinds=None) -> dict:
+    area2 = sum(poly[i][0] * poly[(i + 1) % len(poly)][1] - poly[(i + 1) % len(poly)][0] * poly[i][1] for i in range(len(poly)))
+    return {"name": name, "poly": poly, "x": (x0, x1), "kinds": kinds or {}, "sign": 1 if area2 > 0 else -1}
+
+
+def _yz_box(fr, y0, y1, z0, z1) -> list[tuple[float, float]]:
+    return [_to_st(fr, y0, z0), _to_st(fr, y1, z0), _to_st(fr, y1, z1), _to_st(fr, y0, z1)]
+
+
+def guide_prisms(s, half: str | None = None) -> list[dict]:
+    """The guides' prisms as built (`airq_mini_face.guide_pieces`): {name ("co2 bar", "D1 foot", ...), body, poly,
+    x, kinds: {edge: "exit" | "entry"}, sign}. `half` keeps one guide's."""
+    v = s.v
+    out = []
+    for feat, body, key, x0, x1 in MF.guide_pieces():
+        if half and body != f"light_guide_{half}":
+            continue
+        poly = [(v(a), v(b)) for a, b in MF.PROFILES[key]()]
+        name = f"{body[len('light_guide_'):]} bar" if key == "bar" else f"{feat.split()[-1]} foot"
+        pr = _prism(name, poly, v(x0), v(x1), {"bar": {0: "exit"}, "foot": {1: "entry"}}[key])
+        pr["body"] = body
+        out.append(pr)
+    return out
+
+
+def _x_ranges(s, skip: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """[-inner_x, inner_x] less the `skip` ranges."""
+    v = s.v
+    out, x = [], -v("inner_x")
+    for a, b in sorted(skip):
+        if a > x:
+            out.append((x, a))
+        x = max(x, b)
+    if x < v("inner_x"):
+        out.append((x, v("inner_x")))
+    return out
+
+
+def opaque_prisms(s, stop: bool = True) -> list[dict]:
+    """The opaque solids round the band, as prisms (each named by its part; `material` says what it is):
+    - the shell's face wall (t 0 ... wall, from its lower edge at the crease, z = lip + clr_remove, to the top
+      wall's underside), less the band slots, the flexure's whole width (its U slot and thinned beam: no
+      blocking counted there) and, over the labels' height, their 0.4 deboss (all x: conservative);
+    - the band's ribs (shell) and `guide_stop` (black foam; `stop` False leaves it out) with its windows;
+    - the four LED bodies and the board (opaque), the zone wall's section (ledge, slant, flat part) over the
+      x between its boss notches and its drawer, `zone_seal` (black foam) and the lip (base), less its intake
+      rows (all their x and z: conservative) and the light-sensor window (as its square).
+    The crease (the 0.2 parting line over the lip's top) is air: nothing is put there."""
+    v = s.v
+    fr = _fr(s)
+    sn, c, lip = fr
+    w = v("wall")
+    out = []
+    s_b0 = v("clr_remove") / c                                       # the face wall's lower edge (z = lip + clr_remove)
+    s_b1 = (v("clr_remove") + w * sn) / c
+    s_top0, s_top1 = v("(H - lip) / cos_t"), v("(H - wall - lip + wall * sin_t) / cos_t")
+    s_l0, s_l1 = v("label_f0 - lip - label_sub_drop"), v("label_f1 - lip")
+    s_g0, s_g1 = v("band_f0 - lip"), v("band_f1 - lip")
+    flex = (v("flex_x0 - flex_slot"), v("flex_x1 + flex_slot"))
+    full = _x_ranges(s, [flex])
+    band = _x_ranges(s, [flex, (v("band_co2_x0"), v("band_co2_x1")), (v("band_pm_x0"), v("band_pm_x1"))])
+    t_lab = v("label_depth")
+    pieces = [("face low", [(s_b0, 0.0), (s_l0, 0.0), (s_l0, w), (s_b1, w)], full),
+              ("face labels", [(s_l0, t_lab), (s_l1, t_lab), (s_l1, w), (s_l0, w)], full),
+              ("face mid", [(s_l1, 0.0), (s_g0, 0.0), (s_g0, w), (s_l1, w)], full),
+              ("face band", [(s_g0, 0.0), (s_g1, 0.0), (s_g1, w), (s_g0, w)], band),
+              ("face high", [(s_g1, 0.0), (s_top0, 0.0), (s_top1, w), (s_g1, w)], full)]
+    for name, poly, xs in pieces:
+        for k, (a, b) in enumerate(xs):
+            pr = _prism(f"shell {name} {k}", poly, a, b)
+            pr["material"] = "shell"
+            out.append(pr)
+    rib = [_to_st(fr, v(y), v(z)) for y, z in MF.rib_profile()]
+    for name, (x0, x1) in MF.rib_spans().items():
+        pr = _prism(f"shell rib {name}", rib, v(x0), v(x1))
+        pr["material"] = "shell"
+        out.append(pr)
+    if stop:
+        y0, y1, z0, z1 = v("lg_ysf"), v("stop_y1"), v("rib_z0"), v("stop_z1")
+        wins = [tuple(v(e) for e in wn) for wn in MF.stop_windows()]
+        wz0, wz1 = min(wn[2] for wn in wins), max(wn[3] for wn in wins)
+        for name, za, zb, xs in (("low", z0, wz0, [(v("stop_x0"), v("stop_x1"))]), ("high", wz1, z1, [(v("stop_x0"), v("stop_x1"))]),
+                                 ("mid", wz0, wz1, [])):
+            if name == "mid":
+                x, xs = v("stop_x0"), []
+                for wn in sorted(wins):
+                    xs.append((x, wn[0]))
+                    x = wn[1]
+                xs.append((x, v("stop_x1")))
+            for k, (a, b) in enumerate(xs):
+                pr = _prism(f"guide_stop {name} {k}", _yz_box(fr, y0, y1, za, zb), a, b)
+                pr["material"] = "foam"
+                out.append(pr)
+    lw, lh, ld = v("led_face_w"), v("led_face_h"), B.led_body_d()
+    yf, zt = v("board_y0"), v("board_z0 + board_t")
+    for i in range(1, 5):
+        pr = _prism(f"D{i}", _yz_box(fr, yf, yf + ld, zt, zt + lh), v(f"d{i}_x") - lw / 2, v(f"d{i}_x") + lw / 2)
+        pr["material"] = "LED"
+        out.append(pr)
+    pr = _prism("board", _yz_box(fr, yf, yf + v("board_d"), v("board_z0"), zt), v("board_x0"), v("board_x0 + board_w"))
+    pr["material"] = "board"
+    out.append(pr)
+    zw = [(v("wall + seal_t"), v("ledge_z0")), (v(C.yb("ledge_z0")), v("ledge_z0")), (v(C.yb("zw_z0")), v("zw_z0")),
+          (v("D - wall - clr_remove"), v("zw_z0")), (v("D - wall - clr_remove"), v("zw_z1")), (v(C.yf("zw_z1")), v("zw_z1")),
+          (v(C.yf("ledge_z1")), v("ledge_z1")), (v("wall + seal_t"), v("ledge_z1"))]
+    zx = v("boss_x - boss_d / 2 - clr_remove")
+    pr = _prism("zone_wall", [_to_st(fr, y, z) for y, z in zw], max(-zx, v("dr_x1")), zx)
+    pr["material"] = "zone wall"
+    out.append(pr)
+    pr = _prism("zone_seal", _yz_box(fr, w, v("wall + seal_t"), v("ledge_z0"), v("ledge_z1")), -v("bp_x0"), v("bp_x0"))
+    pr["material"] = "foam"
+    out.append(pr)
+    r, lx, lz = v("lsw_d") / 2, v("lsw_x"), v("lsw_z")
+    rz0, rz1, rx0 = v("slot_row1_z"), v("slot_row3_z + slot_w"), v("row_x0")
+    W2 = v("W / 2")
+    lip_pieces = [(-W2, W2, 0.0, min(rz0, lz - r)), (-W2, W2, rz1, lip), (-W2, rx0, max(rz0, lz + r), rz1) if lz + r < rz1 else None,
+                  (-W2, rx0, rz0, lz - r) if lz - r > rz0 else None, (-W2, lx - r, lz - r, lz + r), (lx + r, rx0, lz - r, lz + r)]
+    for k, q in enumerate(p for p in lip_pieces if p):
+        x0, x1, z0, z1 = q
+        if x1 > x0 and z1 > z0:
+            pr = _prism(f"lip {k}", _yz_box(fr, 0.0, w, z0, z1), x0, x1)
+            pr["material"] = "base"
+            out.append(pr)
+    for pr in out:
+        ys = [_world(fr, 0.0, a, b)[1] for a, b in pr["poly"]]
+        zs = [_world(fr, 0.0, a, b)[2] for a, b in pr["poly"]]
+        pr["bb"] = (pr["x"][0], min(ys), min(zs), pr["x"][1], max(ys), max(zs))
+    return out
+
+
+def _poly_ivs(P, Q, poly) -> list[tuple[float, float]]:
+    """The fractions of P -> Q (2-D) inside the simple polygon `poly`, as intervals."""
+    ts = [0.0, 1.0]
+    (py, pz), (qy, qz) = P, Q
+    dy, dz = qy - py, qz - pz
+    n = len(poly)
+    for i in range(n):
+        (ay, az), (by, bz) = poly[i], poly[(i + 1) % n]
+        ey, ez = by - ay, bz - az
+        den = dy * ez - dz * ey
+        if abs(den) < 1e-12:
+            continue
+        tt = ((ay - py) * ez - (az - pz) * ey) / den
+        u = ((ay - py) * dz - (az - pz) * dy) / den
+        if 0 <= tt <= 1 and -1e-12 <= u <= 1 + 1e-12:
+            ts.append(tt)
+    ts = sorted(set(ts))
+    out = []
+    for a, b in zip(ts, ts[1:]):
+        if b - a > 1e-12 and A._inside(poly, py + dy * (a + b) / 2, pz + dz * (a + b) / 2):
+            out.append((a, b))
+    return out
+
+
+def _seg_ivs(fr, p, q, pr) -> list[tuple[float, float]]:
+    """The fractions of the world segment p -> q inside the prism `pr`."""
+    bb = pr["bb"]
+    for k in range(3):
+        if max(p[k], q[k]) < bb[k] - 1e-9 or min(p[k], q[k]) > bb[k + 3] + 1e-9:
+            return []
+    xa, xb = pr["x"]
+    dx = q[0] - p[0]
+    if abs(dx) < 1e-12:
+        if not xa < p[0] < xb:
+            return []
+        f0, f1 = 0.0, 1.0
+    else:
+        a, b = (xa - p[0]) / dx, (xb - p[0]) / dx
+        f0, f1 = max(0.0, min(a, b)), min(1.0, max(a, b))
+    if f0 >= f1 - 1e-12:
+        return []
+
+    def st(f):
+        return _to_st(fr, p[1] + (q[1] - p[1]) * f, p[2] + (q[2] - p[2]) * f)
+    return [(f0 + (f1 - f0) * a, f0 + (f1 - f0) * b) for a, b in _poly_ivs(st(f0), st(f1), pr["poly"])]
+
+
+def opaque_len(fr, p, q, prisms, enough: float = math.inf) -> float:
+    """The length of p -> q inside the union of `prisms` (stops counting past `enough`)."""
+    ivs = []
+    ln = math.dist(p, q)
+    for pr in prisms:
+        ivs += _seg_ivs(fr, p, q, pr)
+    ivs.sort()
+    tot, end = 0.0, -1.0
+    for a, b in ivs:
+        if b <= end:
+            continue
+        tot += b - max(a, end)
+        end = b
+        if tot * ln >= enough:
+            break
+    return tot * ln
+
+
+def blocked(fr, p, q, prisms) -> bool:
+    return any(b - a > 1e-9 for pr in prisms for a, b in _seg_ivs(fr, p, q, pr))
+
+
+def surface_samples(s, prisms, dx: float, n_edge: int, n_side: int, skip_kinds: tuple = ()) -> list[tuple]:
+    """Points on every exposed face of `prisms` (one guide's, or both: a point counts if just outside it, along
+    the face's normal, there is no prism of the same body): each profile edge at n_edge + 1 points along it and
+    every `dx` (or finer) along x, each end face on an (n_side + 1)^2 grid inside its profile. Returns (world
+    point, world outward normal, face name)."""
+    fr = _fr(s)
+    sn, c, _ = fr
+    out = []
+    by_body: dict[str, list] = {}
+    for pr in prisms:
+        by_body.setdefault(pr.get("body", ""), []).append(pr)
+
+    def add(pr, face, x, sv, tv, n3):
+        own = by_body[pr.get("body", "")]
+        if A._in_prisms(own, (x + n3[0] * 2e-3, sv + n3[1] * 2e-3, tv + n3[2] * 2e-3)):
+            return
+        nw = (n3[0], n3[1] * sn + n3[2] * c, n3[1] * c - n3[2] * sn)
+        out.append((_world(fr, x, sv, tv), nw, face))
+    for pr in prisms:
+        poly, (xa, xb) = pr["poly"], pr["x"]
+        n = len(poly)
+        nx = max(1, math.ceil((xb - xa) / dx))
+        for i in range(n):
+            kind = pr["kinds"].get(i, f"face {i}")
+            if kind in skip_kinds:
+                continue
+            (s0, t0), (s1, t1) = poly[i], poly[(i + 1) % n]
+            ln = math.hypot(s1 - s0, t1 - t0)
+            nst = (pr["sign"] * (t1 - t0) / ln, -pr["sign"] * (s1 - s0) / ln)
+            for j in range(n_edge + 1):
+                f = j / n_edge
+                for k in range(nx + 1):
+                    add(pr, f"{pr['name']} {kind}", xa + (xb - xa) * k / nx, s0 + (s1 - s0) * f, t0 + (t1 - t0) * f, (0.0, *nst))
+        ss, ts = [q[0] for q in poly], [q[1] for q in poly]
+        for xe, sx in ((xa, -1.0), (xb, 1.0)):
+            for i in range(n_side + 1):
+                for j in range(n_side + 1):
+                    sv = min(ss) + (max(ss) - min(ss)) * i / n_side
+                    tv = min(ts) + (max(ts) - min(ts)) * j / n_side
+                    if A._inside(poly, sv, tv):
+                        add(pr, f"{pr['name']} end", xe, sv, tv, (sx, 0.0, 0.0))
+    return out
+
+
+def led_face_points(s, n: int = 4) -> list[tuple]:
+    """(LED, point) on each LED's light face, an (n + 1)^2 grid."""
+    v = s.v
+    w, h, yf, zc = v("led_face_w"), v("led_face_h"), v("board_y0"), v("led_z")
+    return [(i, (v(f"d{i}_x") - w / 2 + w * a / n, yf, zc - h / 2 + h * b / n)) for i in range(1, 5) for a in range(n + 1) for b in range(n + 1)]
+
+
+def guide_delivery(s, n_rays: int = 20000, seed: int = 1, max_bounce: int = 200) -> dict:
+    """R48 (analytic: a 3-D Monte Carlo ray trace in Python, not a print), the airQ's `airq_check.guide_delivery`
+    on the mini's guides: each guide as built (its bar and two feet) with every face bare: PETG (n 1.57) against
+    air, total internal reflection at 39.6 deg or more, else the ray leaves. Per LED (D1, D2 into
+    light_guide_co2; D3, D4 into light_guide_pm): `n_rays` Lambertian rays from its 4 x 2 face cross the
+    clr_remove gap; those that meet its foot's entry face refract in (Snell; the Fresnel transmittance is the
+    weight) and are followed until they leave. Out through the exit face (the bar's front, in the slot):
+    delivered, times the exit's Fresnel transmittance; anywhere else: lost (its partial reflection dropped:
+    conservative). Returns {leds: {Di: fraction of its emission delivered, entered, delivered, straight: the
+    delivered rays that met no face on the way}, halves: {co2, pm: lit_x, lit_x90, exit_x, bins (10 over the
+    exit), visible: the slot's x}}."""
+    import random
+    v = s.v
+    rng = random.Random(seed)
+    fr = _fr(s)
+    sn, c, lip = fr
+    crit = math.radians(A.CRIT_DEG)
+    ye, yf, zc, hh, hw = v("lg_ye"), v("board_y0"), v("led_z"), v("led_face_h") / 2, v("led_face_w") / 2
+    leds, halves = {}, {}
+    for half, ids in MF.LEDS:
+        prisms = guide_prisms(s, half)
+        bar = next(p for p in prisms if p["name"].endswith("bar"))
+        xs = []
+        for i in ids:
+            foot = next(p for p in prisms if p["name"] == f"D{i} foot")
+            (fs0, ft0), (fs1, ft1) = foot["poly"][1], foot["poly"][2]
+            win_z = sorted(lip + sv * c - tv * sn for sv, tv in ((fs0, ft0), (fs1, ft1)))
+            cx = v(f"d{i}_x")
+            w_sum, entered, hits, straight = 0.0, 0, 0, 0
+            for _ in range(n_rays):
+                r1, r2 = rng.random(), rng.random()
+                ph, sr = 2 * math.pi * r1, math.sqrt(r2)
+                d = (sr * math.cos(ph), -math.sqrt(1 - r2), sr * math.sin(ph))
+                p0 = (cx + rng.uniform(-hw, hw), yf, zc + rng.uniform(-hh, hh))
+                k = (ye - yf) / d[1]
+                q = (p0[0] + k * d[0], ye, p0[2] + k * d[2])
+                if not (foot["x"][0] <= q[0] <= foot["x"][1] and win_z[0] <= q[2] <= win_z[1]):
+                    continue
+                entered += 1
+                w = A._fresnel_t(-d[1], 1.0, A.N_PETG)
+                dx, dz = d[0] / A.N_PETG, d[2] / A.N_PETG
+                dw = (dx, -math.sqrt(max(0.0, 1 - dx * dx - dz * dz)), dz)
+                D = [dw[0], dw[1] * sn + dw[2] * c, dw[1] * c - dw[2] * sn]
+                st = _to_st(fr, q[1], q[2])
+                P = [q[0] + 1e-6 * D[0], st[0] + 1e-6 * D[1], st[1] + 1e-6 * D[2]]
+                for nref in range(max_bounce):
+                    h = A._next_exit(prisms, P, D)
+                    if h is None:
+                        break
+                    lam, nrm, kind = h
+                    P = [P[j] + lam * D[j] for j in range(3)]
+                    cosi = sum(D[j] * nrm[j] for j in range(3))
+                    if math.acos(max(-1.0, min(1.0, cosi))) < crit:
+                        if kind == "exit":
+                            w_sum += w * A._fresnel_t(cosi, A.N_PETG, 1.0)
+                            hits += 1
+                            straight += nref == 0
+                            xs.append(P[0])
+                        break
+                    D = [D[j] - 2 * cosi * nrm[j] for j in range(3)]
+                    P = [P[j] + 1e-7 * D[j] for j in range(3)]
+            leds[f"D{i}"] = {"fraction": w_sum / n_rays, "entered": entered, "delivered": hits, "straight": straight}
+        x_lo, x_hi = bar["x"]
+        bins = [0] * 10
+        for x in xs:
+            bins[min(9, int((x - x_lo) / (x_hi - x_lo) * 10))] += 1
+        xs.sort()
+        halves[half] = {"lit_x": (xs[0], xs[-1]) if xs else None,
+                        "lit_x90": (xs[int(0.05 * (len(xs) - 1))], xs[int(0.95 * (len(xs) - 1))]) if xs else None,
+                        "exit_x": (x_lo, x_hi), "bins": bins, "visible": (v(f"band_{half}_x0"), v(f"band_{half}_x1"))}
+    return {"leds": leds, "halves": halves, "rays_per_led": n_rays}
+
+
+def u4_port(s) -> tuple[float, float, float]:
+    """The MS5611's (U4's) port, as airq_check.u4_port: over its centre, 1.0 above the board's top."""
+    return A.u4_port(s)
+
+
+def ms5611_sight(s, dx: float = 0.25, n_edge: int = 40, n_side: int = 60, stop: bool = True) -> dict:
+    """R13 / R50 (arithmetic: exact straight lines against the opaque prisms, not a SolidCraft ray trace): every
+    exposed face of both guides (the bars, the feet, their side, top, bottom, end and entry faces; the exit faces
+    too), sampled every `dx` along x, n_edge + 1 points along each profile edge, an (n_side + 1)^2 grid on each
+    end. A sample counts where U4's port is in its face's outward half-space; its line to the port is unblocked
+    if it passes through none of `opaque_prisms` (the shell's wall and ribs, `guide_stop`, the LED bodies, the
+    board, the zone wall). The LED faces emit into -y and U4 is behind them. `stop` False leaves `guide_stop`
+    out, to show it is the stop that closes the guides' backs. Returns {samples, unblocked, first, by_face}."""
+    fr = _fr(s)
+    tgt = u4_port(s)
+    obst = [o for o in opaque_prisms(s, stop=stop) if o["material"] != "base"]
+    n, un, first, by = 0, 0, None, {}
+    for p, nw, face in surface_samples(s, guide_prisms(s), dx, n_edge, n_side):
+        if sum((tgt[k] - p[k]) * nw[k] for k in range(3)) <= 0:
+            continue
+        n += 1
+        r = by.setdefault(face, [0, 0])
+        r[0] += 1
+        if not blocked(fr, p, tgt, obst):
+            un += 1
+            r[1] += 1
+            first = first or tuple(round(e, 3) for e in p)
+    led_front = sum(1 for _, p in led_face_points(s) if tgt[1] - p[1] < 0)
+    return {"target": tgt, "samples": n, "unblocked": un, "first": first, "by_face": by, "led_faces_facing_u4": led_front}
+
+
+def guide_to_guide(s, dx: float = 2.0, n_edge: int = 4, n_side: int = 4) -> dict:
+    """The no-straight-path check (plan Task 4 Step 3), two ways:
+    - sampled (arithmetic): every exposed face of `light_guide_co2` against every exposed face of
+      `light_guide_pm` (`surface_samples`), each line's opaque length through `opaque_prisms` (the divider rib,
+      the face wall, `guide_stop`, the LEDs, the board): `air` counts the lines with none (a straight path of
+      air or light), `under` those under 1.2;
+    - hull (analytic, exact for every line): a line between the guides crosses the whole divider slab (x from
+      band_co2_x1 to band_pm_x0), and inside it its (s, t) is a mix of its ends', so it lies in the convex hull of
+      the guides' common profile. `hull_uncovered` counts grid points (0.02) of that hull at the divider's x that
+      no opaque profile there (rib, face wall, stop) covers: 0 means every line runs >= the gap's width (6.8) in
+      opaque material."""
+    fr = _fr(s)
+    v = s.v
+    obst = opaque_prisms(s)
+    a = surface_samples(s, guide_prisms(s, "co2"), dx, n_edge, n_side)
+    b = surface_samples(s, guide_prisms(s, "pm"), dx, n_edge, n_side)
+    air, under, least = 0, 0, math.inf
+    for p, _, _ in a:
+        for q, _, _ in b:
+            ln = opaque_len(fr, p, q, obst, enough=v("band_pm_x0 - band_co2_x1"))
+            least = min(least, ln)
+            air += ln <= 1e-9
+            under += ln < 1.2
+    pts = [pt for pr in guide_prisms(s) for pt in pr["poly"]]
+    hull = _hull(pts)
+    xm = (v("band_co2_x1") + v("band_pm_x0")) / 2
+    cover = [o["poly"] for o in obst if o["x"][0] <= xm <= o["x"][1]]
+    ss, ts = [p[0] for p in hull], [p[1] for p in hull]
+    unc, tot = 0, 0
+    g = 0.02
+    for i in range(int((max(ss) - min(ss)) / g) + 1):
+        for j in range(int((max(ts) - min(ts)) / g) + 1):
+            sv, tv = min(ss) + i * g, min(ts) + j * g
+            if A._inside(hull, sv, tv):
+                tot += 1
+                unc += not any(A._inside(poly, sv, tv) for poly in cover)
+    return {"lines": len(a) * len(b), "air": air, "under_1_2": under, "least": least, "hull_points": tot, "hull_uncovered": unc,
+            "slab": v("band_pm_x0 - band_co2_x1"), "covers": [o["name"] for o in obst if o["x"][0] <= xm <= o["x"][1]]}
+
+
+def _hull(pts) -> list[tuple[float, float]]:
+    pts = sorted(set(pts))
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+    lo, hi = [], []
+    for p in pts:
+        while len(lo) >= 2 and cross(lo[-2], lo[-1], p) <= 0:
+            lo.pop()
+        lo.append(p)
+    for p in reversed(pts):
+        while len(hi) >= 2 and cross(hi[-2], hi[-1], p) <= 0:
+            hi.pop()
+        hi.append(p)
+    return lo[:-1] + hi[:-1]
+
+
+def gap_dark(s, dx: float = 1.0, n_edge: int = 6, n_side: int = 6, edge: float = 1.2) -> dict:
+    """The visible gap between the halves (arithmetic): the least opaque length from any face of either guide
+    (`surface_samples`, the exits included) to points on the gap's outer face (t = 0, the slot's height, x from
+    `edge` inside each slot's end), through `opaque_prisms`. Within `edge` of a slot's end the wall's own end face
+    is thinner than that: the dark part of the gap is its width less 2 x edge."""
+    fr = _fr(s)
+    v = s.v
+    obst = opaque_prisms(s)
+    x0, x1 = v("band_co2_x1") + edge, v("band_pm_x0") - edge
+    tg = [_world(fr, x0 + (x1 - x0) * i / 6, sv, 0.0) for i in range(7) for sv in (v("band_f0 - lip"), v("band_f0 / 2 + band_f1 / 2 - lip"), v("band_f1 - lip"))]
+    least = math.inf
+    for p, _, _ in surface_samples(s, guide_prisms(s), dx, n_edge, n_side):
+        for q in tg:
+            least = min(least, opaque_len(fr, p, q, obst, enough=least))
+    return {"least": least, "dark_x": (x0, x1), "dark_w": x1 - x0}
+
+
+def light_paths(s, dx: float = 1.0, n_edge: int = 6, n_side: int = 6) -> dict:
+    """Review focus 3 (arithmetic: exact straight lines through the opaque prisms, not a ray trace): the least
+    opaque length along any straight line from a guide's surface (every exposed face, the exit included) or a
+    LED face (all four) to:
+    - `sensor`: the tongue's VEML7700 window (its centre and 0.5 round it);
+    - `lip_window`: the light-sensor window's outer face (its disc);
+    - `crease_front`: the crease's open front (y 0, z lip ... lip + clr_remove) along the band's length.
+    Counted opaque: the shell's face wall and ribs, `guide_stop`, the LEDs, the board, the zone wall (ledge,
+    slant, flat part), `zone_seal` (black foam) and the lip; the crease's 0.2 parting line counts as air.
+    Returns {target: (length, (source, target))}."""
+    fr = _fr(s)
+    v = s.v
+    obst = opaque_prisms(s)
+    src = [p for p, _, _ in surface_samples(s, guide_prisms(s), dx, n_edge, n_side)] + [p for _, p in led_face_points(s)]
+    vx, vy, vz = v("veml_wx"), v("veml_wy"), v("veml_wz")
+    r, lx, lz = v("lsw_d") / 2, v("lsw_x"), v("lsw_z")
+    lip, cr = v("lip"), v("clr_remove")
+    targets = {
+        "sensor": [(vx, vy, vz)] + [(vx, vy + dy, vz + dz) for dy, dz in ((0.5, 0), (-0.5, 0), (0, 0.5), (0, -0.5))],
+        "lip_window": [(lx, 0.0, lz)] + [(lx + r * 0.95 * math.cos(a), 0.0, lz + r * 0.95 * math.sin(a)) for a in [k * math.pi / 4 for k in range(8)]],
+        "crease_front": [(x, 0.005, lip + z) for x in (v("stop_x0"), v("band_co2_x0"), v("label_co2_x"), 0.0, v("label_pm_x"), v("band_pm_x1"),
+                                                        v("stop_x1")) for z in (0.01, cr / 2, cr - 0.01)],
+    }
+    out = {}
+    for name, ts in targets.items():
+        best = (math.inf, None)
+        for p in src:
+            for q in ts:
+                ln = opaque_len(fr, p, q, obst, enough=best[0])
+                if ln < best[0]:
+                    best = (ln, (tuple(round(e, 3) for e in p), tuple(round(e, 3) for e in q)))
+        out[name] = best
+    return out
+
+
+def walls(s) -> dict:
+    """The opaque walls' thicknesses (arithmetic): the divider (the visible gap, a rib of the shell), the end
+    ribs, `guide_stop`, the face between the PM2.5 half and the flexure's slot."""
+    v = s.v
+    return {"divider": v("band_pm_x0 - band_co2_x1"), "end_ribs": v("end_rib_t"), "guide_stop": v("stop_t"),
+            "pm_to_flexure": v("flex_x0 - flex_slot - band_pm_x1"), "visible_gap": v("band_gap")}
+
+
 if __name__ == "__main__":
     if "--run" in sys.argv:
         r = run()
@@ -365,9 +984,17 @@ if __name__ == "__main__":
         print("touch:", {f"{a}/{b}": round(x, 4) for (a, b), x in A.touch_volumes(r["touch"], TOUCHES).items()})
         print("passage near:", r["passage_near"])
         print("passage:", {k: round(x, 1) for k, x in passage_sections(s, r["passage"]).items()})
-        for b in r["measure"]["bodies"]:
-            if not b["name"].startswith(("ko_", "air_", "sweep_", "shell_up", "cl_")) and ":" not in b["name"]:
-                pass
+        print("face:", [(p["a"], p["b"], round(p["volume_mm3"], 3)) for p in r["face"]["interferences"]])
+        print("openings:", {k: tuple(round(x, 2) for x in val) for k, val in opening_areas(s, r["openings"]).items()})
+        d = guide_delivery(s)
+        print("delivery:", {k: round(x["fraction"] * 100, 2) for k, x in d["leds"].items()},
+              {h: [round(e, 2) for e in x["lit_x"]] for h, x in d["halves"].items()})
+        print("guide to guide:", guide_to_guide(s))
+        print("gap:", gap_dark(s))
+        sight = ms5611_sight(s)
+        print("R13:", sight["samples"], "samples,", sight["unblocked"], "unblocked")
+        print("light paths:", {k: round(x[0], 2) for k, x in light_paths(s).items()})
+        print("walls:", walls(s))
     else:
         for k, x in distances().items():
             print(k, round(x, 2))

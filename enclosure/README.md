@@ -42,7 +42,8 @@ with Task 5b. The print-test coupons (Task 2) are below.
 | `src/board_sources.py` | Board positions read from their sources (R27): `interface.yaml` values and comment sizes, and `layout.yaml` placements with footprint courtyards (U2, U4) |
 | `airq.sc` | The airQ enclosure design (committed) |
 | `src/airq_mini.py` | The airQ mini's generator: `airq-mini.sc` (the airQ's construction, the sensor zone mirrored) |
-| `src/airq_mini_check.py` | The airQ mini's check design, on `airq_check`'s helpers: references, keep-outs, probes, sweeps, passage slabs |
+| `src/airq_mini_face.py` | The airQ mini's face (Task 4b): the split light band (slots, two guides, ribs, `guide_stop`) and the labels |
+| `src/airq_mini_check.py` | The airQ mini's check design, on `airq_check`'s helpers: references, keep-outs, probes, sweeps, passage slabs; the band's light checks (delivery trace, no path between the guides, R13, opaque paths) |
 | `airq-mini.sc` | The airQ mini enclosure design (committed) |
 | `src/layout_study.py` | The layout studies' section arithmetic for both models (pure Python; `tests/enclosure/test_layout_study.py`) |
 | `coupons.sc` | The coupons design, built from `src/coupons.py` (committed) |
@@ -1102,8 +1103,9 @@ envelope that keeps every rule. `src/airq_mini.py` builds `airq-mini.sc` on the 
 construction: the shell (face, top, sides, printed face down), the base U (floor, lip, rear wall
 and the sealed sensor tub), the zone wall, the board above the standing SEN66 and the seals. The
 sensor zone is the airQ's mirrored: `enclosure_common` builds it with `hand` +1. Task 4a built the
-body and internals. Task 4b adds the split light band, the labels, the light-sensor window, the dot
-and flexure, the openings and the rest of the check table, on the positions named here.
+body and internals. Task 4b added the split light band, the labels, the light-sensor window, the dot
+and flexure, the openings and the rest of the check table, on the positions 4a named ("Face and
+openings (Task 4b)" below). Nothing is exported yet (Task 5b).
 
 Build it with `uv run --with pyyaml python enclosure/build.py airq-mini`, and check it with
 `uv run --with pyyaml python enclosure/src/airq_mini_check.py --run`.
@@ -1186,12 +1188,78 @@ Build it with `uv run --with pyyaml python enclosure/build.py airq-mini`, and ch
 - **Felt feet are ⌀7.5, not the airQ's ⌀10.** They cover the ⌀4.4 heads and stay inside the side
   and front faces. The airQ's ⌀10 overhang is its deferred R35 minor.
 
+### Face and openings (Task 4b)
+
+`src/airq_mini_face.py` builds the band and the labels; `airq_mini.openings` cuts the openings; the
+dot and flexure are the airQ's (`airq_face.flex_params`, `flexure`, `orange_dot`) on the mini's SW1.
+
+**The split light band.** In the mini the LEDs stand level with the band, 3.1 mm behind the face
+wall's inner face (4a's `led_f` carries their light centre horizontally to the face), so each guide is
+a short clear block with a straight path from each LED to its exit:
+
+| Part | What | Fits |
+|---|---|---|
+| Band slots | through the face wall, perpendicular to it: CO₂ x −22.35 … −1.85, PM2.5 x 4.95 … 25.45, 20.5 long, 2.0 high along the slope (z ≈ 32.7 … 34.5 on the face) | `band_*` (4a; `band_half` 20.5, a judgement call below) |
+| `light_guide_co2`, `light_guide_pm` | clear PETG, three prisms each: the **bar** (the tongue in its slot, exit face 0.3 behind the face; the flange behind the wall that stops it going out the front; the body back to y 10.46) and two **feet** that reach back from the bar to the entry faces at y 11.71, in front of their LEDs (D1, D2 / D3, D4), inside each LED face's outline (0.6 in from its −x edge, 0.2 from its +x edge, 0.2 from its top and bottom) | tongue `clr_align` in the slot (sides and ends); flange `clr_align` behind the wall; bar `clr_align` in front of `guide_stop`; feet `clr_align` in the stop's windows; entry faces `clr_remove` + 0.1 in front of the LEDs. Every face bare: no coat, no cladding, no adhesive |
+| Band ribs (shell) | the **divider** fills the visible gap (6.8 between the slots) from inside the face wall back to the stop, z 31.08 up to the wall; an **end rib** (1.2) beyond each half's outer end | joined to the shell; 0.38 over the zone wall's top, 1.4 in front of the board's edge |
+| `guide_stop` | black closed-cell foam, adhesive, die-cut (bought): 50.2 × 3.9 × 1.2, y 10.61 … 11.81, stuck on the three ribs' back faces, four windows round the feet | its back face `clr_remove` in front of the board's edge, the LEDs and J7 |
+
+Retention: each guide is caught between the face wall (its flange) and `guide_stop` (its bar's back),
+`clr_align` each way, and between the ribs in x. Assembly: shell face down, drop each guide into its
+slot, press the stop onto the ribs over the feet.
+
+**Labels** (`label_debossing`): "CO₂" under the left half and "PM2.5" under the right, debossed 0.4,
+5 mm tall (the Task 2 coupon's legible size), on the face at f 27.88 … 32.88. The font's own subscript
+₂ is 0.58 of the cap height (strokes about 0.40, at the 0.4 nozzle's limit), so the subscript is a plain
+3.5 mm "2" (strokes about 0.48), its baseline 1.0 under the label's.
+
+**Dot and flexure.** The orange dot (⌀4, an AMS colour region) at x 29.75 on SW1's push axis (z 34.3),
+top right of the PM2.5 half. The beam is the face wall's 1.0 skin, 4.9 wide (the coupon's), 14.5 long from its root to past the
+dot, cut free by a 0.5 U slot; a ⌀2.4 rod from its inner face ends 0.10 in front of SW1's actuator and
+bottoms on SW1's body after 0.34 of travel: 0.04 after the switch has bottomed, so the switch's body is
+the hard stop (no printed stop gap). Face down, the rod stands 24° off the vertical and the beam is the first layers.
+
+**Openings** (all in `base_plate` but the shell's band slots and U slot):
+
+| Opening | Where | Open area (mm²) | Lowest edge z | Source |
+|---|---|---|---|---|
+| Intake rows | lip, 3 rows × 4 slots 10.98 × 1.2, z 10.0 … 16.0 under the ledge (16.8), x −22.55 … 24.95 | 158.04 (all facing free air, 2.32 deep to the SEN66 cable's bend) | 10.0 | `airq_mini.py` `openings` |
+| Light-sensor window | lip, ⌀2.0 at x −24.75, z 14.0, left of the rows, in front of the VEML7700 (about 30° off its axis) | 3.14 | 13.0 | 4a's `lsw_*` |
+| Outlet grille | lower rear wall, 24 slots 1.2 × 17.3, x −29.15 … 27.25, z 10.0 … 27.3, behind the plenum plate | 498.24 (R18 shortfall: < 660.1, > the 296 floor; owner item) | 10.0 | 4a's `out_*` |
+| Upper-rear exhaust | 13 slots 1.2 × 7.3, x −2.8 … 27.2, z 31.7 … 39.0, over the zone wall | 113.88 drawn; 84.0 face free air (the six slots over the antenna strip face it 0.2 away below z 35.85) | 31.7 | 4a's `exh_*` |
+| USB-C opening | rear wall, 12.9 × 7.4 on J1's axis (x −11.05, z 34.18), 0.5 chamfer outside; H1's post is the support boss (7.73 from J1's centre) | – | 30.48 | 4a's `usb_*` |
+| Band slots (shell) | see above | 41.0 each | 31.96 (inner edge) | `airq_mini_face.band_slots` |
+| Flexure U slot (shell) | x 26.8 … 32.7 round the beam | – | 22.6 (inner edge) | `airq_face.flexure` |
+
+### Judgement calls (Task 4b)
+
+- **Judgement call: each guide is a bar with two feet, behind a black foam stop.** The LEDs face the
+  band's line from 3.1 mm behind the wall, so a block fills the path, but its back would see the
+  MS5611 (U4, 22 mm behind the LEDs at their height) over the board everywhere but in front of the
+  LEDs. Only the feet, inside each LED face's outline, reach the entry plane; the bar's back and the
+  feet's sides are behind `guide_stop` (R13; without it 4,251 of 24,125 samples would see U4).
+- **Judgement call: the stop is bought foam, not a rib of the shell.** A printed back wall would sit
+  between the guide and its slot on the way in. Foam stuck on the ribs after the guides are in place
+  also retains them (no adhesive on a guide, no cladding).
+- **Judgement call: the feet's entry faces 0.1 in front of the stop's back face (`lg_ein`).** Coplanar,
+  a line between the two halves' feet could run along the stop's back face, behind the divider.
+- **Judgement call: `band_half` 20.5, not 21.** At 21 the PM2.5 half's end rib would run 0.1 into the
+  flexure's U slot and the face between them would be 1.1 (< 1.2 opaque). At 20.5 both halves stay
+  centred on their LEDs: rib 0.15 clear of the slot, 1.35 of face.
+- **Judgement call: the CO₂ label's subscript is a separate 3.5 mm "2"** (above).
+- **Judgement call: the exhaust keeps 4a's positions** (z 31.7 … 39.0). The six slots over the
+  antenna strip face it 0.2 away below z 35.85; the table counts only the 84.0 mm² facing free air.
+
 ### Bodies
 
 | Body | Material | Volume (mm³) | Box min (x, y, z) | Box max (x, y, z) |
 |---|---|---|---|---|
-| shell | PETG / ASA | 14324.4 | −34.75, 0.09, 2.00 | 34.75, 50.00, 42.00 |
-| base_plate | PETG / ASA | 21433.6 | −34.75, 0.00, 0.00 | 34.75, 50.00, 40.00 |
+| shell | PETG / ASA (warm white) | 14157.0 | −34.75, 0.09, 2.00 | 34.75, 50.00, 42.00 |
+| orange_dot | PETG, orange (AMS region of the shell's job) | 7.5 | 27.75, 6.44, 32.23 | 31.75, 8.62, 36.13 |
+| light_guide_co2 | PETG, clear / natural | 172.0 | −22.20, 6.87, 31.48 | −2.00, 11.71, 34.60 |
+| light_guide_pm | PETG, clear / natural | 172.0 | 5.10, 6.87, 31.48 | 25.30, 11.71, 34.60 |
+| guide_stop | black closed-cell foam (bought) | 204.1 | −23.55, 10.61, 31.08 | 26.65, 11.81, 35.00 |
+| base_plate | PETG / ASA | 19865.8 | −34.75, 0.00, 0.00 | 34.75, 50.00, 40.00 |
 | zone_wall | PETG / ASA | 5942.7 | −32.75, 2.19, 16.80 | 32.75, 48.00, 31.00 |
 | tongue_mount | PETG | 39.4 | −32.15, 21.00, 4.35 | −27.00, 25.60, 8.95 |
 | gasket_out | TPU 95A | 424.1 | 6.15, 32.46, 3.80 | 30.15, 36.46, 27.80 |
@@ -1208,62 +1276,54 @@ squeeze to 0.
 
 ### Check table (airQ mini)
 
-Task 4a started this table, and 4b completes it with the openings, the band, the window, the dot
-and the no-straight-path check.
+Task 4a started this table; Task 4b completed it with the openings, the band, the window, the dot and
+the no-straight-path check. "How" says how each value was got: **measured** on the geometry (the check
+design, `airq_mini_check --run`), **analytic** (a model of the physics in Python, not a print) or
+**arithmetic** (from the parameters, or exact lines against the parts' prisms in Python).
 
 | Check | Rule | Value | How | Result |
 |---|---|---|---|---|
-| Bounding box | 69.5 × 50 × 42 (R51) | 69.50 × 50.00 × 42.00 | **measured**: `measure`, union of the bodies (`test_build_and_bounding_box`) | pass |
-| Interference with every `ref_*` | 0 (R9) | 0 pairs; 375 bodies (`ref_sen66`, `ref_tongue`, `ref_main` with its 308, the keep-outs, the air probes, the sweeps), 0 unchecked | **measured**: `inspect.interference` at every squeeze 0 (`test_no_interference_with_the_references`) | pass |
-| Shell's way on (I1) | lowers along −z | boss columns swept, shell raised 1–32 mm: 0 | **measured** (`sweep_*`, `shell_up_*`) | pass |
-| Shell clearance (N1) | `clr_remove` off the datums | nudged 0.05: forward, sideways, up 0; back 6.84 mm³ only at y 48.20–48.25 (rear wall); down 10.03 mm³ only at z 1.95–2.00 (floor) | **measured** (`test_shell_nudged_meets_the_base_only_on_its_datums`) | pass |
-| Seals touch (R9) | zero gap, zero overlap | at 0.05: ring 5.30, wiper 1.75, wiper root 5.51, ledge seal 3.14, pad 5.00, top seal 3.62, grommets 0.33 / 0.96 (zone wall), 0.63 (rail) mm³ | **measured**: squeeze 0, then 0.05 (`test_seals_touch_what_they_seal`) | pass |
+| Bounding box | 69.5 × 50 × 42 (R51) | 69.50 × 50.00 × 42.00, 16 bodies | **measured**: `measure`, union of the bodies (`test_build_and_bounding_box`) | pass |
+| Interference with every `ref_*` | 0 (R9) | 0 pairs; 413 bodies (`ref_sen66`, `ref_tongue`, `ref_main` with its 308, the guides, the stop, the keep-outs, the air probes incl. those behind the openings, the sweeps), 0 unchecked | **measured**: `inspect.interference` at every squeeze 0 (`test_no_interference_with_the_references`) | pass |
+| Shell's way on (I1) | lowers along −z | boss columns swept; the shell, both guides and `guide_stop` raised 1–32 mm: 0 | **measured** (`sweep_*`, `shell_up_*`, `gco2_up_*`, `gpm_up_*`, `gstop_up_*`) | pass |
+| Shell clearance (N1, review focus 1) | `clr_remove` off the datums | nudged 0.05: forward, sideways, up 0; back 6.84 mm³ only at y 48.20–48.25 (rear wall); down 10.03 mm³ only at z 1.95–2.00 (floor) | **measured** (`test_shell_nudged_meets_the_base_only_on_its_datums`) | pass |
+| Seals touch (R9, review focus 2) | zero gap, zero overlap | at 0.05: ring 5.30, wiper 1.75, wiper root 5.51, ledge seal 3.14, pad 5.00, top seal 3.62, grommets 0.33 / 0.96 (zone wall), 0.63 (rail) mm³ | **measured**: squeeze 0, then 0.05 (`test_seals_touch_what_they_seal`) | pass |
 | Port groups sealed (I3) | inlets apart from the outlet and the case | ring round the outlet into the plate; wiper between the inlets and the ring; top seal over the module at the wiper's tip; sensor tub one print, the zone wall lapped on it, the ledge sealed to the lip | **measured** (touch run); the closure **analytic** (the airQ's construction, one print for the tub) | pass |
 | SEN66 depth extremes (I3(b)) | 21.3 ± 0.5 held, nothing but the pad met | 21.8 front (plinth, block, plug, bend) meets only the pad, 1.90 deep; 20.8 still meets it, 0.90 | **measured**: `ext_*` probes (`test_sen66_at_its_depth_extremes`) | pass |
 | Intake path (R25) | ≥ 77.3 | port gap 80.7; in front of the module, over its cable 101.6; passage mouth beside the cable's drop 89.6 | **measured**: free probes (`test_air_paths_are_free_sections`) | pass |
 | Passage with the tongue in it (R25) | ≥ 77.3 | at the VEML7700 125.4, middle 144.5, pin 126.6, socket 129.9, plug 145.2, Qwiic turn **107.8**, left stop 112.7 | **measured**: 0.5 mm slabs across the passage against the tongue's STEP, its pin and the cables' keep-outs (`test_passage_keeps_r25_with_the_real_tongue_in_it`) | pass. As an envelope (4.6 × 22, collar, cable) it is 69.1 on paper (**arithmetic**); the real board is sparse |
 | Outlet path (R25) | ring ≥ 330.1; branches ≥ their share | ring 346.4; plenum left of the ring 297.1 ≥ 192.6; behind H1 166.7 ≥ 41.3 | **measured** probes; shares **arithmetic** (slots left of the cut) | pass |
+| R18 intake | ≥ 154.5, only slots facing free air | **158.04** (12 slots 10.98 × 1.2, three rows z 10.0 … 16.0); the air behind every slot is free to 0.1 in front of the SEN66 cable bend's keep-out (2.32 deep; probe `air_slots_front` 0) | **measured**: `op_intake` (probe volume − overlap) / wall (`test_openings_measured_open_areas`) | pass (margin 3.5) |
+| R18 outlet | ≥ 660.1 (floor 296) | **498.24** (24 slots × 1.2 × 17.3); the air behind it free (`air_outlet_grille`) | **measured**: `op_outlet` | owner item (R18 shortfall, as the study) |
+| Light-sensor window | in front of the VEML7700, a free line to it | ⌀2.0 at x −24.75, z 14.0; open 3.14; 12 free boxes along its line to the VEML7700's window (`air_lsw_*`), which passes under the ledge (z 15.5 at its front face, ledge 16.8), right of the boss pocket; about 30° off the sensor's axis | **measured** (`op_lsw`, `air_lsw_*`); the line's height **arithmetic** (`test_labels_and_light_sensor_window`) | pass; lux to calibrate on the prototype |
+| Upper-rear exhaust | over the zone wall, apart from the outlet (R26), facing free air | 13 slots 1.2 × 7.3, z 31.7 … 39.0: 113.88 drawn, **84.0** facing free air (`air_exhaust_left`, `air_exhaust_top`: 0); 4.4 above the outlet's top | **measured** (`op_exhaust`, air probes) | pass |
+| USB-C opening (review focus 5) | on J1's axis, passes the overmold, 0.5 chamfer, support boss | 12.9 × 7.4 on x −11.05, z 34.18; the probe 0.05 under it meets nothing, the one 0.05 over meets the 2.550 mm³ ring; the chamfer leaves 5.408 mm³ against 5.414 for the frustum; J1's axis free (`air_usb_axis`); H1's post (the support boss) 7.73 from J1's centre | **measured**: `usb_in`, `usb_out`, `usb_cham` (`test_usb_opening_fit_and_chamfer`); H1 **arithmetic** | pass; overmold size to confirm |
+| 10 mm rule (review focus 4) | every opening's lower edge ≥ 10, feet not counted, shell openings included | intake 10.0, window 13.0, outlet 10.0, exhaust 31.7, USB-C 30.48; the shell's band slots 31.96 and the flexure's U slot 22.6 (inner edges). Slabs z 0 … 10 over the lip, the rear wall, both rails and both shell side walls are all material (the left rail less the tongue pin's blind hole, 1.0 deep, 0.6 of rail behind it) | **measured**: `low_*` probes (`test_nothing_opens_below_the_10_mm_line`); the edges **arithmetic** (`test_openings_are_cut_where_the_parameters_say`, `test_dot_and_flexure_on_sw1s_axis`) | pass |
+| Intake to outlet (review focus 2) | ≥ 20, different faces | **46.4** between the intake's and the outlet's inner faces; intake in the lip (front, −y), outlet and exhaust in the rear wall (+y) | **measured**: `inspect.clearance` between the opening probes (`test_intake_and_outlet_apart`) | pass |
 | R12 antenna to SEN66 | ≥ 15 (maximise) | **10.35** | **measured**: `inspect.clearance` | owner item (RSSI on the prototype) |
 | R12 antenna to USB plug, inserts, screws | ≥ 15 | 18.55, 41.25, 21.6 | **measured** | pass |
 | Tongue to U3 / U2 | ≥ 20 | 39.27 / 24.18 | **measured** | pass |
 | Tongue in the intake air | in the intake stream | in the passage, which every inlet draws through | **analytic**: the passage is the only way from the slots to the port gap (the study) | pass |
-| R18 intake | ≥ 154.5 | 158.0 (3 rows × 4 × 10.98 × 1.2) | **arithmetic** (4b cuts and measures) | pass (margin 3.5) |
-| R18 outlet | ≥ 660.1 (floor 296) | **498.2** (24 × 1.2 × 17.3) | **arithmetic** (4b cuts and measures) | owner item (R18 shortfall, as the study) |
-| Intake to outlet | ≥ 20, different faces | lip (front) and rear wall: 50 apart | **arithmetic** | pass |
-| 10 mm rule | no opening below z 10 | rows from 10.0, window from 13.0, outlet from 10.0, exhaust from 31.7 | **arithmetic** (positions; 4b measures) | pass |
+| Split band | two halves about 21, gap ≥ 4, opaque wall ≥ 1.2 | 20.5 each (CO₂ over D1/D2, PM2.5 over D3/D4, centred); visible gap 6.8, filled by the divider rib (6.8); end ribs 1.2; `guide_stop` 1.2; 1.35 of face between the PM2.5 slot and the flexure's slot | slots **measured** (`fp_slot_*` open, `fp_ring_*` 3.842 mm³ each = the slot's exact size); walls **arithmetic** (`test_opaque_walls`) | pass |
+| No straight path between the guides | no line of air or light from one guide to the other | sampled: 326,041 lines from every exposed face of `light_guide_co2` to every exposed face of `light_guide_pm`: 0 in air, the least through **6.80** of opaque (the divider's width). Exact: the convex hull of the guides' profile (30,655 points at 0.02) lies wholly inside the rib, the face wall and the stop over the whole divider gap, so every line crosses ≥ 6.8 of opaque | **arithmetic**: exact straight lines against the parts' prisms (`guide_to_guide`, `test_no_straight_path_between_the_guides`) | pass |
+| The gap stays dark | ≥ 1.2 of opaque from either guide to the gap's face | ≥ **1.20** from every guide face to the gap's outer face over its middle 4.4 (all but 1.2 at each slot's end, where the slot's own end wall is the light's way) | **arithmetic** (`gap_dark`, `test_visible_gap_stays_dark`) | pass (dark 4.4 ≥ 4) |
+| Light delivery (R40, R48) | each LED ≥ 3 % to its exit, every face bare | D1 **10.68 %**, D2 **10.37 %**, D3 **10.64 %**, D4 **10.53 %** of their emission; about half of the delivered rays straight (no reflection). Lit x: CO₂ −18.44 … −5.47 (middle 90 % −16.27 … −7.49) of the visible −22.35 … −1.85; PM2.5 9.13 … 21.75 (90 %: 10.91 … 19.87) of 4.95 … 25.45: the halves' last ≈ 4 mm at each end get no direct light | **analytic**: 3-D Monte Carlo ray trace of each guide's three prisms as built, 20 000 Lambertian rays per LED, Snell and Fresnel at the entry and the exit, TIR at 39.6° on every face, the rest lost (`guide_delivery`, `test_guides_deliver_light_with_every_face_bare`); not a print | pass; the dim ends and the evenness: owner print item |
+| No cladding on light-path faces (R40, R48) | no coat, no optical contact | every guide face bare; the nearest solids `clr_align` away (wall, slot, ribs, stop), the LEDs `clr_remove` + 0.1 | **arithmetic** (`test_guide_fits_come_from_the_clearances`) | pass |
+| Opaque walls to the light sensor (review focus 3) | ≥ 1.2 of opaque from any guide face or LED face to the VEML7700, its window and the crease | sensor **1.92** (through the zone wall), the window's outer face **3.30**, the crease's front **6.44**; counted: the lip, the zone wall (ledge, slant, flat part), `zone_seal` (foam), the shell's wall (less the labels' 0.4) and ribs, `guide_stop`; the crease's 0.2 parting line as air | **arithmetic**: exact straight lines against the parts' prisms (`light_paths`, `test_light_stays_off_the_sensor_its_window_and_the_crease`); not a ray trace | pass |
+| MS5611 line of sight (R13, R50) | no straight line from a LED or guide face to U4 | 0 of **24,125** samples on every exposed face of both guides whose outward half-space holds U4's port (bars, feet, sides, ends, entry faces; every 0.25 along x, 41 along each profile edge, a 61 × 61 grid on each end) reach it: the LED bodies, the board, the ribs and `guide_stop` stop them. Without `guide_stop` 4,251 would. The LED faces emit away from U4 | **arithmetic** (`ms5611_sight`, `test_ms5611_sees_no_led_or_guide`) | pass |
+| Labels | "CO₂" and "PM2.5", 0.4 deep, ≥ 5 tall | 5.0 tall, the subscript 3.5; debossed exactly 0.4 (the 0.05 under them is all shell); letters 19.4 / 32.9 mm² | **measured**: `fp_label_*` probes (`test_face_probes`) | pass |
+| Dot and flexure | on SW1's axis, stop on SW1's body, printable face down | dot at x 29.75, z 34.3 (SW1's actuator); beam the 1.0 skin (`fp_beam` 3.9 mm³ = 3.9 × 1 × 1.0); rod end 0.10 in front of the actuator (`fp_pad_end` 0.1, `fp_pad_gap` 0); stop 0.34, 0.04 past the switch's travel; rod 24° off vertical face down | **measured** probes; the stop **arithmetic** (`test_dot_and_flexure_on_sw1s_axis`) | pass; feel at the first print (R43) |
 | Plug room | 5.0 envelope | J2 5.85, J4 6.14 | **arithmetic**; plug keep-outs **measured** clear of `ref_main` | pass |
 | Cables installable with plugs on | split grommets, open-edge drawer | drawer open to the zone wall's left end: way out 0 | **measured**: `edge_drawer` (`test_drawer_opens_to_the_side`) | pass |
 | H2 screw | does not open the zone | blind pilot 1.6 in pad + wall, 0.5 left | **arithmetic** (`test_h2_lies_over_the_sen66_so_it_has_no_post`) | pass |
-| USB-C support boss | within 8 mm | H1 7.73 from the USB-C's centre | **arithmetic** | pass |
-| Rebuild (`check_parameters`) | `wall` 1.6 / 2.4, `clr_*` ±0.1 | no errors or warnings, 12 bodies, volume back to the default each time | **measured**: `parameters.change` walk (`test_rebuilds_over_wall_and_clearances`) | pass (rebuild) |
-| … at those states | the rules keep | intake 159.5 / **153.7** (wall 1.6 / 2.4), 158.8 / 157.3 (`clr_remove` 0.1 / 0.3); passage 7.3 / **5.7** (≈ 75 mm² at the Qwiic turn at wall 2.4); J2 room 6.25 / **4.65**; collar 2.2 / 0.6 | **arithmetic** from the parameters | wall 2.4 loses the intake, passage and J2 margins (owner item, as the airQ's intake at wall 2.4) |
+| Clearances are parameters (review focus 1) | every fit a `clr_*` parameter | the guides' fits `clr_align` / `clr_remove` (no literal gap but `lg_ein` 0.1, a sight-line choice); the stop and ribs `clr_remove` off the board, J7 and the zone wall | **arithmetic** (`test_guide_fits_come_from_the_clearances`) | pass |
+| Rebuild (`check_parameters`) | `wall` 1.6 / 2.4, `clr_*` ±0.1 | no errors or warnings, 16 bodies, volume back to the default each time | **measured**: `parameters.change` walk (`test_rebuilds_over_wall_and_clearances`) | pass (rebuild) |
+| … at those states | the rules keep | intake 159.5 / **153.7** (wall 1.6 / 2.4), 158.8 / 157.3 (`clr_remove` 0.1 / 0.3); passage 7.3 / **5.7** (≈ 75 mm² at the Qwiic turn at wall 2.4); J2 room 6.25 / **4.65**; collar 2.2 / 0.6; at wall 2.4 the band's slot is 0.6 deeper and the LEDs 0.6 nearer (the board follows the rear wall), so the guide's bar tops out at z 33.65 (0.95 under the LEDs' top, `lg_z1`) and the ribs sit `clr_remove` over the zone wall (`rib_z0`); `guide_stop` keeps 1.2 | **arithmetic** from the parameters | wall 2.4 loses the intake, passage and J2 margins (owner item, as the airQ's intake at wall 2.4) |
 | Felt feet | cover the heads, stay on the face | ⌀7.5 at the front screws, 2.0 thick over 1.2 of head | **arithmetic** (`test_feet_cover_the_screw_heads`) | pass (feet to confirm) |
-
-### What Task 4b does here
-
-- **Cut the openings** at the named positions:
-  - the intake rows (`slot_row1_z` … `slot_row3_z`, `row_x0`/`row_x1`, `in_n`);
-  - the light-sensor window (`lsw_*`), checking its line to the VEML7700 (`veml_w*`) under the
-    ledge;
-  - the outlet grille (`out_*`);
-  - the upper-rear exhaust (`exh_*`, over the zone wall);
-  - the USB-C opening (`usb_*`).
-
-  Then measure each one, as the airQ's 3b-2 did.
-- **Build the split band** over D1/D2 (CO₂) and D3/D4 (PM2.5) (`band_*`, `div_x*`, `led_f`):
-  - the two guides, with the opaque divider between them (`divider_t`);
-  - the no-straight-path check;
-  - the labels (`label_*`);
-  - the dot and flexure on SW1's axis (`sw_*`, `dot_*`).
-
-  The LED faces' top corner is 4.22 behind the slope's outer surface (`front_t_need`), 2.4
-  behind its inner face.
-- **R13 (MS5611)** against the band.
-- **Complete this table.**
 
 ## Print and assembly guide (airQ)
 
-For one airQ (95 × 55 × 51 mm). The airQ mini gets its own section here when its envelope is decided.
+For one airQ (95 × 55 × 51 mm). The airQ mini (69.5 × 50 × 42, R51) gets its own section with its exports (Task 5b).
 Everything below comes from the design and its checks. **Nothing has been printed yet**: the owner's
 test print (section 6) is the next step.
 

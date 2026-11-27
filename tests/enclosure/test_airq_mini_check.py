@@ -1,4 +1,9 @@
-"""The airQ mini check design (Task 4a): enclosure/src/airq_mini_check.py on enclosure/airq-mini.sc.
+"""The airQ mini check design (Tasks 4a, 4b): enclosure/src/airq_mini_check.py on enclosure/airq-mini.sc.
+
+Task 4b adds fast analytic tests of the band's light (the 3-D delivery trace with every face bare, the
+no-straight-path check between the guides, the dark gap, R13 against U4, the opaque paths to the light
+sensor, its window and the crease) and SolidCraft tests of the face (band slots, labels, flexure) and the
+openings (open areas, the 10 mm rule, the USB-C fit, the grilles' distance).
 
 Fast tests: the check design's placements and probes follow the design's parameters. SolidCraft
 tests (skipped without solidcraft-cli): interference 0 with every reference (ref_main included),
@@ -38,12 +43,14 @@ def test_placements_are_rigid_and_follow_the_parameters():
 
 
 def test_probes_are_parameter_expressions():
-    for c in K.keepouts(S) + K.air_probes(S) + K.clear_probes(S) + K.passage_slabs(S) + K.plug_probes(S):
+    for c in (K.keepouts(S) + K.air_probes(S) + K.clear_probes(S) + K.passage_slabs(S) + K.plug_probes(S) + K.low_probes(S)
+              + [c for c, *_ in K.opening_probes(S)]):
         q = c["params"]
         for key in ("corner", "base"):
             for e in q.get(key, []):
                 assert isinstance(e, str), (q["name"], e)
-    assert set(K.AIR) == {c["params"]["body_name"] for c in K.air_probes(S)}
+    lsw = {f"air_lsw_{k}" for k in range(K.LSW_STEPS)}       # the window's line: free boxes, not a section
+    assert set(K.AIR) | lsw == {c["params"]["body_name"] for c in K.air_probes(S)}
 
 
 def test_squeezes_are_the_designs():
@@ -56,6 +63,69 @@ def test_passage_envelope_arithmetic_is_recorded():
     keeps less than 77.3 on paper: the geometry run measures it with the tongue's real board."""
     d = K.distances(S)
     assert d["passage_envelope_free"] < 77.3
+
+
+# --- Task 4b: the band's light (analytic and arithmetic, fast) ---------------------------------
+
+def test_guides_deliver_light_with_every_face_bare():
+    """R48 on the mini: a 3-D trace of each guide as built, every face bare (TIR at 39.6 deg, Snell and
+    Fresnel at the entry and the exit): every LED delivers >= 3 % of its emission to its half's exit, part
+    of it straight (no reflection: the LEDs stand level with the band). Each half's lit span is reported
+    (the dim ends are an owner print item)."""
+    d = K.guide_delivery(S)
+    assert set(d["leds"]) == {"D1", "D2", "D3", "D4"}
+    for name, led in d["leds"].items():
+        assert led["fraction"] >= 0.03, (name, led)
+        assert led["straight"] > 0, name
+    for half, h in d["halves"].items():
+        lo, hi = h["lit_x"]
+        vis = h["visible"]
+        assert vis[0] < lo < hi < vis[1], (half, h)
+        assert sum(h["bins"]) > 0
+
+
+def test_no_straight_path_between_the_guides():
+    """Plan Task 4 Step 3: no straight line of air or light joins the guides. Sampled: every exposed
+    face of each guide against every exposed face of the other (326k lines), each through >= the divider's
+    6.8 of opaque material. Exact: the convex hull of the guides' profile lies inside the opaque profiles
+    over the whole divider gap (rib, face wall, guide_stop)."""
+    g = K.guide_to_guide(S)
+    assert g["air"] == 0 and g["under_1_2"] == 0
+    assert g["least"] >= g["slab"] - 1e-6
+    assert g["hull_points"] > 10000 and g["hull_uncovered"] == 0
+    assert "shell rib divider" in g["covers"]
+
+
+def test_visible_gap_stays_dark():
+    """The gap between the halves: from every face of either guide to its outer face, >= 1.2 of opaque
+    over all but 1.2 at each slot's end (4.4 of the 6.8 gap; plan >= 4)."""
+    d = K.gap_dark(S)
+    assert d["least"] >= 1.2 - 1e-6 and d["dark_w"] >= 4.0
+
+
+def test_ms5611_sees_no_led_or_guide():
+    """R13 / R50: 0 unblocked lines from every exposed face of both guides (bars, feet, sides, ends, entry
+    faces, exits) to U4's port; without guide_stop thousands would be. The LED faces emit away from U4."""
+    r = K.ms5611_sight(S)
+    assert r["samples"] > 20000 and r["unblocked"] == 0, r["first"]
+    assert any(k.endswith(" end") for k in r["by_face"]) and any("entry" in k for k in r["by_face"])
+    assert r["led_faces_facing_u4"] == 0
+    assert K.ms5611_sight(S, dx=1.0, n_edge=10, n_side=10, stop=False)["unblocked"] > 0
+
+
+def test_light_stays_off_the_sensor_its_window_and_the_crease():
+    """Review focus 3: >= 1.2 of opaque material (the lip, the zone wall, zone_seal, the shell's wall and
+    ribs, guide_stop; the crease's parting line counted as air) on every straight line from the guides and
+    the LED faces to the VEML7700, the light-sensor window and the crease's front."""
+    lp = K.light_paths(S)
+    for name, (ln, _) in lp.items():
+        assert ln >= 1.2, (name, lp[name])
+
+
+def test_opaque_walls():
+    w = K.walls(S)
+    assert w["divider"] >= V("divider_t") >= 1.2 and w["end_ribs"] >= 1.2 and w["guide_stop"] >= 1.2
+    assert w["pm_to_flexure"] >= 1.2 and w["visible_gap"] >= 4.0
 
 
 # --- SolidCraft --------------------------------------------------------------------------
@@ -71,7 +141,7 @@ def test_no_interference_with_the_references(check):
     assert not inter["unchecked"]
     names = {b["name"] for b in check["measure"]["bodies"]}
     assert {"ko_sen66_plug", "ko_cable_over", "ko_j2_plug", "ko_j4_plug", "ko_tongue_plug", "shell_up_32", "sweep_boss_1",
-            "airq-tongue_PCB", "sen66_body"} <= names
+            "airq-tongue_PCB", "sen66_body", "gco2_up_32", "gpm_up_32", "gstop_up_32", "air_slots_front", "air_lsw_0"} <= names
     assert inter["checked"] > 350                                     # ref_main's 308 bodies included
 
 
@@ -160,3 +230,67 @@ def test_rebuilds_over_wall_and_clearances(cli, tmp_path):
         vols.append(sum(b["volume_mm3"] for b in ins["bodies"]))
     assert vols[1] > vols[2] > vols[0]
     assert all(math.isclose(v, vols[2], rel_tol=1e-9) for v in vols[2::3])
+
+
+def test_face_probes(check):
+    """The band slots open over their length and height and exactly their size (a 0.05 ring round each
+    meets the wall's ring); each label debossed exactly label_depth (the solid 0.05 under it is all shell)
+    with the letters' area; the flexure's beam is its flex_t skin, the pad rod ends flex_gap in front of
+    SW1's actuator."""
+    got = {(p["b"] if p["a"] in K.SHELL_PARTS else p["a"]): p["volume_mm3"] for p in check["face"]["interferences"]}
+    for h in ("co2", "pm"):
+        assert f"fp_slot_{h}" not in got
+        ring = (V(f"band_{h}_x1 - band_{h}_x0") + 0.1) * (V("band_h") + 0.1) - V(f"band_{h}_x1 - band_{h}_x0") * V("band_h")
+        assert got[f"fp_ring_{h}"] == pytest.approx(ring * V("wall - 0.1"), rel=1e-3)
+    for h, x0, x1 in K.LABEL_BOXES:
+        area = V(f"({x1}) - ({x0})") * V("label_f1 - label_f0 + label_sub_drop + 2")
+        assert got[f"fp_label_{h}_floor"] == pytest.approx(area * 0.05, rel=1e-3)
+        letters = (area * V("label_depth") - got[f"fp_label_{h}"]) / V("label_depth")
+        assert letters > 15, (h, letters)
+    assert got["fp_beam"] == pytest.approx(V("flex_w - 1") * 1.0 * V("flex_t"), rel=1e-3)
+    assert got["fp_pad_end"] == pytest.approx(0.1, rel=1e-3) and "fp_pad_gap" not in got
+
+
+def test_openings_measured_open_areas(check):
+    """R18 on the geometry: intake >= 154.5 (every slot faces free air: air_slots_front is free), the
+    outlet 498 (< 660.1, >= the 296 floor: owner item), the window, the exhaust; each as drawn."""
+    areas = K.opening_areas(S, check["openings"])
+    for name, (got, exp) in areas.items():
+        assert got == pytest.approx(exp, rel=1e-3), name
+    assert areas["op_intake"][0] >= 154.5
+    assert 296 <= areas["op_outlet"][0] < 660.1
+
+
+def test_nothing_opens_below_the_10_mm_line(check):
+    """Slabs z 0 ... 10 over the lip, the rear wall, both rails and both shell side walls are all material
+    (the left rail less the tongue pin's blind hole, which does not go through)."""
+    got = {}
+    for p in check["openings"]["interferences"]:
+        a, b = (p["a"], p["b"]) if p["a"].startswith("low_") else (p["b"], p["a"])
+        if a.startswith("low_"):
+            got[(a, b)] = got.get((a, b), 0.0) + p["volume_mm3"]
+    for c in K.low_probes(S):
+        n = c["params"]["body_name"]
+        full = A._volume(c, S)
+        vol = got[(n, K.LOW_PARTS[n])]
+        if n == "low_rail_l":
+            pin = math.pi / 4 * V("tm_pin_d + 2 * clr_align") ** 2 * V("tm_hole_depth")
+            assert vol == pytest.approx(full - pin, rel=1e-3)
+        else:
+            assert vol == pytest.approx(full, rel=1e-4), n
+
+
+def test_usb_opening_fit_and_chamfer(check):
+    got = {}
+    for p in check["openings"]["interferences"]:
+        a, b = (p["a"], p["b"]) if p["a"].startswith("usb_") else (p["b"], p["a"])
+        if a.startswith("usb_"):
+            got[a] = got.get(a, 0.0) + p["volume_mm3"]
+    exp = A.usb_expect(S)
+    assert "usb_in" not in got
+    assert got["usb_out"] == pytest.approx(exp["usb_out"], rel=1e-3)
+    assert got["usb_cham"] == pytest.approx(exp["usb_cham"], rel=2e-3)
+
+
+def test_intake_and_outlet_apart(check):
+    assert check["clearance"]["intake_to_outlet"] >= 20

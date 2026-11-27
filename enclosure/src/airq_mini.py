@@ -1,6 +1,7 @@
-"""airq_mini: the airQ mini enclosure (Plan 3 Task 4a, owner decision 69.5 x 50 x 42, R51): body
-and internals. Task 4b adds the split light band, the labels, the light-sensor window, the dot
-and its flexure, the openings and the full check table on the positions fixed here.
+"""airq_mini: the airQ mini enclosure (Plan 3 Task 4, owner decision 69.5 x 50 x 42, R51). Task 4a:
+body and internals. Task 4b: the split light band and the labels (`airq_mini_face`), the dot and its
+flexure (the airQ's, `airq_face`), the light-sensor window and the openings (`openings`), on the
+positions 4a fixed here.
 
 Layout: enclosure/README.md "airQ mini (Task 4)" (`layout_study.mini_recheck(MINI_WAY_OUT,
 inlet_end="left")`, place a) and "airQ mini enclosure".
@@ -31,12 +32,13 @@ wall in one drawer (a notch open to its left end) over the passage's rear, seale
 grommet (`grommet_zone_a` outer, `grommet_zone_b` inner) laid round them with the plugs on.
 
 Bodies:
-- printed: shell; base_plate (floor, lip, rear wall, side rails, boss pockets risen to the slant,
+- printed: shell (with the band's slots and ribs, the labels, the flexure); orange_dot (an AMS colour
+  region of the shell's job); light_guide_co2, light_guide_pm (clear PETG); base_plate (floor, lip, rear wall, side rails, boss pockets risen to the slant,
   H1's standoff and its web to the plate, the plenum plate, the pad's seat, the module's left
   stop); zone_wall (clamped by the board's screw at H1, the board's H2 screw in a blind pilot in
   it: H2 lies over the module, so it has no post); tongue_mount (the tongue's pin);
 - TPU 95A: gasket_out, gasket_in, grommet_zone_a/_b;
-- foam: sen66_foam, sen66_pad, zone_seal, sen66_top_seal.
+- foam: sen66_foam, sen66_pad, zone_seal, sen66_top_seal, guide_stop (black, behind the guides).
 Felt feet are bought (positions here).
 
 Every position Task 4b needs is a named parameter here, even where 4a does not cut the feature.
