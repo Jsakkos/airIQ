@@ -47,6 +47,7 @@ DESIGNS = {
     "airq-tongue": "ref_pcb_tongue",
     "coupons": "coupons",
     "airq": "airq",
+    "airq-mini": "airq_mini",
 }
 
 

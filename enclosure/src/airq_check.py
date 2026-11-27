@@ -368,7 +368,7 @@ CLEAR_PAIRS = {   # distance label -> (the probes, the bodies they are measured 
 }
 
 
-def sweeps(s) -> list[dict]:
+def sweeps(s, riders: tuple = SHELL_RIDERS) -> list[dict]:
     """The shell's way on (I1): it is lowered along -z onto the assembled base. Its bosses are the
     parts that reach into the case, so their swept columns (from where they end up to above the
     case) must clear everything on the base; and the whole shell is copied at raised steps, with the
@@ -381,7 +381,7 @@ def sweeps(s) -> list[dict]:
                                                       "copy": True, "body_name": f"shell_up_{dz}"}})
         # 3b-1: the light guide and the two foam stops ride in the shell (stuck on the panel): their raised copies must
         # clear the base, the board and the cables too
-        for body, tag in SHELL_RIDERS:
+        for body, tag in riders:
             b.append({"command": "solid.move", "params": {"name": f"{tag}_up_{dz}", "bodies": [body], "translate": [0, 0, dz],
                                                           "copy": True, "body_name": f"{tag}_up_{dz}"}})
     return b
@@ -1089,18 +1089,21 @@ def check_bodies(s) -> list[str]:
     return names
 
 
-def exclusions(names: list[str]) -> list[list[str]]:
+def exclusions(names: list[str], refs: tuple = REFS, riders: tuple = SHELL_RIDERS, shell_parts: tuple = ("shell", "orange_dot"),
+               borne: tuple = SHELL_BORNE, opening_air: tuple = None) -> list[list[str]]:
     """Pairs that may overlap: each reference's own STEP bodies (pins in housings), keep-outs
-    with each other (the routes join), and the shell's sweep with the shell and what it carries."""
-    out = [[f"{n}:1", f"{n}:1"] for n in REFS]
+    with each other (the routes join), and the shell's sweep with the shell and what it carries.
+    The defaults are the airQ's; the mini passes its own references, riders and parts."""
+    opening_air = OPENING_AIR if opening_air is None else opening_air
+    out = [[f"{n}:1", f"{n}:1"] for n in refs]
     ko = [n for n in names if n.startswith("ko_")]
     out += [[a, b] for i, a in enumerate(ko) for b in ko[i + 1:]]
-    sw = [n for n in names if n.startswith(("sweep_", "shell_up_") + tuple(f"{tag}_up_" for _, tag in SHELL_RIDERS))]
+    sw = [n for n in names if n.startswith(("sweep_", "shell_up_") + tuple(f"{tag}_up_" for _, tag in riders))]
     out += [[a, b] for i, a in enumerate(sw) for b in sw[i + 1:]]
-    out += [[a, p] for a in sw for p in ("shell", "orange_dot") + tuple(body for body, _ in SHELL_RIDERS)]
-    out += [[a, f"{r}:1"] for a in sw for r in SHELL_BORNE]
+    out += [[a, p] for a in sw for p in shell_parts + tuple(body for body, _ in riders)]
+    out += [[a, f"{r}:1"] for a in sw for r in borne]
     # 3b-2: the free-air probes in front of the openings share air with the paths' probes
-    op = [n for n in names if n in OPENING_AIR]
+    op = [n for n in names if n in opening_air]
     out += [[a, b] for a in op for b in names if b.startswith("air_") and a != b]
     return out
 
@@ -1186,20 +1189,26 @@ def check_script(save: Path = CHECK_SC, budget_s: float = 900) -> dict:
     return {"commands": steps, "mark": mark}
 
 
-def run(cli: str | None = None) -> dict:
-    """Build the check design and return {inserted, interference, measure, touch} (the run's results)."""
+def run_commands(commands: list[dict], stem: str, design: Path, cli: str | None = None) -> list:
+    """Run a check script on a design (`--in`): enclosure/.build/<stem>.json; return the step results."""
     cli = cli or encbuild.cli_path()
     encbuild.BUILD_DIR.mkdir(parents=True, exist_ok=True)
-    sc = check_script()
-    script = encbuild.BUILD_DIR / "airq-check.json"
-    script.write_text(json.dumps({"commands": sc["commands"]}, indent=1), encoding="utf-8")
-    out = encbuild.BUILD_DIR / "airq-check.results.json"
+    script = encbuild.BUILD_DIR / f"{stem}.json"
+    script.write_text(json.dumps({"commands": commands}, indent=1), encoding="utf-8")
+    out = encbuild.BUILD_DIR / f"{stem}.results.json"
     out.unlink(missing_ok=True)
-    proc = subprocess.run([cli, "run", str(script), "--in", str(ENCLOSURE / airq.OUTPUT), "--results", "--quiet",
+    proc = subprocess.run([cli, "run", str(script), "--in", str(design), "--results", "--quiet",
                            "--json-out", str(out)], capture_output=True, text=True)
     res = json.loads(out.read_text(encoding="utf-8")) if out.exists() else None
     if proc.returncode != 0 or not isinstance(res, list):
         raise RuntimeError(f"check run failed: {res if isinstance(res, dict) else proc.stderr or proc.stdout}")
+    return res
+
+
+def run(cli: str | None = None) -> dict:
+    """Build the check design and return {inserted, interference, measure, touch} (the run's results)."""
+    sc = check_script()
+    res = run_commands(sc["commands"], "airq-check", ENCLOSURE / airq.OUTPUT, cli)
     m = sc["mark"]
     return {"inserted": res[:6], "interference": res[m["interference"]], "measure": res[m["measure"]],
             "touch": res[m["touch"]], "nudge": res[m["nudge"]], "window": res[m["window"]], "extremes": res[m["extremes"]],
@@ -1258,12 +1267,12 @@ def window_fill(window: dict) -> dict:
     return out
 
 
-def sections(measure: dict) -> dict:
+def sections(measure: dict, air: dict = None) -> dict:
     """Each air probe's section (mm2) from its measured box: the face named in AIR (the ring's is
     its circle, pi d^2 / 4 from its measured width)."""
     boxes = {b["name"]: b["bbox"] for b in measure["bodies"]}
     out = {}
-    for name, (_, _, face) in AIR.items():
+    for name, (_, _, face) in (AIR if air is None else air).items():
         lo, hi = boxes[name]["min"], boxes[name]["max"]
         dx, dy, dz = (hi[i] - lo[i] for i in range(3))
         if name == "air_outlet_ring":
@@ -1280,14 +1289,18 @@ BRANCHES = {   # plenum branch -> (its probes, the x it is cut at)
 }
 
 
-def branch_need(s, x_expr: str, port: float = 330.1) -> float:
+def branch_need(s, x_expr: str, port: float = 330.1, side: str = "right") -> float:
     """The outlet port area a plenum branch serves: the port's area times the share of the outlet
-    grille's open area to the right of x (the grille's slots are alike, so the share is their count)."""
+    grille's open area to the right of x (the airQ: its ring is at the left; `side` "left" for the
+    mini, its ring at the right). The grille's slots are alike, so the share is their count."""
     v = s.v
     x = v(x_expr)
-    x0, pitch, n = v("out_gx0"), v("out_pitch"), int(v("out_n"))
-    right = sum(1 for i in range(n) if x0 + i * pitch >= x)
-    return port * right / n
+    x0, pitch, n, w = v("out_gx0"), v("out_pitch"), int(v("out_n")), v("slot_w")
+    if side == "right":
+        k = sum(1 for i in range(n) if x0 + i * pitch >= x)
+    else:
+        k = sum(1 for i in range(n) if x0 + i * pitch + w <= x)
+    return port * k / n
 
 
 def branches(s, measured: dict) -> dict:
@@ -1295,10 +1308,10 @@ def branches(s, measured: dict) -> dict:
     return {name: (sum(measured[p] for p in probes), branch_need(s, x)) for name, (probes, x) in BRANCHES.items()}
 
 
-def touch_volumes(touch: dict) -> dict:
+def touch_volumes(touch: dict, pairs: tuple = TOUCHES) -> dict:
     """{(a, b): overlap volume} for TOUCHES at gasket_squeeze = TOUCH_SQUEEZE."""
     got = {frozenset((p["a"], p["b"])): p["volume_mm3"] for p in touch["interferences"]}
-    return {pair: got.get(frozenset(pair), 0.0) for pair in TOUCHES}
+    return {pair: got.get(frozenset(pair), 0.0) for pair in pairs}
 
 
 # --- distances the layout answers (arithmetic from the parameters and the boards' sources) ---------

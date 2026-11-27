@@ -46,6 +46,7 @@ import ref_sen66
 import ref_sfa40
 from sclib import Script
 
+zt = C.zt          # depth-t point on the slope (moved to enclosure_common, Task 4a)
 DESIGN = "airq"
 OUTPUT = "airq.sc"
 
@@ -121,47 +122,13 @@ def build() -> Script:
     p("sen_y0", f"{C.yb('sen_top')} + clr_remove",
       "SEN66 connector face (front): its top front edge clr_remove behind the zone wall's slant")
     p("sen_y1", "sen_y0 + sen_d", "SEN66 port face (rear)")
-    # ports from ref_sen66 (datasheet Fig. 8), module x from the inlet end, module y from the
-    # square-inlet edge; turned so x -> -x (inlet end right), y -> -z (square inlet high)
-    p("sen_out_x", sen("outlet_x"), "outlet centre from the inlet end (ref_sen66 outlet_x)")
-    p("sen_out_y", sen("outlet_y"), "outlet centre from the square-inlet edge (ref_sen66 outlet_y)")
-    p("outlet_d", sen("outlet_d"), "SEN66 outlet diameter (ref_sen66)")
-    p("sen_sq_x0", sen("inlet_sq_x0"), "square inlet from the inlet end (ref_sen66)")
-    p("sen_sq_x1", sen("inlet_sq_x1"), "square inlet to (ref_sen66)")
-    p("sen_rd_x", sen("inlet_rd_x"), "round inlet centre from the inlet end (ref_sen66)")
-    p("sen_rd_d", sen("inlet_rd_d"), "round inlet diameter (ref_sen66)")
-    p("outlet_x", "sen_x1 - sen_out_x", "derived: outlet centre x")
-    p("outlet_z", "sen_top - sen_out_y", "derived: outlet centre z")
-    p("inlet_x0", "min(sen_x1 - sen_sq_x1, sen_x1 - sen_rd_x - sen_rd_d / 2)", "derived: the inlets' left edge")
-    p("sen_plug_x0", 17.0, "SEN66 connector on its connector face, from the inlet end: scaled from datasheet Fig. 9 (README Frames); to confirm")
-    p("sen_plug_x1", 29.0, "SEN66 connector to (scaled, to confirm)")
-    p("plug_x0", "sen_x1 - sen_plug_x1", "derived: SEN66 plug's left edge (world)")
-    p("plug_x1", "sen_x1 - sen_plug_x0", "derived: SEN66 plug's right edge (world)")
+    C.add_sen66_ports(s, sen)
 
     # --- outlet plenum and the port gaskets (I3, R25) -------------------------------------
     p("port_gap", 3.0, "port face to the plenum plate: the inlets' air path (R25: 3.0 x 26.9 = 80.7 >= 77.3)")
     p("plate_y0", "sen_y1 + port_gap", "derived: plenum plate front face (the baffle in front of the outlet grille)")
     p("plate_y1", "plate_y0 + iwall", "derived: plenum plate back face; the plenum runs from here to the rear wall")
-    p("seat_d", 1.0, "gasket seat depth: the TPU gaskets sit this deep in grooves in the plate and the floor")
-    p("gasket_squeeze", 0.3, "TPU squeeze of the static seals and grommets as printed (R9: the check design sets 0, so the faces touch)")
-    # I3(b): the SEN66 is 21.3 +-0.5 deep (datasheet Fig. 8). Its port face is the datum: the pad at
-    # its front presses it back onto the outlet ring's land, a hard stop, at any depth; the pad
-    # takes the tolerance (the seal does not), and its force acts on the ring's axis (no tipping)
-    p("sen_d_tol", 0.5, "SEN66 depth tolerance, +- (datasheet Fig. 8: 21.3 +-0.5)")
-    p("ring_preload", 0, "outlet ring land in front of the port face: 0, the ring is the module's rear stop (the pad's force is its seal load)")
-    p("ring_w", 1.5, "outlet ring wall (gasket_out)")
-    p("ring_clr", 0.25, "outlet ring bore over the port's edge")
-    p("ring_bore", "outlet_d + 2 * ring_clr", "derived: outlet ring bore (R25: its area is the outlet path's narrowest)")
-    p("ring_od", "ring_bore + 2 * ring_w", "derived: outlet ring outside diameter")
-    p("wiper_t", 0.8, "inlet seal (gasket_in) blade thickness: a TPU wiper between the inlets and the ring, leaning away from the inlets")
-    p("wiper_deg", 55, "inlet seal blade lean from the y axis: long and soft, so its push stays far under the pad's (B1)", unit="deg")
-    p("wiper_squeeze", 0.5, "inlet seal blade preload on the port face (the port face is fixed by the ring; R9: the check sets 0)")
-    p("wiper_w", "wiper_t / cos(wiper_deg)", "derived: blade width along x")
-    p("wiper_x1", "inlet_x0 - 1.0", "blade root's right edge, in its groove in the plate: 1 mm left of the inlets (H1 is left of it)")
-    p("root_w", 2.0, "inlet seal's root (a foot in the plate's slot) width (B3)")
-    p("root_squeeze", 0.05, "inlet seal root's squeeze on its slot's sides and back (B3: no bypass round it, no travel to eat the preload; R9: the check sets 0)")
-    p("wiper_lead", 0.8, "inlet seal tip's 45 deg lead-in at its top: the module's bottom edge pushes the tip back as it goes down (B4)")
-    p("wiper_lean", "(plate_y0 - sen_y1 + wiper_squeeze) * tan(wiper_deg)", "derived: blade tip's shift to the left over the gap")
+    C.add_port_seals(s)
 
     # --- tongue, HCHO pocket (M4, R26, I2) ------------------------------------------------
     hole = B.TONGUE["mounting_hole"]
@@ -259,8 +226,8 @@ def build() -> Script:
     C.base_plate(s)
     C.rails(s)
     C.standoffs(s)
-    plenum(s)
-    cradle(s)
+    C.plenum(s)
+    C.cradle(s)
     hcho_pocket(s)
     C.standoff_pilots(s)
     C.base_screws(s)
@@ -270,11 +237,11 @@ def build() -> Script:
     zone_drawer(s)
     plug_room(s)
     sliver_key(s)
-    top_seal(s)
+    C.top_seal(s)
     tongue_capture(s)
     C.zone_seal(s)
     s.box("SEN66 foam", ["sen_x0", "sen_y0", "floor_t"], ["sen_l", "sen_d", "foam"], body="sen66_foam")
-    gaskets(s)
+    C.gaskets(s)
     hcho_lid(s)
     grommets(s)
     F.light_guide(s)
@@ -337,72 +304,6 @@ def openings(s: Script) -> None:
     d, cx, cz = v("D"), v("usb_x"), v("usb_z")
     hw, hh = v("usb_open_w") / 2, v("usb_open_h") / 2
     s.chamfer("USB-C chamfer", [[cx, d, cz - hh], [cx, d, cz + hh], [cx - hw, d, cz], [cx + hw, d, cz]], "usb_chamfer", body="base_plate")
-
-
-def plenum(s: Script) -> None:
-    """The outlet plenum, part of base_plate: the plate (the baffle in front of the outlet grille,
-    with the ring's seat and bore) between the side rails, from the floor to the zone wall, which
-    rests on its top edge and on the rear-wall rib. H1 merges with the plate, which braces it."""
-    s.box("Plenum plate", ["-tub_x - 0.5", "plate_y0", "floor_t - 0.5"], ["2 * tub_x + 1", "iwall", "zw_z0 - floor_t + 0.5"],
-          operation="join", targets=["base_plate"])
-
-
-def cradle(s: Script) -> None:
-    """The SEN66 cradle, part of base_plate (I3(b)). The module's port face rests on the outlet
-    ring's land (its rear stop); `sen66_pad`, foam stuck on its connector face on the ring's axis,
-    presses it there from the pad's seat, so the module's 21.3 +-0.5 depth goes into the pad, not
-    into the seals. The low right rail is a guide only: it stays clr_align in front of a module at
-    the deepest. The module's left end lies against the left side rail, its right end against the
-    HCHO pocket's left wall.
-    The pad's seat (review round 3, B1) is a seat_t plate from the floor, joined to the left side
-    rail along its height (a plate held on two edges, not a free cantilever), just behind the
-    cables' riser and run. Its top follows the zone wall's slant (under the drawer's grommet) and
-    has a 45 deg lead-in on its back edge, so the pad is squeezed gradually as the module goes
-    down (B4)."""
-    p = s.param
-    p("pad_t", 3.2, "SEN66 front pad: foam thickness free (stuck on the module's connector face on the ring's axis; to confirm with the foam bought)")
-    p("pad_w", 10.0, "pad width (x)")
-    p("pad_h", 10.0, "pad height (z), centred on the outlet: its force passes through the ring's land")
-    p("seat_t", 2.4, "pad seat thickness (B1)")
-    p("seat_y0", "pt_yh + cable_gh_d / 2 + clr_align", "pad seat's front face: just behind the cables' riser and run")
-    p("pad_y0", "seat_y0 + seat_t", "derived: the pad's seat face")
-    p("pad_gap", "sen_y0 - pad_y0", "derived: pad thickness at the nominal module (44 % compressed; 28 % at 20.8 deep, 60 % at 21.8)")
-    p("pad_squeeze", "pad_t - pad_gap", "derived: the pad as modelled, free, over the nominal module (R9: the check design sets 0)")
-    p("seat_lead_z", "outlet_z + pad_h / 2 + 0.2", "derived: where the seat's lead-in starts, just over the pad's top")
-    p("seat_slant_clr", "gasket_squeeze / sin_t + 0.2", "derived: the seat's top under the slant: under the drawer grommet's squeezed face, + 0.2")
-    p("rail_h", 4.0, "cradle right rail (a guide) height above the floor")
-    tb = "zw_tf + zone_t"
-    # the apex where the lead-in (45 deg up and forward from the back face) meets the slant-following top
-    y_apex = f"(seat_lead_z + pad_y0 + seat_slant_clr - lip + ({tb}) / sin_t) / (cos_t / sin_t + 1)"
-    p("seat_apex_y", y_apex, "derived: the seat's top apex, y")
-    p("seat_apex_z", "seat_lead_z + pad_y0 - seat_apex_y", "derived: the seat's top apex, z")
-    pts = [("seat_y0", "floor_t - 0.5"), ("pad_y0", "floor_t - 0.5"), ("pad_y0", "seat_lead_z"), ("seat_apex_y", "seat_apex_z"),
-           ("seat_y0", f"{zt('seat_y0', tb)} - seat_slant_clr")]
-    with s.sketch("Pad seat profile", "YZ", offset="-tub_x - iwall") as sk:
-        sk.polyline(pts)
-    s.extrude("Pad seat", "Pad seat profile", "plug_x0 - 1.0 + tub_x + iwall", operation="join", targets=["base_plate"])
-    s.box("Cradle front rail R", ["plug_x1 + 1.0", "sen_y0 - sen_d_tol - clr_align - iwall", "floor_t - 0.5"],
-          ["sen_x1 - plug_x1 - 1.0", "iwall", "rail_h + 0.5"], operation="join", targets=["base_plate"])
-
-
-def wiper_profile(c: str = "0") -> list[tuple[str, str]]:
-    """The inlet seal's plan (XY): a foot in the plate's slot (root_w, squeezed root_squeeze on its
-    sides and back, B3), then the blade leaning wiper_deg to the left from the plate's face to its
-    tip on the port face. With `c` the outline grows by c all round (the floor groove): the
-    blade's edges by c across them, its tip by c along it."""
-    tip = "sen_y1 - wiper_squeeze"
-    rs = "root_squeeze"
-    if c == "0":
-        return [(f"wiper_x1 - root_w - {rs}", f"plate_y0 + seat_d + {rs}"), (f"wiper_x1 + {rs}", f"plate_y0 + seat_d + {rs}"),
-                (f"wiper_x1 + {rs}", "plate_y0"), ("wiper_x1", "plate_y0"), ("wiper_x1 - wiper_lean", tip),
-                ("wiper_x1 - wiper_lean - wiper_w", tip), ("wiper_x1 - wiper_w", "plate_y0"), (f"wiper_x1 - root_w - {rs}", "plate_y0")]
-    cn = f"{c} / cos(wiper_deg)"                     # across the blade
-    ct = f"{c} * tan(wiper_deg)"                     # the tip moved c along the blade
-    tipc = f"{tip} - {c}"
-    return [(f"wiper_x1 - root_w - {rs} - {c}", f"plate_y0 + seat_d + {rs} + {c}"), (f"wiper_x1 + {rs} + {c}", f"plate_y0 + seat_d + {rs} + {c}"),
-            (f"wiper_x1 + {rs} + {c}", "plate_y0"), (f"wiper_x1 + {cn}", "plate_y0"), (f"wiper_x1 - wiper_lean + {cn} - {ct}", tipc),
-            (f"wiper_x1 - wiper_lean - wiper_w - {cn} - {ct}", tipc), (f"wiper_x1 - wiper_w - {cn}", "plate_y0"),
-            (f"wiper_x1 - root_w - {rs} - {c}", "plate_y0")]
 
 
 SFA_HOLES = ((0, 0), (1, 0), (0, 1), (1, 1))        # the SFA40's holes: (0, 0) front left ... (1, 1) rear right
@@ -471,7 +372,7 @@ def base_cuts(s: Script) -> None:
           ["root_w", "seat_d + 0.5", "zw_z0 - floor_t + seat_d + 0.5"],
           operation="cut", targets=["base_plate"])
     with s.sketch("Inlet seal floor groove outline", "XY", offset="floor_t - seat_d") as sk:
-        sk.polyline(wiper_profile("clr_align"))
+        sk.polyline(C.wiper_profile("clr_align"))
     s.extrude("Inlet seal floor groove", "Inlet seal floor groove outline", "seat_d", operation="cut", targets=["base_plate"])
     s.box("HCHO chimney window", ["hx1 - 0.5", "cy0 + 0.8", "floor_t"], ["iwall + 1", "cy1 - cy0 - 1.6", "lid_z0 - shelf_w - floor_t"],
           operation="cut", targets=["base_plate"])
@@ -509,11 +410,6 @@ def hcho_window(s: Script) -> None:
     with s.sketch("HCHO window outline", "YZ", offset="inner_x - 0.5") as sk:
         sk.polyline(pts)
     s.extrude("HCHO window", "HCHO window outline", "wall + 1", operation="cut", targets=["shell"])
-
-
-def zt(y: str, t: str) -> str:
-    """z of the point at depth y with depth t behind the slope's outer surface (an expression)."""
-    return f"lip + (({y}) * cos_t - ({t})) / sin_t"
 
 
 def tongue_capture(s: Script) -> None:
@@ -557,21 +453,6 @@ def sliver_key(s: Script) -> None:
           operation="join", targets=["base_plate"])
     s.box("Sliver key groove", [f"{x0} - clr_align", "bp_y1 - iwall - 1", "ledge_z0 - 1"],
           [f"{x1} - ({x0}) + 2 * clr_align", "key_w + clr_align + 1", "key_h + clr_align + 1"], operation="cut", targets=["zone_wall"])
-
-
-def top_seal(s: Script) -> None:
-    """Review round 3 (the space beside the ring): `sen66_top_seal`, a foam strip stuck across the
-    module's top at the inlet wiper's tip, from its port face to its connector face, closes the
-    0.3 gap over the module there, so the space between the ring and the wiper no longer joins the
-    inlets' side over the module's top-rear edge (a 5 mm path round the wiper); it joins only the
-    front plenum, 21 mm forward through 0.2-0.3 slits, far from the inlets."""
-    p = s.param
-    p("top_seal_t", 0.6, "foam strip on the SEN66's top, free (0.2-0.5 gap over the module's +0.1/-0.2 height: 17-67 %)")
-    p("top_seal_squeeze", "top_seal_t - zone_gap", "derived: the strip as modelled, free (R9: the check sets 0)")
-    p("top_seal_x0", "wiper_x1 - wiper_lean - wiper_w - 1.0", "top seal's left end: 1 mm past the wiper's tip")
-    p("top_seal_x1", "wiper_x1 - wiper_lean + 1.0", "top seal's right end")
-    s.box("SEN66 top seal", ["top_seal_x0", "sen_y0", "sen_top"], ["top_seal_x1 - top_seal_x0", "sen_d", "zone_gap + top_seal_squeeze"],
-          body="sen66_top_seal")
 
 
 def plug_room(s: Script) -> None:
@@ -625,28 +506,6 @@ def zone_drawer(s: Script) -> None:
         with s.sketch(f"Drawer groove {name} profile", "YZ", offset=x0) as sk:
             sk.polyline(pts)
         s.extrude(f"Drawer groove {name}", f"Drawer groove {name} profile", f"pt_x1 - ({x0})", operation="cut", targets=["zone_wall"])
-
-
-def gaskets(s: Script) -> None:
-    """`gasket_out` (TPU 95A): the outlet ring, from the port face round the outlet into its seat
-    in the plate; its land is the module's rear stop (I3(b)), pressed by the pad. `gasket_in`
-    (TPU 95A): the blade on the port face between the inlets and the ring, from its groove in the
-    floor to the zone wall, its root in its groove in the plate; a soft wiper (well under 2 N), so
-    it cannot tip the module off the ring. They separate the port groups (I3). At ring_preload,
-    wiper_squeeze and pad_squeeze 0 their faces touch the module (R9). `sen66_pad` (foam)."""
-    s.cylinder("Outlet ring", ["outlet_x", "sen_y1 - ring_preload", "outlet_z"], "ring_od",
-               "port_gap + seat_d + ring_preload", axis="Y", body="gasket_out")
-    s.cylinder("Outlet ring bore", ["outlet_x", "sen_y1 - ring_preload - 1", "outlet_z"], "ring_bore",
-               "port_gap + seat_d + ring_preload + 2", axis="Y", operation="cut", targets=["gasket_out"])
-    with s.sketch("Inlet seal outline", "XY", offset="floor_t - seat_d") as sk:
-        sk.polyline(wiper_profile())
-    s.extrude("Inlet seal", "Inlet seal outline", "zw_z0 - floor_t + seat_d", body="gasket_in")
-    tip = "sen_y1 - wiper_squeeze"
-    with s.sketch("Inlet seal lead-in profile", "YZ", offset="wiper_x1 - wiper_lean - wiper_w - 1") as sk:
-        sk.polyline([(f"{tip} - 1", "zw_z0 - wiper_lead - 1"), (f"{tip} + wiper_lead + 1", "zw_z0 + 1"), (f"{tip} - 1", "zw_z0 + 1")])
-    s.extrude("Inlet seal lead-in", "Inlet seal lead-in profile", "wiper_lean + wiper_w + 2", operation="cut", targets=["gasket_in"])
-    s.box("SEN66 pad", ["outlet_x - pad_w / 2", "pad_y0", "outlet_z - pad_h / 2"], ["pad_w", "pad_gap + pad_squeeze", "pad_h"],
-          body="sen66_pad")
 
 
 def hcho_lid(s: Script) -> None:

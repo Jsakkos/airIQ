@@ -70,10 +70,10 @@ def test_component_names_are_the_plan_interfaces():
     ref_fpc_adapter; Task 2 adds the coupons design. insert_design names the component after
     the design."""
     assert {encbuild.module(n).DESIGN for n in encbuild.DESIGNS} == {
-        "ref_sen66", "ref_epd", "ref_sfa40", "ref_main", "ref_tongue", "ref_fpc_adapter", "coupons", "airq"}
+        "ref_sen66", "ref_epd", "ref_sfa40", "ref_main", "ref_tongue", "ref_fpc_adapter", "coupons", "airq", "airq-mini"}
     for name, s in SCRIPTS.items():
         assert s.commands[0] == {"command": "file.new", "params": {"name": encbuild.module(name).DESIGN}}
-        assert encbuild.module(name).OUTPUT.startswith("reference/") == (name not in ("coupons", "airq"))
+        assert encbuild.module(name).OUTPUT.startswith("reference/") == (name not in ("coupons", "airq", "airq-mini"))
 
 
 @pytest.mark.parametrize("name", list(encbuild.DESIGNS))
@@ -116,6 +116,8 @@ def test_every_body_is_named(name):
                     "coupon_lg_bar_dark_2"],
         "airq": ["shell", "base_plate", "zone_wall", "sen66_top_seal", "zone_seal", "sen66_foam", "gasket_out", "gasket_in", "sen66_pad", "hcho_lid",
                  "grommet_zone_a", "grommet_zone_b", "grommet_j4_a", "grommet_j4_b", "grommet_tongue_a", "grommet_tongue_b", "light_guide", "crease_seal", "led_mask", "gap_stop", "orange_dot"],
+        "airq-mini": ["shell", "base_plate", "zone_wall", "zone_seal", "sen66_foam", "gasket_out", "gasket_in", "sen66_pad", "sen66_top_seal",
+                      "tongue_mount", "grommet_zone_a", "grommet_zone_b"],
     }[name]
     assert SCRIPTS[name].bodies == expected
 
