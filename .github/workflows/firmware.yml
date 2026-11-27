@@ -2,9 +2,9 @@ name: firmware
 
 on:
   push:
-    paths: ["firmware/**", "hardware/interface.yaml", "tests/**", ".github/workflows/firmware.yml"]
+    paths: ["firmware/**", "hardware/interface.yaml", "hardware/step/**", "enclosure/**", "tests/**", ".github/workflows/firmware.yml"]
   pull_request:
-    paths: ["firmware/**", "hardware/interface.yaml", "tests/**", ".github/workflows/firmware.yml"]
+    paths: ["firmware/**", "hardware/interface.yaml", "hardware/step/**", "enclosure/**", "tests/**", ".github/workflows/firmware.yml"]
 
 jobs:
   host-tests:

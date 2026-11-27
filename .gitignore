@@ -17,3 +17,6 @@ _autosave-*
 # reports kicad-cli writes into the working folder when run without -o
 *-erc.rpt
 *-drc.rpt
+
+# enclosure generator scripts and oversized designs (enclosure/README.md)
+enclosure/.build/
