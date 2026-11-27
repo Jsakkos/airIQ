@@ -194,6 +194,19 @@ def test_hold_pads_stand_on_the_zone_wall():
     assert {f"Hold pad {n}" for n in spans} <= names
 
 
+def test_drawer_grommet_split_is_pressed_shut():
+    """Review M2: the drawer grommet splits across x at the cables' line; the outer half reaches the shell's
+    side wall (drawer_squeeze into it, a lead-in at its top), the inner half the notch's closed end
+    (drawer_squeeze), so the split is squeezed shut between them; the outer half's bottom is at contact."""
+    a = next(c["params"] for c in S.commands if c["params"].get("name") == "Zone grommet a")
+    b = next(c["params"] for c in S.commands if c["params"].get("name") == "Zone grommet b")
+    assert V(a["corner"][0]) == pytest.approx(V("-inner_x - drawer_squeeze"))
+    assert V(f"{a['corner'][0]} + {a['length']}") == pytest.approx(V("cab_x")) == pytest.approx(V(b["corner"][0]))
+    assert V(f"{b['corner'][0]} + {b['length']}") == pytest.approx(V("dr_x1 + drawer_squeeze"))
+    assert V(a["corner"][2]) == pytest.approx(V("zw_z0")) and V("drawer_floor_squeeze") == 0
+    assert "Zone grommet a lead-in" in {c["params"].get("name") for c in S.commands}
+
+
 def test_labels_and_light_sensor_window():
     """Task 4b: "CO2" under the left half and "PM2.5" under the right, debossed 0.4, 5 mm tall (the
     coupon's legible size); the CO2 label's subscript is a 3.5 mm "2" (strokes about 0.48 above the

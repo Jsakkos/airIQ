@@ -51,7 +51,8 @@ SQUEEZES = ("gasket_squeeze", "wiper_squeeze", "pad_squeeze", "ring_preload", "r
 TOUCHES = (("gasket_out", "sen66_body"), ("gasket_in", "sen66_body"), ("gasket_in", "base_plate"), ("zone_seal", "base_plate"),
            ("sen66_pad", "sen66_body"), ("grommet_zone_a", "zone_wall"), ("grommet_zone_b", "zone_wall"),
            ("grommet_zone_a", "base_plate"), ("sen66_top_seal", "zone_wall"),
-           ("shell", "zone_wall"))                 # review I1: the shell's hold-down pads bear on the zone wall's top
+           ("shell", "zone_wall"),                 # review I1: the shell's hold-down pads bear on the zone wall's top
+           ("grommet_zone_a", "shell"))           # review M2: the side wall presses the split shut (a on b on the closed end)
 # the shell's datums (N1): the floor and the rear wall, and (review I1) the zone wall's top under its hold-down pads
 NUDGE_DATUMS = {"shell_ny_p": (("base_plate", "y", "D - wall"),), "shell_nz_m": (("base_plate", "z", "floor_t"), ("zone_wall", "z", "zw_z1"))}
 

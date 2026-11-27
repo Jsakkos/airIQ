@@ -151,6 +151,7 @@ def build() -> Script:
     p("groove_w", 0.8, "drawer grooves' height, centred in the zone wall's thickness")
     p("drawer_squeeze", 0.05, "TPU squeeze of the drawer grommet's faces (the airQ's B6 value; R9: the check sets 0)")
     p("drawer_floor_squeeze", 0, "the outer grommet's bottom on the left rail's top: at contact (review I1: a squeeze there would push the zone wall up beside the drawer, outside its holds; R9: the touch run sets 0.05)")
+    p("grommet_lead", 0.4, "lead-in on the outer drawer grommet's top outer edge: the shell's side wall slides down past it (review M2)")
     p("bore_squeeze", 0.2, "grommet bores under the cable's diameter (they hug the cable; R9: the check sets 0)")
     cable_params(s)
 
@@ -395,18 +396,27 @@ def grommets(s: Script) -> None:
     """`grommet_zone_a` (outer) and `grommet_zone_b` (inner), TPU 95A, split along the cables'
     line (x = cab_x) so they go round both cables with the plugs on. Each fills the notch between
     its faces with drawer_squeeze on the front and rear faces (and on the closed end for the inner
-    half); ribs in the notch's grooves hold them in z. The outer half sits on the left rail's top
-    (drawer_squeeze into it); the shell's side wall keeps it in. Bores hug the cables (bore_squeeze)."""
+    half); ribs in the notch's grooves hold them in z. The outer half stands on the left rail's top
+    at contact (review I1) and reaches the shell's side wall with drawer_squeeze (review M2): the wall
+    presses the split shut against the inner half and the notch's closed end, so the cables' push in
+    the bores (bore_squeeze) cannot open it."""
     sq, c = "drawer_squeeze", "clr_align"
     zm0, zm1 = f"zw_z0 + zone_t / 2 - groove_w / 2 + {c}", f"zw_z0 + zone_t / 2 + groove_w / 2 - {c}"
     rib = f"groove_d - {c}"
-    for half, xa, xb, z0 in (("a", "-inner_x + clr_remove", "cab_x", "zw_z0 - drawer_floor_squeeze"), ("b", "cab_x", f"dr_x1 + {sq}", "zw_z0")):
+    for half, xa, xb, z0 in (("a", "-inner_x - drawer_squeeze", "cab_x", "zw_z0 - drawer_floor_squeeze"), ("b", "cab_x", f"dr_x1 + {sq}", "zw_z0")):
         body = f"grommet_zone_{half}"
         s.box(f"Zone grommet {half}", [xa, f"dr_y0 - {sq}", z0], [f"{xb} - ({xa})", f"dr_y1 - dr_y0 + 2 * {sq}", f"zw_z1 - ({z0})"], body=body)
         s.box(f"Zone grommet {half} rib front", [xa, f"dr_y0 - {sq} - ({rib})", zm0], [f"{xb} - ({xa})", f"{rib} + 0.5", f"{zm1} - ({zm0})"],
               operation="join", targets=[body])
         s.box(f"Zone grommet {half} rib rear", [xa, f"dr_y1 + {sq} - 0.5", zm0], [f"{xb} - ({xa})", f"{rib} + 0.5", f"{zm1} - ({zm0})"],
               operation="join", targets=[body])
+    # review M2: the outer half reaches the shell's side wall (drawer_squeeze into it): the wall presses the split shut,
+    # so the cables' push in the bores cannot open it; a lead-in at its top outer edge for the wall coming down past it
+    with s.sketch("Zone grommet a lead-in outline", "XZ", offset="dr_y0 - drawer_squeeze - 1") as sk:
+        sk.polyline([("-inner_x - drawer_squeeze - 0.1", "-(zw_z1 + 0.1)"), ("-inner_x - drawer_squeeze + grommet_lead", "-(zw_z1 + 0.1)"),
+                     ("-inner_x - drawer_squeeze - 0.1", "-(zw_z1 - grommet_lead - 0.1)")])
+    s.extrude("Zone grommet a lead-in", "Zone grommet a lead-in outline", "dr_y1 - dr_y0 + 2 * drawer_squeeze + 2", operation="cut",
+              targets=["grommet_zone_a"])
     for name, y, d in (("GH", "gh_y", "cable_gh_d"), ("Qwiic", "qw_y", "cable_qw_d")):
         s.cylinder(f"Zone grommet hole {name}", ["cab_x", y, "zw_z0 - 1"], f"{d} - bore_squeeze", "zone_t + 2", operation="cut",
                    targets=["grommet_zone_a", "grommet_zone_b"])
