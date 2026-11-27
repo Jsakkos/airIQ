@@ -818,8 +818,8 @@ they enter (`interface.yaml`): Qwiic 6.0 × 2.95, GH 10.75 × 4.25, to confirm.
       finish") pushed tongue-first into the LED slot from inside and stuck to the panel's back with a
       0.2 mm adhesive pad (the bar's gap to the panel): it hangs by its tongue and the pad until the
       shell is on;
-  11. the FFC's free end into the adapter's ZIF with the shell held 25 mm over the base (the lift the
-      FFC allows with both ends plugged in), then the shell lowered along −z;
+  11. the FFC's free end into the adapter's ZIF with the shell held 15 mm over the base (the lift the
+      FFC allows with both ends plugged in, with 4 mm to spare), then the shell lowered along −z;
   12. feet.
 - **Fastening:** three M2 screws into heat-set inserts in the shell.
   - Two front floor bosses take screws from underneath, the heads under the felt feet. On the way
@@ -861,11 +861,12 @@ positions 3b needs (M6):
 - panel and its pocket: `panel_x0`, `panel_s0`, `bezel`, `window_xc`, `pocket_x0`, `pocket_x1`;
 - LED slot and light guide: `led_f0`, `led_h_slot`, `led_len`, `led_z`, `guide_t`;
 - adapter: `adapter_x`, `adapter_s`, `adapter_t`;
-- FFC: an 80 mm 24-pin 0.5 mm FFC, same-side contacts (Type A), 4.5 mm inserted at each end, into
-  `j7_x0` … `j7_x1`. Its seated route is 67.3 mm of centre line, 3.7 mm spare, and it lets the shell
-  be held 25 mm over the base with both ends plugged in. At J7 the contacts are up and pin 1 is on
+- FFC: an 80 mm 24-pin 0.5 mm FFC, same-side contacts (Type A), 5.2 mm inserted at each end (J7's body is
+  5.4 deep), into `j7_x0` … `j7_x1`. Its seated route is 68.1 mm of centre line, so 1.5 mm is left, within the
+  FFC's length tolerance (no bow to place), and it lets the shell be held 15 mm over the base with both
+  ends plugged in, with 4.3 mm to spare over the straight distance. At J7 the contacts are up and pin 1 is on
   the right, so pin i is on pin i (the adapter is taken as 1:1, both ZIFs on its panel side). The route
-  as built still has three 45° folds (the review asks for none, R39: open, see the report);
+  has three 45° direction-change folds (R42: at most three, made once at assembly over a fold jig, never re-flexed);
 - dot and flexure on SW1's push axis: `sw_x`, `sw_z`, `dot_f`, `dot_d`;
 - light-sensor window: `lsw_x`, `lsw_z`, `lsw_d`, and its gap in the slot rows, `lsw_gap_x0` …
   `lsw_gap_x1`;
@@ -993,8 +994,9 @@ These values are parameters, so a correction is a parameter change and a rebuild
 - The adapter: a 24-pin 0.5 mm FPC adapter with both ZIFs on the panel side, pins 1:1 (straight through) and its
   size (placeholder 12 × 20; the FFC ZIF's slot level, 1.0 above the board). A crossed or opposite-side adapter flips
   the contact-side outcome.
-- The FFC: 24-pin 0.5 mm, 80 mm, Type A (contacts on the same side at both ends), 12.5 wide, 0.3 thick, 4.5 inserted;
-  the vendor's fold and bend-radius rules (the route's 45° folds go against the scope's no-crease rule until it is re-routed).
+- The FFC: 24-pin 0.5 mm, 80 mm, Type A (contacts on the same side at both ends), 12.5 wide, 0.3 thick, 5.2 inserted;
+  choose an FFC whose datasheet allows folding (three 45° direction-change folds, made once over a jig), or a
+  factory-folded one; and check continuity of all 24 conductors on the prototype after the folds, before power.
 - The light guide: the tongue's fit in its slot (0.15 a side), the facets' print quality, the 0.2 adhesive pad, white
   then black cladding; a print of this guide shape is the proof that the 30 mm line lights evenly.
 - The button: a coupon of the face-down flexure with the rod at 30° (not yet made); the rod's end bottoms on SW1's body

@@ -132,9 +132,10 @@ def ffc_params(s: Script) -> None:
     p("ffc_x_gap", 2.0, "FFC: air from the adapter's mouth to crease 1's strip")
     p("ffc_x_c1", "ffc_x_m + ffc_w / 2 + ffc_x_gap", "FFC creases 1 and 2: the centre of their strip, x")
     p("ffc_z_j7", "board_z0 + board_t + ffc_slot_h", "FFC slot level in J7: z")
-    p("ffc_lh", 0.3, "FFC horizontal run into J7's mouth after the last bend")
+    p("ffc_lh", 1.5, "FFC horizontal run into J7's mouth after the last bend")
     p("ffc_crease", 0.5, "FFC length used by each fold (folded flat over itself)")
-    p("ffc_insert", 4.5, "FFC length inserted in each connector: J7's contacts 24 x 0.5 are 3.66 .. 4.0 long on a typical FFC, plus the stiffener's margin")
+    p("ffc_insert", 5.2, "FFC length inserted in each connector: J7's body is 5.4 deep (board_sources j7_body), so the tail goes in to 0.2 short of its back")
+    p("ffc_tol", 1.5, "FFC length the seated route may leave over: the vendor's length tolerance (typically +-1 mm) and 0.5 of insertion slip; the route is matched to the bought length within this, so no bow is needed")
     v = s.v
     lo, hi = _jog_limits(v)
     target = v("ffc_len") - 2 * v("ffc_insert")
@@ -172,7 +173,7 @@ def ffc_derived_params(s: Script) -> None:
     p("ffc_t_b", "ffc_t_a + ffc_pitch", "FFC layer B (between crease 1 and 2), depth behind the face")
     p("ffc_t_c", "ffc_t_b + ffc_pitch", "FFC layer C (the run under the LEDs), depth behind the face")
     p("ffc_t_d", "ffc_t_b", "FFC layer D (after crease 3, folded to the front of C), depth behind the face")
-    p("ffc_service_dz", "zw_z1 + 1 - (floor_t + boss_h) + 2.0", "service lift of the shell over its seat while the FFC is plugged in J7 and in the adapter: its floor bosses clear the zone wall's notch tops (zw_z1 + 1, with 2 mm to spare) - see airq_face.ffc_service")
+    p("ffc_service_dz", 15.0, "service lift of the shell over its seat while the FFC is plugged in J7 and in the adapter: enough to reach the adapter's ZIF with a finger (judgement); the floor bosses are still in the zone wall's notches, so the shell stays guided; the FFC allows more, see airq_face.ffc_service")
     p("ffc_service_margin", 2.0, "FFC service lift: the chain must be this much longer than the straight distance (the bends and the fold's thickness)")
     p("ffc_s_b0", "(board_y0 - ffc_lh - ffc_r * (2 - cos_t) - ffc_t_d * cos_t) / sin_t",
       "FFC layer D's straight run ends here (up the slope): where the bend over to J7's mouth starts")

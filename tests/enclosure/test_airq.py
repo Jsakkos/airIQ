@@ -482,16 +482,20 @@ def test_window_and_pocket_follow_the_panel():
 
 
 def test_ffc_route_length_and_service_lift():
-    """3b-1 feature 2: the FFC is 12.5 x 0.3 with bends of inner radius >= 1; its seated route (centre
-    line, from the adapter's mouth to J7's) plus the two insertions fits the bought length with a spare;
-    the shell can be lifted the service distance (the floor bosses clear the zone wall's notches) with
-    the FFC plugged in at J7 and the adapter."""
+    """3b-1 feature 2 (R42: at most three 45-degree direction-change folds, made once at assembly over a jig): the
+    FFC is 12.5 x 0.3; the route has at most three folds (flat, no radius, not re-flexed) and one radiused bend
+    into J7 of inner radius >= 1 (the only bend that moves); its centre line plus the two insertions fills the
+    bought 80 mm within the length tolerance (so there is no slack to place and no bow); with both ends plugged
+    in the shell can be lifted the service distance with a margin of 3 mm or more over the straight distance."""
     g = F.ffc_geometry(V, V("ffc_s_c3"))
     assert (V("ffc_w"), V("ffc_t")) == pytest.approx((12.5, 0.3))
-    assert V("ffc_r") - V("ffc_t") / 2 >= 1.0                                        # inner bend radius >= 1
+    assert round(g["creases"] / V("ffc_crease")) <= 3                              # at most three folds
+    assert V("ffc_r") - V("ffc_t") / 2 >= 1.0                                        # the J7 bend: inner radius >= 1
+    assert g["arc1"] > 0 and g["arc2"] > 0 and min(V("ffc_r") - V("ffc_t") / 2, V("ffc_r") + V("ffc_t") / 2) >= 1.0
     assert g["centre_len"] + 2 * V("ffc_insert") <= V("ffc_len")                    # fits the bought length
+    assert V("ffc_insert") <= B.j7_body()[1] - 0.2 + 1e-9                           # inserted short of J7's back
     spare = V("ffc_len") - 2 * V("ffc_insert") - g["centre_len"]
-    assert 0 <= spare < 10                                                          # no more than a few mm to lose
+    assert 0 <= spare <= V("ffc_tol")                                               # the route matches the length: no bow
     assert V("ffc_len") == 80.0                                                     # a standard length
     # J7: the ribbon enters its mouth between D2 and D3, inside the 15.5 body, flat, 1 mm over the board
     leds = B.MAIN["leds"]["chain"]
@@ -507,8 +511,8 @@ def test_ffc_route_length_and_service_lift():
     assert V("ffc_s_c3") + V("ffc_w") / 2 <= led_lo - 0.29
     assert V("ffc_x_m") == pytest.approx(V("adapter_x") + V("ad_l") / 2)
     sv = F.ffc_service(V, g, V("ffc_service_dz"))
-    assert sv["ok"], sv                                                              # service lift with both ends plugged
-    assert V("ffc_service_dz") >= V("zw_z1") + 1 - (V("floor_t") + V("boss_h"))     # the bosses are out of the zone wall's notches
+    assert sv["ok"] and sv["chain"] - sv["d_lift"] - V("ffc_service_margin") >= 3.0, sv   # service lift: 3 mm over the allowance
+    assert V("ffc_service_dz") <= V("zw_z1") + 1 - (V("floor_t") + V("boss_h"))     # the bosses are still in the zone wall's notches: the shell stays guided
     # the contacts side and pin 1 (hardware/interface.yaml mechanical.main.fpc.pin_order)
     out = F.ffc_pin_outcome()
     assert out == {"creases": 3, "contacts_up": True, "pin1_x": 1, "mirrored": False}
