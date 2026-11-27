@@ -291,21 +291,21 @@ def openings(s: Script) -> None:
     for row, zr in ((1, "slot_row1_z"), (2, "slot_row2_z")):
         for side, n, x0, ln in (("L", "in_n_l", "row_x0", "in_len_l"), ("R", "in_n_r", "lsw_gap_x1", "in_len_r")):
             for i in range(int(s.v(n))):
-                s.box(f"Intake slot {row}{side}{i + 1}", [f"{x0} + {i} * ({ln} + slot_bar)", "-0.5", zr], [ln, "wall + 1", "slot_w"],
+                s.box(f"Intake slot {row}{side}{i + 1}", [f"{x0} + {i} * ({ln} + slot_bar)", "-wall", zr], [ln, "3 * wall", "slot_w"],
                       operation="cut", targets=["base_plate"])
-    s.cylinder("Light-sensor window", ["lsw_x", "-0.5", "lsw_z"], "lsw_d", "wall + 1", axis="Y", operation="cut", targets=["base_plate"])
+    s.cylinder("Light-sensor window", ["lsw_x", "-wall", "lsw_z"], "lsw_d", "3 * wall", axis="Y", operation="cut", targets=["base_plate"])
     for i in range(int(s.v("out_n"))):
-        s.box(f"Outlet slot {i + 1}", [f"out_gx0 + {i} * out_pitch", "D - wall - 0.5", "out_gz0"], ["slot_w", "wall + 1", "out_gz1 - out_gz0"],
+        s.box(f"Outlet slot {i + 1}", [f"out_gx0 + {i} * out_pitch", "D - 2 * wall", "out_gz0"], ["slot_w", "3 * wall", "out_gz1 - out_gz0"],
               operation="cut", targets=["base_plate"])
     p("exh_n", 14, "electronics exhaust slot count: 14 x 2.4 - 1.2 = 32.4 fits exh_x0 ... exh_x1; whole number", unit="")
     for i in range(int(s.v("exh_n"))):
-        s.box(f"Exhaust slot {i + 1}", [f"exh_x0 + {i} * out_pitch", "D - wall - 0.5", "exh_z0"], ["slot_w", "wall + 1", "exh_z1 - exh_z0"],
+        s.box(f"Exhaust slot {i + 1}", [f"exh_x0 + {i} * out_pitch", "D - 2 * wall", "exh_z0"], ["slot_w", "3 * wall", "exh_z1 - exh_z0"],
               operation="cut", targets=["base_plate"])
     p("usb_plug_w", 12.5, "USB-C plug overmold width (typical, to confirm; README Layout studies row 9)")
     p("usb_plug_h", 7.0, "USB-C plug overmold height (typical, to confirm)")
     p("usb_open_w", "usb_plug_w + 2 * clr_remove", "USB-C opening width: the overmold passes (its tip is in the wall's thickness, usb_well)")
     p("usb_open_h", "usb_plug_h + 2 * clr_remove", "USB-C opening height")
-    s.box("USB-C opening", ["usb_x - usb_open_w / 2", "D - wall - 1", "usb_z - usb_open_h / 2"], ["usb_open_w", "wall + 2", "usb_open_h"],
+    s.box("USB-C opening", ["usb_x - usb_open_w / 2", "D - 2 * wall", "usb_z - usb_open_h / 2"], ["usb_open_w", "3 * wall", "usb_open_h"],
           operation="cut", targets=["base_plate"])
     v = s.v
     d, cx, cz = v("D"), v("usb_x"), v("usb_z")
