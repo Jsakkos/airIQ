@@ -85,6 +85,7 @@ def build() -> Script:
     C.add_standoffs(s)
     C.add_bosses(s)
     p("zw_pilot_depth", 1.6, "H2: blind M2 pilot from the pad's top into the zone wall (pad 0.3 + 1.3), 0.5 of zone wall left under it; an M2 x 3 screw takes 1.4 of thread")
+    p("h2_screw_len", 3.0, "H2's screw: M2 x 3 ONLY (board 1.6 + 1.4 of thread in the pilot); an M2 x 4, or the airQ's M2 x 6 board screw, would go through the 0.5 skin and the 0.3 gap into the SEN66's housing (review M6)")
     p("sen_x1", "tub_x - clr_remove", "SEN66 outlet end (right), beside the right rail")
     p("sen_x0", "sen_x1 - sen_l", "SEN66 inlet end (left): the intake passage between it and the left rail")
     p("passage", "sen_x0 + tub_x", "derived: the intake passage's width (Task 4a study 6.9)")

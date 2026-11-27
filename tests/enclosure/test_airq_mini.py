@@ -260,6 +260,9 @@ def test_h2_lies_over_the_sen66_so_it_has_no_post():
     assert V("sen_x0") < V("h2_x") - r and V("h2_x") < V("sen_x1") + r
     assert V("sen_y0") < V("h2_y") < V("sen_y1")
     assert V("zw_z0") < V("board_z0 - zw_pilot_depth") - 0.4
+    # review M6: H2's M2 x 3 ends in its pilot, over the skin; one 1 mm longer would reach the SEN66's top
+    tip = V("board_z0 + board_t - h2_screw_len")
+    assert V("board_z0 - zw_pilot_depth") <= tip and tip - 1.0 <= V("sen_top")
     names = {c["params"].get("name") for c in S.commands}
     assert "Standoff H1" in names and "Standoff H2" not in names
     assert "Zone wall pilot H2" in names and "Zone wall screw hole H2" not in names
