@@ -428,7 +428,7 @@ def flexure(s: Script) -> None:
     # the rod's front corner would stand proud of the face: trim everything in front of the face over the beam
     with s.sketch("Flex trim outline", slope_plane(s), offset=toff("0")) as sk:
         sk.rect("flex_x0", ys("dot_s - 3"), "flex_x1", ys("dot_s + 3"))
-    s.extrude("Flex trim", "Flex trim outline", "2", operation="cut", targets=["shell"])
+    s.extrude("Flex trim", "Flex trim outline", "dot_d / 2", operation="cut", targets=["shell"])
 
 
 def orange_dot(s: Script) -> None:
@@ -436,6 +436,8 @@ def orange_dot(s: Script) -> None:
     end, on SW1's push axis, top right (right of the pocket). It is a separate body in the same job: cut
     from the shell and filled by this body, which touches it everywhere (no clearance)."""
     with s.sketch("Dot outline", slope_plane(s), offset=toff("0")) as sk:
-        sk.circle(("sw_x", ys("dot_s")), "dot_d")
+        n = 32                                   # a 32-gon: a sketch circle would add an unnamed dimension parameter
+        sk.polyline([(f"sw_x + dot_d / 2 * {math.cos(2 * math.pi * i / n):.6f}", ys(f"dot_s + dot_d / 2 * {math.sin(2 * math.pi * i / n):.6f}"))
+                     for i in range(n)])
     s.extrude("Dot recess", "Dot outline", "dot_depth", operation="cut", targets=["shell"], direction="negative")
     s.extrude("Orange dot", "Dot outline", "dot_depth", body="orange_dot", direction="negative")

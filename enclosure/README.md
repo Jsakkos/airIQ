@@ -879,6 +879,15 @@ keep-outs (`ko_*`), the air probes (`air_*`) and the shell's sweep (`sweep_*`, `
 
 `tests/enclosure/test_airq.py` repeats it.
 
+### Shell face (Task 3b-1): print and finish
+
+| Part | Print | Finish / material |
+|---|---|---|
+| `shell` | face down on textured PEI; the adapter holder's arm hangs free and needs support, reached from the open bottom before the panel goes in | warm white; the panel is bonded to the bezel's back with 0.1 mm tape (no rear retainer) |
+| `orange_dot` | same job as the shell, an AMS colour region: it prints first, on the bed, flush with the face (a 0.6 deep recess in the flexure beam's tip) | orange |
+| `light_guide` | clear PETG, standing on its leg ends or lying on its back (the legs are 2 mm bars) | **Opacity: every surface except the four entry windows (each LED face inset 0.4 / 0.2 / 0.2, 0.2 in front of it) and the exit tongue's front face is coated matt black (paint or vinyl tape), so no guide surface sees U4 (R13) or the crease.** Chosen over a printed opaque sleeve or a two-material print: the guide is only 2 mm thick and the coating costs no clearance |
+| `crease_seal` | not printed: 0.3 mm black closed-cell foam tape, full width, 1.7 wide, on the lip's top | black |
+
 ### Check table
 
 Task 3a filled the rows its features answer. Task 3b completes the table.
