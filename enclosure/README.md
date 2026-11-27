@@ -814,11 +814,12 @@ they enter (`interface.yaml`): Qwiic 6.0 × 2.95, GH 10.75 × 4.25, to confirm.
   9. the FFC into J7 (contacts up, latch closed; the shell is off, so J7 is open from above);
   10. on the shell, upside down on the bench: the panel taped (0.1 mm tape) into its pocket, its tail
       folded into the adapter, `crease_seal` (0.3 mm black foam tape) stuck on the lip's top (the
-      base's side, see the table above), the clear `light_guide` (cladded, see "Shell face: print and
+      base's side, see the table above), the bare clear `light_guide` (no cladding; see "Shell face: print and
       finish") pushed tongue-first into the LED slot from inside and stuck to the panel's back with a
       0.2 mm adhesive pad (the bar's gap to the panel): it hangs by its tongue and the pad until the
-      shell is on;
-  11. the FFC's free end into the adapter's ZIF with the shell held 15 mm over the base (the lift the
+      shell is on; the black foam `led_mask` stuck to the panel's back in front of D3 and D4 (also 0.2 mm
+      adhesive pad);
+  11. the FFC's free end into the adapter's ZIF with the shell held 12 mm over the base (the lift the
       FFC allows with both ends plugged in, with 4 mm to spare), then the shell lowered along −z;
   12. feet.
 - **Fastening:** three M2 screws into heat-set inserts in the shell.
@@ -861,12 +862,14 @@ positions 3b needs (M6):
 - panel and its pocket: `panel_x0`, `panel_s0`, `bezel`, `window_xc`, `pocket_x0`, `pocket_x1`;
 - LED slot and light guide: `led_f0`, `led_h_slot`, `led_len`, `led_z`, `guide_t`;
 - adapter: `adapter_x`, `adapter_s`, `adapter_t`;
-- FFC: an 80 mm 24-pin 0.5 mm FFC, same-side contacts (Type A), 5.2 mm inserted at each end (J7's body is
-  5.4 deep), into `j7_x0` … `j7_x1`. Its seated route is 68.1 mm of centre line, so 1.5 mm is left, within the
-  FFC's length tolerance (no bow to place), and it lets the shell be held 15 mm over the base with both
-  ends plugged in, with 4.3 mm to spare over the straight distance. At J7 the contacts are up and pin 1 is on
-  the right, so pin i is on pin i (the adapter is taken as 1:1, both ZIFs on its panel side). The route
-  has three 45° direction-change folds (R42: at most three, made once at assembly over a fold jig, never re-flexed);
+- FFC: a 75 mm 24-pin 0.5 mm FFC, same-side contacts (Type A), 3.5 mm inserted at each end (about 3.5 mm goes
+  inside J7: `hardware/README.md`, "E-ink FPC fit (airQ)", the reach analysis, lines 167 and 176), into `j7_x0` …
+  `j7_x1`. Its seated route is 68.0 mm of centre line, so route and insertions fill the 75 mm; the fold jig takes
+  the vendor's ±1 mm (the jog's depth moves by about half of it), so there is no slack and no bow. It lets the shell
+  be held 12 mm over the base with both ends plugged in, 4.3 mm over the straight distance. At J7 the contacts are
+  up and pin 1 is on the right, so pin i is on pin i (the adapter is taken as 1:1, both ZIFs on its panel side). The
+  route has three 45° direction-change folds (R42: at most three, made once at assembly over a fold jig, never
+  re-flexed);
 - dot and flexure on SW1's push axis: `sw_x`, `sw_z`, `dot_f`, `dot_d`;
 - light-sensor window: `lsw_x`, `lsw_z`, `lsw_d`, and its gap in the slot rows, `lsw_gap_x0` …
   `lsw_gap_x1`;
@@ -913,7 +916,8 @@ thickness; `airq_check.opening_probes`).
 |---|---|---|
 | `shell` | face down on textured PEI; the adapter holder's arm hangs free and needs support, reached from the open bottom before the panel goes in | warm white; the panel is bonded to the bezel's back with 0.1 mm tape (no rear retainer) |
 | `orange_dot` | same job as the shell, an AMS colour region: it prints first, on the bed, flush with the face (a 0.6 deep recess in the flexure beam's tip) | orange |
-| `light_guide` | clear PETG, standing on its leg ends or lying on its back (the legs are 2 mm bars) | **Opacity: every surface except the four entry windows (each LED face inset 0.4 / 0.2 / 0.2, 0.2 in front of it) and the exit tongue's front face is coated matt black (paint or vinyl tape), so no guide surface sees U4 (R13) or the crease.** Chosen over a printed opaque sleeve or a two-material print: the guide is only 2 mm thick and the coating costs no clearance |
+| `light_guide` | clear PETG, standing on its leg ends or lying on its back (the legs are 2 mm bars) | **Bare: no coating, cladding or paint on any face (R45).** Total internal reflection at the two facets and the faces needs bare PETG facing air; the bar's front sits 0.2 from the panel (an adhesive pad fills the gap and is the only contact). It is lit by D1 and D2 only; every bare face that can see U4 or the crease is stopped by the zone wall, the LED bodies or the board (R13 row), and the line's evenness along its 30 mm is a print item (To confirm) |
+| `led_mask` | not printed: black closed-cell foam block in front of D3 and D4, 0.2 from their faces, stuck on the panel's back | black; stops D3's and D4's light so none reaches the case, the light sensor, the crease or U4 (firmware drives all four alike) |
 | `crease_seal` | not printed: 0.3 mm black closed-cell foam tape, full width, 1.7 wide, on the lip's top | black |
 
 ### Check table
@@ -956,13 +960,13 @@ Every row is measured on the geometry where the check design can (probes with `i
 | Light-sensor window | in front of the VEML7700, free line to it | ⌀ 2.5 hole at x 16.4, z 11.74 (centre = the tongue's window, R27) in the lip's gap in the rows; open area 4.91 = π ⌀² / 4; the line from the window to the tongue's front edge is free (probe `air_lsw`, interference 0); window's lower edge 10.49 | `op_lsw` probe; `air_lsw` | pass |
 | USB-C opening (review focus 5) | on J1's plug axis, passes the overmold, 0.5 chamfer | 12.9 × 7.4 (the 12.5 × 7 overmold + `clr_remove` a side) centred on x 1.4, z 34.18 (J1's axis); chamfer 0.5 on the outer edge: the wall keeps 5.408 mm³ over the chamfer's depth against 5.414 for the frustum; the probe 0.05 under the opening meets nothing, the one 0.05 over meets the 2.550 mm³ ring, so the opening is within 0.05 of its place and size; J1's shell axis is free to the outside (`air_usb_axis`); lower edge 30.48, 0.22 under the zone wall's top (opens only the dead-end 0.2 slit over the rib, not the sensor zone) | probes `usb_in`, `usb_out`, `usb_cham`, `air_usb_axis` (`test_usb_opening_fit_and_chamfer`) | pass; overmold size to confirm |
 | Upper-rear exhaust | stays apart from the outlet (R26), faces free air | 14 slots 1.2 × 10 at x 9.4 … 41.8, z 37.0 … 47.0, above the antenna module (top 36.9), 168.0 mm²; 9.7 above the outlet grille's top, 1.55 from the USB-C opening | `op_exhaust` probe, `air_exhaust` | pass |
-| Opaque walls (review focus 3; guide → VEML7700) | ≥ 1.2 of opaque path from any non-exit guide surface to the sensor | 1.20 to the sensor (through the ledge, `zone_seal` and the lip), 1.48 to the lip's window, 1.29 to the crease's front (plugged by `crease_seal`); sources: every non-exit surface of the guide and the four LED faces (the LED faces added, review M2); the guide's non-window surfaces are clad white then black, the two facets stay bare and face air | analytic 2-D section at the sensor's x with `light_paths` (`test_guide_light_stays_off_the_crease_the_sensor_and_u4`); not a ray trace | pass (margin 0 at the sensor: the slot's `led_f0` was raised 0.3 for it) |
-| MS5611 line of sight (R13) | no straight line from the LEDs or the guide to U4's port | 0 of 196 entry-window samples reach U4 (the LED bodies and the board stop them); the 196 LED-face lines start on the faces and the LED's emission hemisphere (-y) does not contain U4 (behind it), counted by the hemisphere test, not by the LED's own body | analytic ray against the LED and board boxes, `airq_check.ms5611_sight` (arithmetic, not a ray trace in SolidCraft) | pass |
-| Clearances are parameters (review focus 1) | every fit is a `clr_*` parameter, swept | `clr_align`, `clr_remove`, `clr_snap` ±0.1 and `wall` 1.6 / 2.4 rebuild every feature, the openings included; the shell nudged 0.05 meets only its datums | the rebuild walk and the nudge run above; the light guide's fits are `clr_align` (tongue in its slot) and `clr_remove` (to the shell, the panel's pad gap, the LED faces); the 3b-1 fix round moved them from literals | rebuild walk: measured; fits: arithmetic (`test_guide_fits_come_from_the_clearances`) | pass |
+| Opaque walls (review focus 3; guide → VEML7700) | ≥ 1.2 of opaque path from any non-exit guide surface to the sensor | 1.20 to the sensor (through the ledge, `zone_seal` and the lip), 1.48 to the lip's window, 1.29 to the crease's front (plugged by `crease_seal`); sources: every non-exit surface of the bare guide and the four LED faces (D3, D4 behind `led_mask`) | analytic 2-D section at the sensor's x with `light_paths` (`test_guide_light_stays_off_the_crease_the_sensor_and_u4`); not a ray trace | pass (margin 0 at the sensor: the slot's `led_f0` was raised 0.3 for it) |
+| MS5611 line of sight (R13) | no straight line from the LEDs or the guide to U4's port | 0 of 98 entry-window samples (D1, D2) and 0 of 91 samples on the guide's other bare faces whose outward half-space holds U4 reach it (the LED bodies, the zone wall and the board stop them); the 196 LED-face samples: U4 is behind the faces' emission hemisphere (-y), counted by the hemisphere test; D3, D4 are behind `led_mask` | analytic ray against the LED and board boxes, `airq_check.ms5611_sight` (arithmetic, not a ray trace in SolidCraft) | pass |
+| Clearances are parameters (review focus 1) | every fit is a `clr_*` parameter, swept | `clr_align`, `clr_remove`, `clr_snap` ±0.1 and `wall` 1.6 / 2.4 rebuild every feature, the openings included; the shell nudged 0.05 meets only its datums; the light guide's fits are `clr_align` (tongue in its slot) and `clr_remove` (to the shell, the panel's pad gap, the LED faces) | the rebuild walk and the nudge run above (measured); the guide's fits by arithmetic (`test_guide_fits_come_from_the_clearances`) | pass |
 | Intake and outlet separate, gasket faces touch (review focus 2) | no warm or exhaust air to the intake | grilles 51.4 apart on opposite faces (above); the outlet's ring, the inlet wiper, the pad and the seals touch the SEN66 at squeeze 0 and overlap by area × 0.05 at 0.05 | rows above (gaskets, grilles apart) | pass |
 | Grilles without feet (review focus 4) | ≥ 10 with the feet off | see "Openings' lower edges" | as above | pass |
 | Positions from their sources (R27) | read, not retyped | every board and reference position compared with `interface.yaml`, the references and `layout.yaml` | `test_positions_are_read_from_their_sources`, `test_generator_retypes_no_board_numbers` | pass |
-| Intake and outlet grilles apart (review focus 2) | ≥ 20, on different faces | **51.4** between the intake slots' inner faces (y 1.8) and the outlet's (y 53.2), 55.0 outer face to outer face; the intake is in the lip's front face (faces −y), the outlet and the exhaust in the rear wall (+y), the HCHO grille in the right side (+x) | `inspect.clearance` between the probes `op_intake_l/r` and `op_outlet` (`test_distances_on_the_geometry`); the faces from the cuts' y (`test_openings_are_cut_where_the_parameters_say`) | pass |
+| Intake and outlet grilles apart (review focus 2) | ≥ 20, on different faces | **51.4** between the intake slots' inner faces (y 1.8) and the outlet's (y 53.2), 55.0 outer face to outer face; the intake is in the lip's front face (faces −y), the outlet and the exhaust in the rear wall (+y), the HCHO grille in the right side (+x) | arithmetic: `inspect.clearance` between probe boxes built from the parameters (D − 2·wall), not a model of the part; the faces from the cuts' y (`test_openings_are_cut_where_the_parameters_say`) | pass |
 
 ## Sources
 
@@ -994,11 +998,18 @@ These values are parameters, so a correction is a parameter change and a rebuild
 - The adapter: a 24-pin 0.5 mm FPC adapter with both ZIFs on the panel side, pins 1:1 (straight through) and its
   size (placeholder 12 × 20; the FFC ZIF's slot level, 1.0 above the board). A crossed or opposite-side adapter flips
   the contact-side outcome.
-- The FFC: 24-pin 0.5 mm, 80 mm, Type A (contacts on the same side at both ends), 12.5 wide, 0.3 thick, 5.2 inserted;
+- The FFC: 24-pin 0.5 mm, 75 mm, Type A (contacts on the same side at both ends), 12.5 wide, 0.3 thick, 3.5 inserted
+  (hardware/README.md:167, :176); stock lengths to confirm with the vendor (50, 60, 75, 80, 100 mm are the usual ones: 60
+  is too short for the route, 80 and 100 leave 5 and 25 mm of slack with no room for a bow, so a 75 mm cut is needed);
   choose an FFC whose datasheet allows folding (three 45° direction-change folds, made once over a jig), or a
   factory-folded one; and check continuity of all 24 conductors on the prototype after the folds, before power.
-- The light guide: the tongue's fit in its slot (0.15 a side), the facets' print quality, the 0.2 adhesive pad, white
-  then black cladding; a print of this guide shape is the proof that the 30 mm line lights evenly.
+- The light guide (R45): print it and look: whether D1 and D2 light the 30 mm line evenly (the line is lit near x −10 … 11
+  only in the 2-D trace; a rough facet or a diffuser strip may be needed), the tongue's fit in its slot (0.15 a side),
+  the facets' print quality, the 0.2 adhesive pad. The 2-D trace gives about 4.6 % of the LED cone to the exit.
+- Deferred to the prototype: how the shell is lifted with the FFC in (layer D curls about 7.5 mm at a 12–15 mm lift; creases
+  1 and 2 must not re-flex); whether the adapter's ZIF can be reached at that lift; the stack of `flex_gap` against the
+  y tolerances (a negative stack holds SW1 closed, the stop being the switch); SW1's stem protrusion against the 2.4 mm
+  rod landing on the body; where the fold jig puts the three folds.
 - The button: a coupon of the face-down flexure with the rod at 30° (not yet made); the rod's end bottoms on SW1's body
   0.04 after the switch has bottomed.
 

@@ -134,8 +134,8 @@ def ffc_params(s: Script) -> None:
     p("ffc_z_j7", "board_z0 + board_t + ffc_slot_h", "FFC slot level in J7: z")
     p("ffc_lh", 1.5, "FFC horizontal run into J7's mouth after the last bend")
     p("ffc_crease", 0.5, "FFC length used by each fold (folded flat over itself)")
-    p("ffc_insert", 5.2, "FFC length inserted in each connector: J7's body is 5.4 deep (board_sources j7_body), so the tail goes in to 0.2 short of its back")
-    p("ffc_tol", 1.5, "FFC length the seated route may leave over: the vendor's length tolerance (typically +-1 mm) and 0.5 of insertion slip; the route is matched to the bought length within this, so no bow is needed")
+    p("ffc_insert", 3.5, "FFC length inserted in each connector: about 3.5 mm goes inside J7 (hardware/README.md, 'E-ink FPC fit (airQ)', the reach analysis, lines 167 and 176; FPC-05FB-24PH20 back-flip); the adapter's ZIF is taken alike")
+    p("ffc_tol", 1.5, "FFC length the seated route may leave over or short: the vendor's length tolerance (typically +-1 mm) and 0.5 of insertion slip. The folds are made once at assembly over a jig, so the jog depth takes it up (R42); no bow is needed")
     v = s.v
     lo, hi = _jog_limits(v)
     target = v("ffc_len") - 2 * v("ffc_insert")
@@ -152,7 +152,7 @@ def ffc_params(s: Script) -> None:
             else:
                 b = m
         s_c3 = b
-    p("ffc_s_c3", round(s_c3, 3), "FFC run C (behind the guide's legs, under the LEDs): its centre line up the slope; sized in airq_face.ffc_params so the route fits ffc_len")
+    p("ffc_s_c3", math.ceil(s_c3 * 1000) / 1000, "FFC run C (behind the guide's legs, under the LEDs): its centre line up the slope; sized in airq_face.ffc_params so the route fits ffc_len")
 
 
 def _jog_limits(v) -> tuple[float, float]:
@@ -173,7 +173,7 @@ def ffc_derived_params(s: Script) -> None:
     p("ffc_t_b", "ffc_t_a + ffc_pitch", "FFC layer B (between crease 1 and 2), depth behind the face")
     p("ffc_t_c", "ffc_t_b + ffc_pitch", "FFC layer C (the run under the LEDs), depth behind the face")
     p("ffc_t_d", "ffc_t_b", "FFC layer D (after crease 3, folded to the front of C), depth behind the face")
-    p("ffc_service_dz", 15.0, "service lift of the shell over its seat while the FFC is plugged in J7 and in the adapter: enough to reach the adapter's ZIF with a finger (judgement); the floor bosses are still in the zone wall's notches, so the shell stays guided; the FFC allows more, see airq_face.ffc_service")
+    p("ffc_service_dz", 12.0, "service lift of the shell over its seat while the FFC is plugged in J7 and in the adapter: enough to reach the adapter's ZIF with a finger (judgement, to confirm on the prototype); the floor bosses are still in the zone wall's notches, so the shell stays guided; see airq_face.ffc_service")
     p("ffc_service_margin", 2.0, "FFC service lift: the chain must be this much longer than the straight distance (the bends and the fold's thickness)")
     p("ffc_s_b0", "(board_y0 - ffc_lh - ffc_r * (2 - cos_t) - ffc_t_d * cos_t) / sin_t",
       "FFC layer D's straight run ends here (up the slope): where the bend over to J7's mouth starts")
@@ -317,13 +317,16 @@ def guide_params(s: Script) -> None:
     p("gd_sf", "gd_sb - (gd_tb - gd_t0) * cos_t / sin_t", "light guide foot: where the front face turns into the turning facet (a plane at the tilt to the slope: light from the LED, going -t and -s, meets it at 60 degrees, over PETG's 39.6 critical angle, and turns down the leg)")
     p("gd_tc", "(gd_y_e - (led_z - led_face_h / 2 - lip) * sin_t / cos_t) * cos_t", "light guide foot: depth of the entry plane at the faces' lower edge")
     p("gd_sc", "(led_z - led_face_h / 2 - lip + gd_tc * sin_t) / cos_t", "light guide foot: slope position there")
-    p("gd_l1x0", "led_d1_x - led_face_w / 2 - gd_clr", "light guide: D1/D2 leg, tail-side face")
-    p("gd_l1x1", "led_d2_x + led_face_w / 2 + gd_clr", "light guide: D1/D2 leg, far face")
-    p("gd_l2x0", "led_d3_x - led_face_w / 2 - gd_clr", "light guide: D3/D4 leg, tail-side face")
-    p("gd_l2x1", "led_d4_x + led_face_w / 2 + gd_clr", "light guide: D3/D4 leg, far face")
+    p("gd_l2x0", "led_d3_x - led_face_w / 2 - gd_clr", "LED mask over D3 and D4 (R45): tail-side face")
+    p("gd_l2x1", "led_d4_x + led_face_w / 2 + gd_clr", "LED mask over D3 and D4: far face")
+    p("mask_mz", 0.6, "LED mask: beyond the LED faces' top and lower edges")
     p("gd_win_xm", 0.4, "light guide: the uncoated entry window starts this far inside the LED face's tail-side (-x) edge (a line to U4, at -x, drifts that way over the 0.2 gap and the LED's depth)")
     p("gd_win_xp", 0.2, "light guide: the uncoated entry window stops this far inside the LED face's far (+x) edge")
     p("gd_win_z", 0.2, "light guide: the uncoated entry window is this far inside the LED face's top and lower edges")
+    p("gd_l1x0", "led_d1_x - led_face_w / 2 + gd_win_xm", "light guide: D1/D2 leg, tail-side face: inside D1's face by gd_win_xm, so a line from the leg toward U4 (at -x) enters D1's body")
+    p("gd_l1x1", "led_d2_x + led_face_w / 2 - gd_win_xp", "light guide: D1/D2 leg, far face: inside D2's face by gd_win_xp")
+    p("gd_la_x1", "led_d1_x + led_face_w / 2 - gd_win_xp", "light guide: D1 foot's far face")
+    p("gd_lb_x0", "led_d2_x - led_face_w / 2 + gd_win_xm", "light guide: D2 foot's tail-side face (no guide face over the gap between D1 and D2, where a line to U4 would pass between the LEDs)")
     p("gd_tg", "clr_align", "light guide: the tongue's clearance to the slot on each side (clr_align: located part)")
     p("gd_rec", "clr_remove + 0.1", "light guide: the tongue's front face is this far behind the face")
     p("crease_y0", 0.12, "crease seal: front edge, flush with the shell's outer face at its lower edge (the foam plugs the parting line over the lip's top from the outside: 1.7 of foam)")
@@ -367,14 +370,28 @@ def light_guide(s: Script) -> None:
     meets the bar's bottom 45 degree facet (TIR) which turns it toward the slot; the tongue, continuous
     with the bar's bottom, fills the slot (clr_align each side) and shows the line. The legs are the
     only parts in the FFC's row; the bar sits gd_clr behind the panel (the adhesive pad's gap).
-    The facets stay uncoated and face air; the other faces take a white layer then black (a coat in
-    optical contact would kill TIR)."""
+    No face is coated or clad (R45): every face is bare PETG facing air (the pad on the bar's front is
+    the one contact). D3 and D4 do not feed it: `led_mask` covers them."""
     pc = guide_profile_pts()
     x0, x1 = "led_x0 + gd_tg", "led_x1 - gd_tg"
     _guide_poly(s, "Guide tongue", pc["tongue"], x0, x1, True)
-    _guide_poly(s, "Guide low", pc["low"], x0, "gd_l2x1", False)
-    for k, (lx0, lx1) in enumerate((("gd_l1x0", "gd_l1x1"), ("gd_l2x0", "gd_l2x1")), 1):
-        _guide_poly(s, f"Guide leg {k}", pc["leg"], lx0, lx1, False)
+    _guide_poly(s, "Guide low", pc["low"], x0, x1, False)
+    _guide_poly(s, "Guide leg 1", pc["leg"], "gd_l1x0", "gd_la_x1", False)
+    _guide_poly(s, "Guide leg 2", pc["leg"], "gd_lb_x0", "gd_l1x1", False)
+
+
+def led_mask(s: Script) -> None:
+    """`led_mask` (R45): black closed-cell foam in front of D3 and D4, stuck to the panel's back (the 0.2 adhesive
+    pad's gap), gd_clr from their faces: their light is stopped there and does not reach the case, the light
+    sensor, the crease or U4. The line is lit by D1 and D2 only (firmware unchanged)."""
+    zt, zb = "(led_z + led_face_h / 2 + mask_mz)", "(led_z - led_face_h / 2 - mask_mz)"
+    tt = f"((gd_y_e - ({zt} - lip) * sin_t / cos_t) * cos_t)"
+    tb = f"((gd_y_e - ({zb} - lip) * sin_t / cos_t) * cos_t)"
+    st = f"(({zt} - lip + {tt} * sin_t) / cos_t)"
+    sb = f"(({zb} - lip + {tb} * sin_t) / cos_t)"
+    with s.sketch("LED mask profile", "YZ", offset="gd_l2x0") as sk:
+        sk.polyline([yz(sb, "gd_t0"), yz(sb, tb), yz(st, tt), yz(st, "gd_t0")])
+    s.extrude("LED mask", "LED mask profile", "gd_l2x1 - gd_l2x0", body="led_mask")
 
 
 def crease_seal(s: Script) -> None:

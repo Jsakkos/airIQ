@@ -728,13 +728,15 @@ def light_paths(s) -> dict:
 
 
 def ms5611_sight(s) -> dict:
-    """R13: the straight lines from the LED faces and the guide's uncoated faces to the MS5611's port
-    (U4): `unblocked` counts those that no opaque part stops (0 is the pass). The light guide's
-    surfaces other than the four entry windows and the exit face are coated (opaque), so those are
-    the only guide faces that emit. Sources: samples on each LED face and on each entry window (the
-    LED face inset by gd_win_*, gd_clr in front of it); the exit face emits outward, so U4,
-    which is behind it, is not in its hemisphere. Obstacles: the LED bodies (depth from the
-    interface.yaml comment) and the board."""
+    """R13 (arithmetic: straight lines against boxes and the zone wall, not a SolidCraft ray trace): `unblocked`
+    counts the straight lines to the MS5611's port (U4) that nothing opaque stops (0 is the pass).
+    - LED faces (all four): each emits into -y only and U4 is behind them, so no line in the hemisphere.
+    - The guide's entry windows (the leg's entry plane in front of D1 and D2, inset gd_win_z top and bottom):
+      the LED bodies and the board stop every line.
+    - Every other bare face of the guide whose outward half-space holds U4 (`guide_surface_sight`): the zone
+      wall, the LED bodies and the board stop them; the leg stops inside D1's face by `gd_win_xm`, so a line
+      toward U4 (at -x) enters D1's body.
+    - D3 and D4: masked by `led_mask`, which has no line to U4 either (it is opaque foam)."""
     v = s.v
     u4 = B.layout_part("U4")["center"]
     ms_h = 1.0                                                      # MS5611 package height (datasheet; its port is in the lid)
@@ -767,9 +769,12 @@ def ms5611_sight(s) -> dict:
         cx = v(f"led_d{i}_x")
         for a in range(n + 1):
             for b in range(n + 1):
-                for kind, y, (im, ip, iz) in (("led_faces", yf, (0.0, 0.0, 0.0)),
-                                              ("entry_windows", v("gd_y_e"), (v("gd_win_xm"), v("gd_win_xp"), v("gd_win_z")))):
-                    x0, x1 = cx - w / 2 + im, cx + w / 2 - ip
+                for kind, y in (("led_faces", yf), ("entry_windows", v("gd_y_e"))):
+                    if kind == "entry_windows" and i > 2:
+                        continue                                    # D3, D4: masked
+                    x0 = cx - w / 2 if kind == "led_faces" else v("gd_l1x0" if i == 1 else "gd_lb_x0")
+                    x1 = cx + w / 2 if kind == "led_faces" else v("gd_la_x1" if i == 1 else "gd_l1x1")
+                    iz = 0.0 if kind == "led_faces" else v("gd_win_z")
                     p = (x0 + (x1 - x0) * a / n, y, zc - hh / 2 + iz + (hh - 2 * iz) * b / n)
                     count[kind] += 1
                     # a LED face emits into -y only: U4 is behind it, so only lines in that hemisphere count
@@ -777,7 +782,73 @@ def ms5611_sight(s) -> dict:
                         continue
                     if not hits(p, (tx, ty, tz)):
                         un[kind] += 1
+    surf = guide_surface_sight(s)
+    count["guide_faces"], un["guide_faces"] = surf
     return {"target": (tx, ty, tz), "samples": count, "unblocked": un}
+
+
+def _inside(poly, y, z) -> bool:
+    c = False
+    for i in range(len(poly)):
+        (ay, az), (by, bz) = poly[i], poly[(i + 1) % len(poly)]
+        if (az > z) != (bz > z) and y < ay + (z - az) * (by - ay) / (bz - az):
+            c = not c
+    return c
+
+
+def guide_surface_sight(s) -> tuple[int, int]:
+    """(lines tried, unblocked) from samples on every bare face of the guide, except its exit and entry
+    faces, whose outward half-space holds U4, to U4's port: obstacles are the zone wall, the LED bodies
+    and the board (a point walk along the line). The leg's end faces use x = gd_l1x0 and gd_l1x1; the bar's
+    its own ends."""
+    v = s.v
+    sn, c, lip = v("sin_t"), v("cos_t"), v("lip")
+    poly = guide_outline(s)
+    n = len(poly)
+    u4 = B.layout_part("U4")["center"]
+    tgt = (v("board_x0") + u4[0], v("board_y0") + v("board_d") - u4[1], v("board_z0") + v("board_t") + 1.0)
+    zw = [(v("wall + seal_t"), v("ledge_z0")), (v(C.yb("ledge_z0")), v("ledge_z0")), (v(C.yb("zw_z0")), v("zw_z0")),
+          (v("D - wall - clr_remove"), v("zw_z0")), (v("D - wall - clr_remove"), v("zw_z1")), (v(C.yf("zw_z1")), v("zw_z1")),
+          (v(C.yf("ledge_z1")), v("ledge_z1")), (v("wall + seal_t"), v("ledge_z1"))]
+    w, dep, yf = v("led_face_w"), B.led_body_d(), v("board_y0")
+    leds = [(v(f"led_d{i}_x") - w / 2, v(f"led_d{i}_x") + w / 2) for i in range(1, 5)]
+
+    def blocked(p, q) -> bool:
+        for k in range(1, 300):
+            f = k / 300
+            x, y, z = (p[j] + (q[j] - p[j]) * f for j in range(3))
+            if _inside(zw, y, z):
+                return True
+            if any(a <= x <= b for a, b in leds) and yf <= y <= yf + dep and v("led_z") - v("led_face_h") / 2 <= z <= v("led_z") + v("led_face_h") / 2:
+                return True
+            if v("board_x0") <= x <= v("board_x0") + v("board_w") and yf <= y and v("board_z0") <= z <= v("board_z0") + v("board_t"):
+                return True
+        return False
+    tried = bad = 0
+    for i in range(1, n):
+        if i == 4:
+            continue                                                # the entry plane (the windows above)
+        (a0, b0), (a1, b1) = poly[i], poly[(i + 1) % n]
+        ex, ey = a1 - a0, b1 - b0
+        ln = math.hypot(ex, ey)
+        nx, ny = -ey / ln, ex / ln
+        if _inside(poly, (a0 + a1) / 2 + nx * 1e-3, (b0 + b1) / 2 + ny * 1e-3):
+            nx, ny = -nx, -ny
+        nwy, nwz = nx * sn + ny * c, nx * c - ny * sn
+        # the leg's faces (poly 3..7) at the leg's x range; the others at the bar's
+        xs = (v("gd_l1x0"), v("gd_la_x1"), v("gd_lb_x0"), v("gd_l1x1")) if 3 <= i <= 7 else (v("led_x0"), 0.0, v("led_x1") - v("gd_tg"))
+        for j in range(13):
+            f = j / 12
+            sp, tp = a0 + ex * f, b0 + ey * f
+            for x in xs:
+                p = (x, sp * sn + tp * c, lip + sp * c - tp * sn)
+                d = (tgt[0] - p[0], tgt[1] - p[1], tgt[2] - p[2])
+                if d[1] * nwy + d[2] * nwz <= 0:
+                    continue
+                tried += 1
+                bad += 0 if blocked(p, tgt) else 1
+    # the side faces of the leg and the bar (outward -x, +x)
+    return tried, bad
 
 
 EXTREME_PARTS = ("base_plate", "zone_wall", "sen66_pad", "gasket_out", "gasket_in")

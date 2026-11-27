@@ -32,7 +32,7 @@ S = airq.build()
 V = S.v
 GROMMETS = ["grommet_zone_a", "grommet_zone_b", "grommet_j4_a", "grommet_j4_b", "grommet_tongue_a", "grommet_tongue_b"]
 BODIES = ["shell", "base_plate", "zone_wall", "sen66_top_seal", "zone_seal", "sen66_foam", "gasket_out", "gasket_in", "sen66_pad", "hcho_lid",
-          *GROMMETS, "light_guide", "crease_seal", "orange_dot"]
+          *GROMMETS, "light_guide", "crease_seal", "led_mask", "orange_dot"]
 TPU = ["gasket_out", "gasket_in", *GROMMETS]
 # positions Task 3b needs (task-3-scope, M6), fixed here as parameters
 FACE = ["panel_x0", "panel_s0", "bezel", "window_xc", "pocket_x0", "pocket_x1", "led_f0", "led_h_slot", "led_len", "led_z",
@@ -489,14 +489,13 @@ def test_ffc_route_length_and_service_lift():
     in the shell can be lifted the service distance with a margin of 3 mm or more over the straight distance."""
     g = F.ffc_geometry(V, V("ffc_s_c3"))
     assert (V("ffc_w"), V("ffc_t")) == pytest.approx((12.5, 0.3))
-    assert round(g["creases"] / V("ffc_crease")) <= 3                              # at most three folds
-    assert V("ffc_r") - V("ffc_t") / 2 >= 1.0                                        # the J7 bend: inner radius >= 1
-    assert g["arc1"] > 0 and g["arc2"] > 0 and min(V("ffc_r") - V("ffc_t") / 2, V("ffc_r") + V("ffc_t") / 2) >= 1.0
-    assert g["centre_len"] + 2 * V("ffc_insert") <= V("ffc_len")                    # fits the bought length
-    assert V("ffc_insert") <= B.j7_body()[1] - 0.2 + 1e-9                           # inserted short of J7's back
+    assert len(airq_check.ffc_pieces(S)) - 1 == 3                                    # four layers cut by three folds: at most three (R42)
+    assert V("ffc_r") - V("ffc_t") / 2 >= 1.0 and g["arc1"] > 0 and g["arc2"] > 0     # the J7 bend: inner radius >= 1
+    assert g["centre_len"] + 2 * V("ffc_insert") <= V("ffc_len") + 1e-9                # fits the bought length
+    assert 3.0 <= V("ffc_insert") <= 4.0                                              # J7's insertion: about 3.5 (hardware/README.md:167, :176)
     spare = V("ffc_len") - 2 * V("ffc_insert") - g["centre_len"]
-    assert 0 <= spare <= V("ffc_tol")                                               # the route matches the length: no bow
-    assert V("ffc_len") == 80.0                                                     # a standard length
+    assert 0 <= spare <= V("ffc_tol")                                               # the route is the bought length: the fold jig takes the tolerance
+    assert V("ffc_len") == 75.0                                                     # a stock length of some vendors (to confirm)
     # J7: the ribbon enters its mouth between D2 and D3, inside the 15.5 body, flat, 1 mm over the board
     leds = B.MAIN["leds"]["chain"]
     d2, d3 = V("board_x0") + leds[1]["center_x"] + 2.0, V("board_x0") + leds[2]["center_x"] - 2.0
@@ -540,8 +539,11 @@ def test_led_slot_and_light_guide_follow_the_leds():
     assert V("gd_y_e") == pytest.approx(V("board_y0") - V("gd_clr"))
     assert V("gd_t0") >= V("bezel") + V("panel_t") + V("clr_remove") - 1e-9               # behind the panel's back face
     assert V("gd_t1") - V("gd_t0") == pytest.approx(V("guide_t"))
-    assert V("gd_l1x0") < V("led_d1_x") - 2.0 and V("led_d2_x") + 2.0 < V("gd_l1x1")        # the legs flank the LED faces
-    assert V("gd_l2x0") < V("led_d3_x") - 2.0 and V("led_d4_x") + 2.0 < V("gd_l2x1")
+    # R45: the feet are inside D1's and D2's faces (a line toward U4 enters their bodies); D3 and D4 are masked
+    assert V("gd_l1x0") - (V("led_d1_x") - 2.0) == pytest.approx(V("gd_win_xm")) and V("gd_la_x1") <= V("led_d1_x") + 2.0
+    assert V("gd_lb_x0") - (V("led_d2_x") - 2.0) == pytest.approx(V("gd_win_xm")) and V("gd_l1x1") <= V("led_d2_x") + 2.0
+    assert V("gd_la_x1") < V("gd_lb_x0")                                                    # no guide face over the gap between D1 and D2
+    assert V("gd_l2x0") < V("led_d3_x") - 2.0 and V("led_d4_x") + 2.0 < V("gd_l2x1")        # the mask covers D3 and D4
     assert V("gd_l1x1") < V("ffc_xc") - V("ffc_w") / 2 and V("ffc_xc") + V("ffc_w") / 2 < V("gd_l2x0")   # the FFC's strip is clear
     assert V("gd_l1x1") - V("gd_l1x0") < 10.0 and V("gd_l2x1") <= V("board_x0") + V("board_w")
     zmin = V("lip") + V("gd_sg") * V("cos_t") - V("gd_t0") * V("sin_t")
@@ -580,8 +582,8 @@ def test_guide_light_stays_off_the_crease_the_sensor_and_u4():
     for name, (length, _) in paths.items():
         assert length >= 1.2 - 1e-6, (name, length)
     sight = airq_check.ms5611_sight(S)
-    assert sight["unblocked"] == {"led_faces": 0, "entry_windows": 0}, sight
-    assert sight["samples"]["entry_windows"] > 100
+    assert sight["unblocked"] == {"led_faces": 0, "entry_windows": 0, "guide_faces": 0}, sight
+    assert sight["samples"]["entry_windows"] > 50 and sight["samples"]["guide_faces"] > 50
     # the crease seal: the lip's top to the shell's lowest plane, over 1.2 of foam
     assert V("wall") - V("crease_y0") >= 1.2                                                 # foam tape: 1.2 or more along the line
 
@@ -781,11 +783,13 @@ def test_light_guide_and_crease_seal_on_the_geometry(check):
     bodies = {b["name"]: b for b in check["measure"]["bodies"]}
     lo, hi = bodies["light_guide"]["bbox"]["min"], bodies["light_guide"]["bbox"]["max"]
     assert hi[2] == pytest.approx(V("gd_top_z"), abs=0.01) and hi[1] == pytest.approx(V("gd_y_e"), abs=0.01)
-    assert lo[0] == pytest.approx(V("led_x0") + V("clr_align"), abs=0.01) and hi[0] == pytest.approx(V("gd_l2x1"), abs=0.01)
+    assert lo[0] == pytest.approx(V("led_x0") + V("clr_align"), abs=0.01) and hi[0] == pytest.approx(V("led_x1") - V("gd_tg"), abs=0.01)
     assert lo[2] >= V("lip") + V("clr_remove") + 0.0 - 1e-6                                      # off the parting line
     assert check["interference"]["count"] == 0
     names = {b["name"] for b in check["measure"]["bodies"]}
-    assert {"guide_up_1", "guide_up_32", "ref_ffc", "crease_seal"} <= names
+    assert {"guide_up_1", "guide_up_32", "ref_ffc", "crease_seal", "led_mask"} <= names
+    mk = bodies["led_mask"]["bbox"]
+    assert mk["max"][1] == pytest.approx(V("gd_y_e"), abs=0.02) and mk["min"][0] == pytest.approx(V("gd_l2x0"), abs=0.01)   # 0.2 in front of the LEDs
     vols = airq_check.touch_volumes(check["touch"])
     expect = V("W") * (V("wall") - V("crease_y0")) * airq_check.TOUCH_SQUEEZE
     assert vols[("crease_seal", "shell")] == pytest.approx(expect, rel=0.08)
