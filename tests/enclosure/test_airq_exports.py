@@ -72,7 +72,7 @@ BED_CONTACT = {
     "base_plate": (4500, 700),       # bridges: slots, grilles, the USB-C ceiling (12.9 mm)
     "zone_wall": (80, 25),           # one small support at the boss notch's ledge
     "hcho_lid": (600, 300),          # the tongue pocket's 13.3 mm bridge
-    "light_guide": (9, 70),          # on its +x end; supports only under the feet's two +x side faces
+    "light_guide": (0, 250),         # on its back plane (R53): 222 mm2 over the bed, all on the named faces below
     "gasket_out": (90, 1),
     "gasket_in": (6, 1),             # 7.1 mm2 of contact on a 27.9 tall post: brim
     "grommet_zone_a": (28, 40),
@@ -82,6 +82,51 @@ BED_CONTACT = {
     "grommet_tongue_a": (3, 8),      # 3.3 mm2: brim
     "grommet_tongue_b": (3, 8),
 }
+
+
+def down_faces(path, tol=0.05, steep=-0.72):
+    """{(nx, ny, nz, z): area mm2} of the down-facing faces above the bed steeper than 45 deg, grouped by
+    plane (the normal rounded to 0.05, the lowest z of the face rounded to 0.1)."""
+    with zipfile.ZipFile(path) as z:
+        root = ET.fromstring(z.read("3D/3dmodel.model"))
+    ns = {"m": root.tag[root.tag.index("{") + 1:root.tag.index("}")]}
+    v = [(float(e.get("x")), float(e.get("y")), float(e.get("z"))) for e in root.findall(".//m:vertex", ns)]
+    zmin = min(p[2] for p in v)
+    groups = {}
+    for t in root.findall(".//m:triangle", ns):
+        a, b, c = (v[int(t.get(k))] for k in ("v1", "v2", "v3"))
+        u = [b[i] - a[i] for i in range(3)]
+        w = [c[i] - a[i] for i in range(3)]
+        n = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]]
+        length = math.sqrt(sum(x * x for x in n))
+        if not length or n[2] / length >= steep:
+            continue
+        if max(a[2], b[2], c[2]) - zmin < tol:
+            continue                               # on the bed
+        key = tuple(round(round(x / length / 0.05) * 0.05, 2) + 0.0 for x in n) + (round(min(a[2], b[2], c[2]), 1),)
+        groups[key] = groups.get(key, 0.0) + length / 2
+    return groups
+
+
+# R53: the guide's only down-facing faces over the bed, each named. Normals are the world's after the
+# print turn; z is the face's lowest point. The back plane floats 1.0 over the bed and is supported
+# (bar back about 19 % of the delivered rays, each foot's back about 35 %); the entry-end faces are
+# the 1.0 dip below it (every delivered ray enters there); the lip is the 0.1 wide flat at the bottom facet.
+GUIDE_SUPPORTED = {
+    "back plane (bar back, both feet's backs)": ((0.0, 0.0, -1.0, 1.0), 205.5),
+    "entry-end faces (the dip below the back plane)": ((0.0, 0.5, -0.85, 0.0), 13.6),
+    "bottom facet's lip": ((0.0, 0.0, -1.0, 2.9), 3.0),
+}
+
+
+def test_light_guide_hangs_only_the_named_faces():
+    got = down_faces(EXPORT / "airq-light_guide.3mf")
+    named = {k: a for k, a in GUIDE_SUPPORTED.values()}
+    for key, area in got.items():
+        match = [k for k in named if all(abs(x - y) < 0.1 for x, y in zip(key[:3], k[:3])) and abs(key[3] - k[3]) < 0.15]
+        assert match, f"light_guide hangs {area:.1f} mm2 over the bed on an unnamed face {key}"
+        assert area <= named[match[0]] * 1.05
+    assert sum(got.values()) <= 250
 
 
 def test_every_printed_part_has_a_bed_contact_budget():
