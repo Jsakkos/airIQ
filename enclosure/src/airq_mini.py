@@ -150,6 +150,7 @@ def build() -> Script:
     p("groove_d", 0.6, "drawer grooves' depth into the notch's faces (along y)")
     p("groove_w", 0.8, "drawer grooves' height, centred in the zone wall's thickness")
     p("drawer_squeeze", 0.05, "TPU squeeze of the drawer grommet's faces (the airQ's B6 value; R9: the check sets 0)")
+    p("drawer_floor_squeeze", 0, "the outer grommet's bottom on the left rail's top: at contact (review I1: a squeeze there would push the zone wall up beside the drawer, outside its holds; R9: the touch run sets 0.05)")
     p("bore_squeeze", 0.2, "grommet bores under the cable's diameter (they hug the cable; R9: the check sets 0)")
     cable_params(s)
 
@@ -194,6 +195,8 @@ def build() -> Script:
     MF.band_ribs(s)
     MF.light_guides(s)
     MF.guide_stop(s)
+    MF.hold_params(s)
+    MF.hold_pads(s)
     MF.label_params(s)
     MF.labels(s)
     # the dot on SW1's push axis and its flexure: the airQ's (airq_face), on the mini's sw_x, sw_z, dot_f
@@ -391,7 +394,7 @@ def grommets(s: Script) -> None:
     sq, c = "drawer_squeeze", "clr_align"
     zm0, zm1 = f"zw_z0 + zone_t / 2 - groove_w / 2 + {c}", f"zw_z0 + zone_t / 2 + groove_w / 2 - {c}"
     rib = f"groove_d - {c}"
-    for half, xa, xb, z0 in (("a", "-inner_x + clr_remove", "cab_x", f"zw_z0 - {sq}"), ("b", "cab_x", f"dr_x1 + {sq}", "zw_z0")):
+    for half, xa, xb, z0 in (("a", "-inner_x + clr_remove", "cab_x", "zw_z0 - drawer_floor_squeeze"), ("b", "cab_x", f"dr_x1 + {sq}", "zw_z0")):
         body = f"grommet_zone_{half}"
         s.box(f"Zone grommet {half}", [xa, f"dr_y0 - {sq}", z0], [f"{xb} - ({xa})", f"dr_y1 - dr_y0 + 2 * {sq}", f"zw_z1 - ({z0})"], body=body)
         s.box(f"Zone grommet {half} rib front", [xa, f"dr_y0 - {sq} - ({rib})", zm0], [f"{xb} - ({xa})", f"{rib} + 0.5", f"{zm1} - ({zm0})"],

@@ -122,6 +122,20 @@ def test_light_stays_off_the_sensor_its_window_and_the_crease():
         assert ln >= 1.2, (name, lp[name])
 
 
+def test_zone_wall_is_held_down():
+    """Review I1 (analytic): the board's one clamp (H1) and the shell's four hold-down pads hold the zone wall
+    against the top seal's push: every hold pushes down (the push lies 8 mm inside their polygon); as a 20 mm
+    strip between the pads and H1 (the plate and the board ignored: a bound) it lifts <= 0.1 at the seal with
+    the soft foam specified, the plenum plate's lap <= 0.05, and the seal keeps >= 30 % compression (>= 20 %
+    with firm foam); the grommet's bottom is at contact, so nothing lifts it beside the drawer."""
+    r = K.seal_forces(S)
+    assert all(x > 0 for x in r["share"].values()) and r["inside_mm"] > 5
+    soft, firm = r["lift"][30.0], r["lift"][100.0]
+    assert soft["at_seal"] <= 0.1 and soft["at_plate_lap"] <= 0.05 and soft["seal_compression_left"] >= 0.3
+    assert firm["seal_compression_left"] >= 0.2 and firm["at_plate_lap"] < 0.1
+    assert r["drawer_floor_n"] == 0.0 and V("drawer_floor_squeeze") == 0
+
+
 def test_opaque_walls():
     w = K.walls(S)
     assert w["divider"] >= V("divider_t") >= 1.2 and w["end_ribs"] >= 1.2 and w["guide_stop"] >= 1.2
@@ -191,9 +205,11 @@ def test_drawer_opens_to_the_side(check):
 
 
 def test_shell_nudged_meets_the_base_only_on_its_datums(check):
-    assert A.nudge_faults(check["nudge"], S) == []
+    assert K.nudge_faults(check["nudge"], S) == []
     met = {p["a"] if p["a"] in A.NUDGES else p["b"] for p in check["nudge"]["interferences"]}
-    assert met == set(A.NUDGE_DATUMS)
+    assert met == set(K.NUDGE_DATUMS)
+    hit = {(p["a"], p["b"]) if p["a"] in A.NUDGES else (p["b"], p["a"]) for p in check["nudge"]["interferences"]}
+    assert ("shell_nz_m", "zone_wall") in hit                          # review I1: the pads bear on the zone wall's top
 
 
 def test_distances_on_the_geometry(check):

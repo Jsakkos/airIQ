@@ -178,6 +178,22 @@ def test_guide_fits_come_from_the_clearances():
         assert chk["rib_to_flex"] > 0 and chk["face_to_flex"] >= 1.2
 
 
+def test_hold_pads_stand_on_the_zone_wall():
+    """Review I1: the shell's hold-down pads (under the three band ribs and one left of them) bear on the zone
+    wall's flat top at contact (hold_squeeze 0), behind its front top edge, in front of the board's edge, clear
+    of the left boss notch; the drawer grommet's bottom is at contact on the rail."""
+    import airq_mini_face as MF
+    assert V("hold_z0") == V("zw_z1") and V("hold_squeeze") == 0
+    assert V("lg_ysf") < V("board_y0 - clr_remove")
+    assert V("hold_lx0") > V("-boss_x + boss_d / 2 + clr_remove")
+    spans = MF.hold_spans()
+    assert set(spans) == {"divider", "left", "right", "left pad"}
+    for x0, x1 in spans.values():
+        assert V(f"({x1}) - ({x0})") >= 1.2 - 1e-9
+    names = {c["params"].get("name") for c in S.commands}
+    assert {f"Hold pad {n}" for n in spans} <= names
+
+
 def test_labels_and_light_sensor_window():
     """Task 4b: "CO2" under the left half and "PM2.5" under the right, debossed 0.4, 5 mm tall (the
     coupon's legible size); the CO2 label's subscript is a 3.5 mm "2" (strokes about 0.48 above the

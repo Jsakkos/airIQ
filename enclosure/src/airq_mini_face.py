@@ -177,6 +177,36 @@ def guide_stop(s: Script) -> None:
               operation="cut", targets=["guide_stop"])
 
 
+def hold_params(s: Script) -> None:
+    """Review I1: the shell holds the zone wall's front down. The three band ribs and a pad left of
+    them stand on the zone wall's flat top in front of the board's edge, at contact, so the board's
+    one clamp (H1) and these pads hold it against the top seal's push (`airq_mini_check.seal_forces`)."""
+    p = s.param
+    p("hold_squeeze", 0, "the shell's hold-down pads on the zone wall's top: at contact as built (R9: the touch run sets 0.05 to show they bear on it)")
+    p("hold_z0", "zw_z1 - hold_squeeze", "hold-down pads: their bearing face, on the zone wall's top")
+    p("hold_lx0", "-boss_x + boss_d / 2 + clr_remove + 0.35", "left hold pad: left end, 0.35 right of the zone wall's left boss notch")
+
+
+def hold_profile() -> list[tuple[str, str]]:
+    """A hold-down pad's (y, z) profile: from inside the face wall (t = rib_tin) back to the stop's
+    front plane (y = lg_ysf), from its bearing face up into the rib above it."""
+    def yi(z):
+        return f"(rib_tin + ({z} - lip) * sin_t) / cos_t"
+    return [(yi("hold_z0"), "hold_z0"), ("lg_ysf", "hold_z0"), ("lg_ysf", "rib_z0 + 0.5"), (yi("rib_z0 + 0.5"), "rib_z0 + 0.5")]
+
+
+def hold_spans() -> dict:
+    """{pad: (x0, x1)}: under each band rib, and one left of the left end rib."""
+    return {**rib_spans(), "left pad": ("hold_lx0", "band_co2_x0 - end_rib_t")}
+
+
+def hold_pads(s: Script) -> None:
+    for name, (x0, x1) in hold_spans().items():
+        with s.sketch(f"Hold pad {name} profile", "YZ", offset=x0) as sk:
+            sk.polyline(hold_profile())
+        s.extrude(f"Hold pad {name}", f"Hold pad {name} profile", f"({x1}) - ({x0})", operation="join", targets=["shell"])
+
+
 def label_params(s: Script) -> None:
     """The labels' layout. The built-in font's own subscript two is 0.58 of the cap height: at 5 mm its
     strokes are about 0.40, at the 0.4 nozzle's limit, so the CO2 label's subscript is a plain "2" at

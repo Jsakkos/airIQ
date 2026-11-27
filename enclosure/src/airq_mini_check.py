@@ -46,10 +46,33 @@ SHELL_PARTS = ("shell", "orange_dot")
 # <tag>_up_<dz> are swept with the shell
 RIDERS = (("light_guide_co2", "gco2"), ("light_guide_pm", "gpm"), ("guide_stop", "gstop"))
 SQUEEZES = ("gasket_squeeze", "wiper_squeeze", "pad_squeeze", "ring_preload", "root_squeeze", "drawer_squeeze", "bore_squeeze",
+            "hold_squeeze", "drawer_floor_squeeze",
             "seal_squeeze", "top_seal_squeeze")
 TOUCHES = (("gasket_out", "sen66_body"), ("gasket_in", "sen66_body"), ("gasket_in", "base_plate"), ("zone_seal", "base_plate"),
            ("sen66_pad", "sen66_body"), ("grommet_zone_a", "zone_wall"), ("grommet_zone_b", "zone_wall"),
-           ("grommet_zone_a", "base_plate"), ("sen66_top_seal", "zone_wall"))
+           ("grommet_zone_a", "base_plate"), ("sen66_top_seal", "zone_wall"),
+           ("shell", "zone_wall"))                 # review I1: the shell's hold-down pads bear on the zone wall's top
+# the shell's datums (N1): the floor and the rear wall, and (review I1) the zone wall's top under its hold-down pads
+NUDGE_DATUMS = {"shell_ny_p": (("base_plate", "y", "D - wall"),), "shell_nz_m": (("base_plate", "z", "floor_t"), ("zone_wall", "z", "zw_z1"))}
+
+
+def nudge_faults(nudge: dict, s=None) -> list[str]:
+    """airq_check.nudge_faults with the mini's datums: a nudged shell may meet a part only on that part's datum face."""
+    s = s or airq_mini.build()
+    out = []
+    for p in nudge["interferences"]:
+        a, b = (p["a"], p["b"]) if p["a"] in A.NUDGES else (p["b"], p["a"])
+        lo, hi = p["bbox"]["min"], p["bbox"]["max"]
+        datum = next((d for d in NUDGE_DATUMS.get(a, ()) if d[0] == b), None)
+        if datum is None:
+            out.append(f"{a} meets {b} at {[round(c, 2) for c in lo]}..{[round(c, 2) for c in hi]}")
+            continue
+        k = "xyz".index(datum[1])
+        face = s.v(datum[2])
+        f0, f1 = sorted((face, face + A.NUDGES[a][k]))
+        if not (f0 - 1e-3 <= lo[k] and hi[k] <= f1 + 1e-3):
+            out.append(f"{a} meets {b} off its datum: {datum[1]} {lo[k]:.3f}..{hi[k]:.3f}")
+    return out
 EXTREME_PARTS = A.EXTREME_PARTS
 
 
@@ -959,6 +982,91 @@ def light_paths(s, dx: float = 1.0, n_edge: int = 6, n_side: int = 6) -> dict:
     return out
 
 
+FOAM_KPA = A.FOAM_KPA       # closed-cell foam at 25 % compression, kPa (soft ... firm; to confirm)
+TOP_SEAL_KPA = (30.0, 100.0)   # the top seal's foam spec: soft (30) is the design value, firm (100) the bound
+ZW_E = 1800.0               # the zone wall's plastic (PETG, the softer of PETG/ASA), MPa
+STRIP_W = 20.0              # the zone wall's width taken as carrying the top seal's push to its holds (a strip: the plate is wider, the board ignored)
+
+
+def hold_supports(s) -> dict:
+    """{name: (x, y)} where the zone wall is held down: H1's clamp (the board's screw through its pad into
+    H1's post) and the shell's hold-down pads (their bearing areas' centres, `airq_mini_face.hold_spans`)."""
+    v = s.v
+    yc = (v(C.yf("zw_z1")) + v("lg_ysf")) / 2
+    out = {"H1": (v("h1_x"), v("h1_y"))}
+    for name, (x0, x1) in MF.hold_spans().items():
+        out[name] = ((v(x0) + v(x1)) / 2, yc)
+    return out
+
+
+def seal_forces(s=None) -> dict:
+    """Review I1 (analytic, with stated models; the airQ's `airq_check.seal_forces` redone for the mini): what
+    pushes on the zone wall and whether its holds keep it, its laps and the top seal closed.
+    - loads: the top seal (foam, top_seal_t over zone_gap: its compression, TOP_SEAL_KPA at 25 % taken linear
+      to its compression) pushes the zone wall up over the module's top; the zone seal pushes the lip and the
+      ledge apart horizontally (no lift); the drawer grommet's faces push the notch's front and rear faces
+      (horizontal); its bottom is at contact on the rail (`drawer_floor_squeeze` 0), so no lift there;
+    - holds (`hold_supports`): H1's clamp and the shell's pads, all pushing down. Statics as a rigid plate on equal
+      springs at the holds (the least-squares split): every hold's reaction must be >= 0 (downward), i.e. the
+      top seal's push lies inside the holds' polygon (its distance inside, `inside_mm`);
+    - flexibility (a bound): the zone wall as a STRIP_W strip simply supported between the front pads' line and
+      H1's line, the push at the seal's centre, PETG at ZW_E; with the foam as a spring in series, the lift at
+      the seal and at the plenum plate's lap (the nearest lap in that span), and the top seal's compression
+      left. The rail fronts' and the boss-pocket rises' laps are under or beside the pads (lift 0 at contact)."""
+    s = s or airq_mini.build()
+    v = s.v
+    comp = v("top_seal_squeeze") / v("top_seal_t")
+    area = v("top_seal_x1 - top_seal_x0") * v("sen_d")
+    top = tuple(k / 1000 * comp / 0.25 * area for k in TOP_SEAL_KPA)
+    zone = tuple(k / 1000 * 2 * v("bp_x0") * v("ledge_t") for k in FOAM_KPA)
+    drawer = tuple(e * v("drawer_squeeze") / v("cab_x + inner_x") * v("dr_y1 - dr_y0") * v("zone_t") for e in A.TPU_E)
+    px, py = v("(top_seal_x0 + top_seal_x1) / 2"), v("sen_y0 + sen_d / 2")
+    sup = hold_supports(s)
+    names = list(sup)
+    # least-squares split: R = F (1/n + a (x - xm) + b (y - ym)) with the moments matched
+    n = len(names)
+    xm = sum(sup[k][0] for k in names) / n
+    ym = sum(sup[k][1] for k in names) / n
+    sxx = sum((sup[k][0] - xm) ** 2 for k in names)
+    syy = sum((sup[k][1] - ym) ** 2 for k in names)
+    sxy = sum((sup[k][0] - xm) * (sup[k][1] - ym) for k in names)
+    det = sxx * syy - sxy * sxy
+    dx, dy = px - xm, py - ym
+    a = (dx * syy - dy * sxy) / det
+    b = (dy * sxx - dx * sxy) / det
+    share = {k: 1 / n + a * (sup[k][0] - xm) + b * (sup[k][1] - ym) for k in names}
+    inside = _inside_distance(px, py, [sup[k] for k in names])
+    y_f = sup["divider"][1]
+    L = sup["H1"][1] - y_f
+    aa = py - y_f
+    bb = L - aa
+    inertia = STRIP_W * v("zone_t") ** 3 / 12
+    k_plate = 3 * ZW_E * inertia * L / (aa * aa * bb * bb)          # point load at aa on a simply supported span L
+    out = {"top_seal_n": top, "top_seal_compression": comp, "zone_seal_n": zone, "drawer_faces_n": drawer, "drawer_floor_n": 0.0,
+           "supports": sup, "share": share, "inside_mm": inside, "span": L, "k_plate": k_plate, "lift": {}}
+    yl = v("plate_y0")                                                 # the plenum plate's lap: its front edge, the nearest in the span
+    xl = yl - y_f
+    for kpa, f in zip(TOP_SEAL_KPA, top):
+        k_foam = f / v("top_seal_squeeze")
+        lift = k_foam * v("top_seal_squeeze") / (k_foam + k_plate)      # foam and plate in series
+        force = k_plate * lift
+        lap = force * aa * (L - xl) * (L * L - aa * aa - (L - xl) ** 2) / (6 * ZW_E * inertia * L)
+        out["lift"][kpa] = {"at_seal": lift, "force_n": force, "at_plate_lap": lap,
+                            "seal_compression_left": (v("top_seal_squeeze") - lift) / v("top_seal_t")}
+    return out
+
+
+def _inside_distance(px, py, pts) -> float:
+    """The distance of (px, py) inside the convex hull of `pts` (negative outside)."""
+    h = _hull(pts)
+    d = math.inf
+    for i in range(len(h)):
+        (ax, ay), (bx, by) = h[i], h[(i + 1) % len(h)]
+        ln = math.hypot(bx - ax, by - ay)
+        d = min(d, ((bx - ax) * (py - ay) - (by - ay) * (px - ax)) / ln)
+    return d
+
+
 def walls(s) -> dict:
     """The opaque walls' thicknesses (arithmetic): the divider (the visible gap, a rib of the shell), the end
     ribs, `guide_stop`, the face between the PM2.5 half and the flexure's slot."""
@@ -977,7 +1085,7 @@ if __name__ == "__main__":
         sec = A.sections(r["measure"], AIR)
         print("sections:", {k: round(x, 1) for k, x in sec.items()})
         print("branches:", {k: tuple(round(x, 1) for x in val) for k, val in branches(s, sec).items()})
-        print("nudge:", A.nudge_faults(r["nudge"], s), [(p["a"], p["b"]) for p in r["nudge"]["interferences"]])
+        print("nudge:", nudge_faults(r["nudge"], s), [(p["a"], p["b"]) for p in r["nudge"]["interferences"]])
         print("plugs:", r["plugs"]["count"])
         print("extremes:", {f"{a}/{b}": round(d, 3) for (a, b), d in A.extreme_reach(r["extremes"]).items()})
         print("clearance:", {k: round(x, 2) for k, x in r["clearance"].items()})
