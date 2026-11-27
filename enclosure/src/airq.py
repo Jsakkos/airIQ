@@ -268,8 +268,49 @@ def build() -> Script:
     p("exh_x1", "tub_x - 2.0", "electronics exhaust right end")
     p("exh_z0", "H - wall - clr_remove - 12.0", "electronics exhaust lower edge, high on the rear wall")
     p("exh_z1", "H - wall - clr_remove - 2.0", "electronics exhaust upper edge")
-
+    openings(s)
     return s
+
+
+def openings(s: Script) -> None:
+    """Task 3b-2: the openings in `base_plate`, cut last (every join is done). Positions are the
+    parameters above; each opening's lower edge is at least grille_min_z.
+    - intake slot rows in the lower front lip (two rows, slot_w high, slots end to end with
+      slot_bar bars, two spans either side of the light-sensor window's gap);
+    - the light-sensor window (a round hole in the lip, in front of the tongue's VEML7700);
+    - the outlet grille in the lower rear wall, behind the plenum plate;
+    - the electronics exhaust in the upper rear wall;
+    - the USB-C opening in the rear wall on J1's plug axis, passing the plug's overmold, with a
+      0.5 chamfer on its outer edge.
+    The HCHO grille is cut in `base_cuts` (3a), behind the window in the shell's side wall."""
+    p = s.param
+    p("in_n_l", 5, "intake slots per row in the left span (left of the light-sensor window); whole number", unit="")
+    p("in_n_r", 2, "intake slots per row in the right span; whole number", unit="")
+    p("in_len_l", "(lsw_gap_x0 - row_x0 - (in_n_l - 1) * slot_bar) / in_n_l", "derived: intake slot length, left span")
+    p("in_len_r", "(row_x1 - lsw_gap_x1 - (in_n_r - 1) * slot_bar) / in_n_r", "derived: intake slot length, right span")
+    for row, zr in ((1, "slot_row1_z"), (2, "slot_row2_z")):
+        for side, n, x0, ln in (("L", "in_n_l", "row_x0", "in_len_l"), ("R", "in_n_r", "lsw_gap_x1", "in_len_r")):
+            for i in range(int(s.v(n))):
+                s.box(f"Intake slot {row}{side}{i + 1}", [f"{x0} + {i} * ({ln} + slot_bar)", "-0.5", zr], [ln, "wall + 1", "slot_w"],
+                      operation="cut", targets=["base_plate"])
+    s.cylinder("Light-sensor window", ["lsw_x", "-0.5", "lsw_z"], "lsw_d", "wall + 1", axis="Y", operation="cut", targets=["base_plate"])
+    for i in range(int(s.v("out_n"))):
+        s.box(f"Outlet slot {i + 1}", [f"out_gx0 + {i} * out_pitch", "D - wall - 0.5", "out_gz0"], ["slot_w", "wall + 1", "out_gz1 - out_gz0"],
+              operation="cut", targets=["base_plate"])
+    p("exh_n", 14, "electronics exhaust slot count: 14 x 2.4 - 1.2 = 32.4 fits exh_x0 ... exh_x1; whole number", unit="")
+    for i in range(int(s.v("exh_n"))):
+        s.box(f"Exhaust slot {i + 1}", [f"exh_x0 + {i} * out_pitch", "D - wall - 0.5", "exh_z0"], ["slot_w", "wall + 1", "exh_z1 - exh_z0"],
+              operation="cut", targets=["base_plate"])
+    p("usb_plug_w", 12.5, "USB-C plug overmold width (typical, to confirm; README Layout studies row 9)")
+    p("usb_plug_h", 7.0, "USB-C plug overmold height (typical, to confirm)")
+    p("usb_open_w", "usb_plug_w + 2 * clr_remove", "USB-C opening width: the overmold passes (its tip is in the wall's thickness, usb_well)")
+    p("usb_open_h", "usb_plug_h + 2 * clr_remove", "USB-C opening height")
+    s.box("USB-C opening", ["usb_x - usb_open_w / 2", "D - wall - 1", "usb_z - usb_open_h / 2"], ["usb_open_w", "wall + 2", "usb_open_h"],
+          operation="cut", targets=["base_plate"])
+    v = s.v
+    d, cx, cz = v("D"), v("usb_x"), v("usb_z")
+    hw, hh = v("usb_open_w") / 2, v("usb_open_h") / 2
+    s.chamfer("USB-C chamfer", [[cx, d, cz - hh], [cx, d, cz + hh], [cx - hw, d, cz], [cx + hw, d, cz]], "usb_chamfer", body="base_plate")
 
 
 def plenum(s: Script) -> None:

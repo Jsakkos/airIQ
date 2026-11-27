@@ -203,6 +203,12 @@ AIR = {   # probe -> (path, R25 minimum, the probe's face that is the section: "
     "air_hcho_chimney": ("HCHO: up the chimney to the grille", 27.4, "z"),
     "air_tongue_left": ("intake (M4): the slots in front of the tongue, out to the left", None, "x"),
     "air_tongue_right": ("intake (M4): the slots in front of the tongue, out to the right", None, "x"),
+    # 3b-2: the air in front of every opening is free (interference 0 against every reference)
+    "air_slots_front": ("intake rows: the free air behind every slot, to the tongue's front edge", None, "y"),
+    "air_lsw": ("light-sensor window: the free line to the VEML7700's front edge", None, "y"),
+    "air_outlet_grille": ("outlet grille: the free air behind its slots, in the plenum", None, "y"),
+    "air_exhaust": ("electronics exhaust: the free air behind its slots", None, "y"),
+    "air_usb_axis": ("USB-C: the plug's shell, from inside the rear wall out along J1's axis", None, "y"),
 }
 
 
@@ -229,7 +235,134 @@ def air_probes(s) -> list[dict]:
         _box("air_hcho_chimney", "cx0", "cy0", "grille_min_z - 0.5", "tub_x", "cy1", "grille_min_z"),
         _box("air_tongue_left", f"{tl} - 0.5", "wall", "lid_z0 + lid_t", tl, "tongue_y0", "ledge_z0"),
         _box("air_tongue_right", "tongue_x1", "wall", "lid_z0 + lid_t", "tongue_x1 + 0.5", "tongue_y0", "ledge_z0"),
+        _box("air_slots_front", "row_x0", "wall", "slot_row1_z", "row_x1", "tongue_y0", "slot_row2_z + slot_w"),
+        _cyl("air_lsw", ["lsw_x", "wall", "lsw_z"], "lsw_d", "tongue_y0 - wall", axis="Y"),
+        _box("air_outlet_grille", "out_gx0", "D - wall - 3.0", "out_gz0", "out_gx1", "D - wall", "out_gz1"),
+        _box("air_exhaust", "exh_x0", "D - wall - 3.0", "exh_z0", "exh_x0 + exh_n * out_pitch - (out_pitch - slot_w)", "D - wall", "exh_z1"),
+        _box("air_usb_axis", "usb_x - usb_sw / 2", "D - wall - 1.0", "usb_z - usb_sh / 2", "usb_x + usb_sw / 2", "D + 5.0", "usb_z + usb_sh / 2"),
     ]
+
+
+# --- the openings (Task 3b-2): open area, lower edge and fit, measured on the cut geometry ----------------
+HCHO_SLOTS = airq.HCHO_SLOTS
+
+
+def _volume(c, s) -> float:
+    """Volume of a probe box or cylinder from its parameters."""
+    v = s.v
+    q = c["params"]
+    if c["command"] == "solid.box":
+        return v(q["length"]) * v(q["width"]) * v(q["height"])
+    return math.pi / 4 * v(q["diameter"]) ** 2 * v(q["height"])
+
+
+def opening_probes(s) -> list[tuple[dict, str, str, str]]:
+    """(probe, part, thickness expression, expected open area expression) per opening. A probe is
+    a box (or a cylinder) over the opening and a little of the bars round it, through the wall's
+    thickness: the open area is (its volume - its overlap with the part) / the thickness. Every
+    one overlaps its part by design, so they run apart from the main interference check."""
+    sp = "slot_w"
+    out = []
+    for side, x0, x1, n, ln in (("l", "row_x0", "lsw_gap_x0", "in_n_l", "in_len_l"), ("r", "lsw_gap_x1", "row_x1", "in_n_r", "in_len_r")):
+        out.append((_box(f"op_intake_{side}", x0, "0", "slot_row1_z", x1, "wall", f"slot_row2_z + {sp}"), "base_plate", "wall",
+                    f"2 * {n} * {ln} * {sp}"))
+    out.append((_cyl("op_lsw", ["lsw_x", "0", "lsw_z"], "lsw_d + 1.0", "wall", axis="Y"), "base_plate", "wall", "3.141592653589793 * lsw_d * lsw_d / 4"))
+    out.append((_box("op_outlet", "out_gx0", "D - wall", "out_gz0", "out_gx1", "D", "out_gz1"), "base_plate", "wall",
+                 f"out_n * {sp} * (out_gz1 - out_gz0)"))
+    out.append((_box("op_exhaust", "exh_x0", "D - wall", "exh_z0", "exh_x0 + exh_n * out_pitch - (out_pitch - slot_w)", "D", "exh_z1"),
+                "base_plate", "wall", f"exh_n * {sp} * (exh_z1 - exh_z0)"))
+    for i in range(HCHO_SLOTS):
+        y = f"cy0 + 0.6 + {i} * hg_pitch"
+        top = f"{C.z_under(y)} - hg_margin"
+        out.append((_box(f"op_hcho_{i + 1}", "tub_x", f"{y} - 0.3", "grille_min_z", "tub_x + iwall", f"{y} + {sp} + 0.3", top),
+                    "base_plate", "iwall", f"{sp} * ({top} - grille_min_z)"))
+    return out
+
+
+def usb_probes(s) -> list[dict]:
+    """The USB-C opening's fit: `usb_in` (0.05 smaller all round, through the straight part)
+    must meet nothing, `usb_out` (0.05 larger) meets the wall's ring, and `usb_cham` over the
+    chamfer's depth meets what the chamfer leaves of its box. Together they place the opening
+    within 0.05 of J1's axis and size it."""
+    e = 0.05
+    hw, hh = "usb_open_w / 2", "usb_open_h / 2"
+    x, z = "usb_x", "usb_z"
+    y1 = "D - usb_chamfer - 0.05"
+    c = "usb_chamfer"
+    return [
+        _box("usb_in", f"{x} - {hw} + {e}", "D - wall", f"{z} - {hh} + {e}", f"{x} + {hw} - {e}", y1, f"{z} + {hh} - {e}"),
+        _box("usb_out", f"{x} - {hw} - {e}", "D - wall", f"{z} - {hh} - {e}", f"{x} + {hw} + {e}", y1, f"{z} + {hh} + {e}"),
+        _box("usb_cham", f"{x} - {hw} - {c}", f"D - {c}", f"{z} - {hh} - {c}", f"{x} + {hw} + {c}", "D", f"{z} + {hh} + {c}"),
+    ]
+
+
+def usb_expect(s) -> dict:
+    """The material each USB probe should meet (mm3): none in `usb_in`, the wall's ring round the
+    straight part in `usb_out`, and the box less the chamfer's frustum in `usb_cham`."""
+    v = s.v
+    w, h, e, c, wall = v("usb_open_w"), v("usb_open_h"), 0.05, v("usb_chamfer"), v("wall")
+    a1, a2 = w * h, (w + 2 * c) * (h + 2 * c)
+    frustum = c / 3 * (a1 + a2 + math.sqrt(a1 * a2))
+    return {"usb_in": 0.0, "usb_out": ((w + 2 * e) * (h + 2 * e) - w * h) * (wall - c - 0.05),
+            "usb_cham": a2 * c - frustum}
+
+
+def low_probes(s) -> list[dict]:
+    """Nothing opens below grille_min_z: a box under the line over each wall's face must be all
+    material. The lip and the rear wall are base_plate (the lip's inner face is recessed clr_remove
+    round the bosses, so its probe stops there); the right side is the rail (base_plate) and the
+    shell's wall (past its seam clr_remove from the lip, over the floor lap)."""
+    z = "grille_min_z"
+    return [_box("low_lip", "-W / 2", "0", "0", "W / 2", "wall - clr_remove", z),
+            _box("low_rear", "-W / 2", "D - wall", "0", "W / 2", "D", z),
+            _box("low_rail", "tub_x", "bp_y1", "0", "tub_x + iwall", "D - wall", z),
+            _box("low_side", "inner_x", "wall + clr_remove", "floor_t", "W / 2", "D - wall", z)]
+
+
+LOW_PARTS = {"low_lip": "base_plate", "low_rear": "base_plate", "low_rail": "base_plate", "low_side": "shell"}
+
+
+def opening_run_bodies(s) -> list[str]:
+    names = [c["params"]["body_name"] for c, *_ in opening_probes(s)]
+    return names + [c["params"]["body_name"] for c in usb_probes(s) + low_probes(s)]
+
+
+def clear_probes(s) -> list[dict]:
+    """R12 and the tongue's distances on the geometry (`inspect.clearance`): the antenna strip, the
+    USB plug's overmold, the shell's bosses and the standoffs' screws as probe solids from the
+    boards' sources, against the SEN66's body; and the tongue's envelope against U3 and U2."""
+    m = B.MAIN
+    x0, z_top = "board_x0", "board_z0 + board_t"
+    mod = m["antenna"]["module_body"]
+    mh = B.module_h()
+    (ux0, uy0), (ux1, uy1) = B.layout_part("U2")["box"]
+    dev_y = lambda yy: f"(board_y0 + board_d - {yy})"          # noqa: E731
+    b = [
+        _box("cl_antenna", f"{x0} + {mod[0][0]}", dev_y(mod[0][1]), z_top, f"{x0} + {mod[1][0]}", dev_y(0), f"{z_top} + {mh}"),
+        _box("cl_u3", f"{x0} + {mod[0][0]}", dev_y(mod[1][1]), z_top, f"{x0} + {mod[1][0]}", dev_y(mod[0][1]), f"{z_top} + {mh}"),
+        _box("cl_u2", f"{x0} + {ux0}", dev_y(uy1), z_top, f"{x0} + {ux1}", dev_y(uy0), f"{z_top} + {m['max_part_height']}"),
+        _box("cl_tongue", "tongue_x1 - tongue_w", "tongue_y0", "tongue_z0", "tongue_x1", "tongue_y0 + tongue_dp",
+             "tongue_z0 + tongue_t + tongue_parts_h"),
+        _box("cl_usb_plug", "usb_x - usb_plug_w / 2", dev_y(0), "usb_z - usb_plug_h / 2", "usb_x + usb_plug_w / 2", "D + 20.0",
+             "usb_z + usb_plug_h / 2"),
+    ]
+    for i, sx in enumerate(("-boss_x", "boss_x"), 1):
+        b.append(_cyl(f"cl_boss_{i}", [sx, "boss_y", "floor_t - head_depth"], "boss_d", "boss_h + head_depth"))
+    b.append(_cyl("cl_boss_3", ["rear_boss_x", "D - wall - clr_remove - rear_boss_len", "rear_boss_z"], "boss_d",
+                  "rear_boss_len + wall + clr_remove", axis="Y"))
+    for i, (x, y) in enumerate((("h1_x", "h1_y"), ("h2_x", "h2_y")), 1):
+        b.append(_cyl(f"cl_screw_{i}", [x, y, "board_z0 - pilot_depth"], "screw_d", "pilot_depth + board_t + 2.0"))
+    return b
+
+
+CLEAR_PAIRS = {   # distance label -> (probe, the bodies it is measured against)
+    "antenna_to_sen66": ("cl_antenna", ("sen66_body",)),
+    "antenna_to_usb_plug": ("cl_antenna", ("cl_usb_plug",)),
+    "antenna_to_inserts": ("cl_antenna", ("cl_boss_1", "cl_boss_2", "cl_boss_3")),
+    "antenna_to_screws": ("cl_antenna", ("cl_screw_1", "cl_screw_2")),
+    "tongue_to_u3": ("cl_tongue", ("cl_u3",)),
+    "tongue_to_u2": ("cl_tongue", ("cl_u2",)),
+}
 
 
 def sweeps(s) -> list[dict]:
@@ -614,6 +747,9 @@ def extreme_reach(ext: dict) -> dict:
     return out
 
 
+OPENING_AIR = ("air_slots_front", "air_lsw", "air_outlet_grille", "air_exhaust", "air_usb_axis")
+
+
 def check_bodies(s) -> list[str]:
     names = []
     for c in keepouts(s) + air_probes(s) + sweeps(s):
@@ -633,6 +769,9 @@ def exclusions(names: list[str]) -> list[list[str]]:
     out += [[a, b] for i, a in enumerate(sw) for b in sw[i + 1:]]
     out += [[a, "shell"] for a in sw] + [[a, "light_guide"] for a in sw] + [[a, "orange_dot"] for a in sw]
     out += [[a, f"{r}:1"] for a in sw for r in SHELL_BORNE]
+    # 3b-2: the free-air probes in front of the openings share air with the paths' probes
+    op = [n for n in names if n in OPENING_AIR]
+    out += [[a, b] for a in op for b in names if b.startswith("air_") and a != b]
     return out
 
 
@@ -696,6 +835,19 @@ def check_script(save: Path = CHECK_SC, budget_s: float = 900) -> dict:
     mark["face"] = len(steps)
     steps.append({"command": "inspect.interference", "params": {
         "budget_s": 120, "bodies": [*names_f, *FACE_PARTS], "exclude_pairs": face_pairs(s)}})
+    # 3b-2: the openings' open area, lower edge and fit (probes that overlap the base by design)
+    oprobes = [c for c, *_ in opening_probes(s)] + usb_probes(s) + low_probes(s)
+    steps += oprobes
+    names_o = opening_run_bodies(s)
+    mark["openings"] = len(steps)
+    steps.append({"command": "inspect.interference", "params": {
+        "budget_s": 120, "bodies": [*names_o, "base_plate", "shell"],
+        "exclude_pairs": [[a, b] for i, a in enumerate(names_o) for b in names_o[i + 1:]] + [["base_plate", "shell"]]}})
+    # 3b-2: R12, the tongue's distances and the grilles' separation as exact distances between solids
+    steps += clear_probes(s)
+    mark["clearance"] = len(steps)
+    for probe, against in CLEAR_PAIRS.values():
+        steps.append({"command": "inspect.clearance", "params": {"bodies": [probe], "against": list(against), "clearance": 200}})
     steps.append({"command": "parameters.change", "params": {"changes": {n: f"{TOUCH_SQUEEZE} mm" for n in SQUEEZES}}})
     mark["touch"] = len(steps)
     steps.append({"command": "inspect.interference", "params": {"budget_s": 120, "bodies": sorted({b for p in TOUCHES for b in p})}})
@@ -721,7 +873,27 @@ def run(cli: str | None = None) -> dict:
     m = sc["mark"]
     return {"inserted": res[:6], "interference": res[m["interference"]], "measure": res[m["measure"]],
             "touch": res[m["touch"]], "nudge": res[m["nudge"]], "window": res[m["window"]], "extremes": res[m["extremes"]],
-            "plugs": res[m["plugs"]], "face": res[m["face"]]}
+            "plugs": res[m["plugs"]], "face": res[m["face"]], "openings": res[m["openings"]],
+            "clearance": {k: _near(res[m["clearance"] + i]) for i, k in enumerate(CLEAR_PAIRS)}}
+
+
+def _near(res: dict) -> float:
+    """The least distance in an `inspect.clearance` result (inf when nothing is within the search)."""
+    return min([p["distance_mm"] for p in res["near"]] + [math.inf])
+
+
+def opening_areas(s, res: dict) -> dict:
+    """{probe: (open area measured, expected)} for every opening, from the openings run:
+    (probe volume - its overlap with the part) / the thickness."""
+    got = {}
+    for p in res["interferences"]:
+        a, b = (p["a"], p["b"]) if p["a"].startswith(("op_", "usb_", "low_")) else (p["b"], p["a"])
+        got[(a, b)] = got.get((a, b), 0.0) + p["volume_mm3"]
+    out = {}
+    for c, part, th, exp in opening_probes(s):
+        n = c["params"]["body_name"]
+        out[n] = ((_volume(c, s) - got.get((n, part), 0.0)) / s.v(th), s.v(exp))
+    return out
 
 
 def nudge_faults(nudge: dict, s=None) -> list[str]:
@@ -823,7 +995,8 @@ def distances(s=None) -> dict:
     tx1, ty0, tz0 = v("tongue_x1"), v("tongue_y0"), v("tongue_z0")
     tongue = ((tx1 - v("tongue_w"), tx1), (ty0, ty0 + v("tongue_dp")), (tz0, tz0 + v("tongue_t") + v("tongue_parts_h")))
     usb_x = v("usb_x")
-    plug = ((usb_x - 6.25, usb_x + 6.25), (dev(0, 0)[1], v("D") + 20.0), (v("usb_z") - 3.5, v("usb_z") + 3.5))   # 12.5 x 7 overmold out the rear (typical, to confirm)
+    plug = ((usb_x - v("usb_plug_w") / 2, usb_x + v("usb_plug_w") / 2), (dev(0, 0)[1], v("D") + 20.0),
+            (v("usb_z") - v("usb_plug_h") / 2, v("usb_z") + v("usb_plug_h") / 2))   # the overmold out the rear (typical, to confirm)
     r = v("boss_d") / 2
     bosses = [((x - r, x + r), (v("boss_y") - r, v("boss_y") + r), (v("floor_t") - v("head_depth"), v("floor_t") + v("boss_h")))
               for x in (-v("boss_x"), v("boss_x"))]
@@ -948,15 +1121,10 @@ def seal_forces(s=None) -> dict:
 
 
 def intake_open(s) -> float:
-    """Open area of the two intake rows (1.2 slots, slot_bar bars) between row_x0 and row_x1 with
-    the light-sensor window's gap: each span holds slots end to end with bars between."""
+    """Open area of the two intake rows as cut: in_n_l slots in the left span and in_n_r in the
+    right span, in two rows, each slot in_len_* long and slot_w high."""
     v = s.v
-    spans = [(v("row_x0"), v("lsw_gap_x0")), (v("lsw_gap_x1"), v("row_x1"))]
-    per_row = 0.0
-    for a, b in spans:
-        n = max(1, math.floor((b - a + v("slot_bar")) / 10.0))        # slots about 8.8-10 mm long
-        per_row += (b - a) - (n - 1) * v("slot_bar")
-    return 2 * per_row * v("slot_w")
+    return 2 * v("slot_w") * (v("in_n_l") * v("in_len_l") + v("in_n_r") * v("in_len_r"))
 
 
 def insertion_probe(s=None) -> list[str]:
@@ -1009,3 +1177,13 @@ if __name__ == "__main__":
         need = window_backing(airq.build())
         print("window (N2) fill / need / shell:", {k: (round(f, 2), round(need[k], 2), round(sh, 3))
                                                    for k, (f, sh) in window_fill(r["window"]).items()})
+        s = airq.build()
+        o = r["openings"]
+        print("openings (open area measured / expected):", {k: (round(a, 2), round(e, 2)) for k, (a, e) in opening_areas(s, o).items()})
+        vols = {}
+        for p in o["interferences"]:
+            n = p["a"] if p["a"].startswith(("usb_", "low_")) else p["b"]
+            if n.startswith(("usb_", "low_")):
+                vols[(n, p["b"] if n == p["a"] else p["a"])] = round(p["volume_mm3"], 3)
+        print("usb / low probes (material met):", vols, "expected usb:", {k: round(x, 3) for k, x in usb_expect(s).items()})
+        print("clearance (exact distances):", {k: round(x, 2) for k, x in r["clearance"].items()})
