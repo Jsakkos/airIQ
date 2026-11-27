@@ -604,23 +604,48 @@ z 3.0 … 28.6.
 0.35 mm. Instead the **port face is the datum**:
 - **Rear stop.** The port face rests on the land of `gasket_out` (`ring_preload` 0: the ring is a
   hard stop, not a squeeze). The seals therefore see the same port face at 20.8, 21.3 and 21.8.
-- **Front pad.** `sen66_pad`, a 10 × 10 foam pad 3.0 thick free (`pad_t`), is stuck on the
-  module's connector face (its plinth) on the outlet's axis. It sits against the cradle's tall left
-  rail and presses the module onto the ring. It is 50 % compressed at the nominal depth, 33 % at
-  20.8 and 67 % at 21.8. The low right rail is only a guide: it stays `clr_align` in front of a
+- **Front pad.** `sen66_pad`, a 10 × 10 foam pad 3.2 thick free (`pad_t`), is stuck on the
+  module's connector face (its plinth) on the outlet's axis. It presses the module onto the ring.
+  It is 44 % compressed at the nominal depth, 28 % at 20.8 and 60 % at 21.8 (26–53 % once the
+  seat's give is counted). The low right rail is only a guide: it stays `clr_align` in front of a
   21.8 module.
-- **No tipping or yaw.** The pad's force passes through the ring's centre, so the ring's land
-  takes it with its reaction centred. `gasket_in` is a soft 45° wiper (0.8 thick, 4.9 long,
-  0.5 preload): it pushes 0.7–1.4 N (TPU 95A at 26–50 MPa). The ring's reaction stays inside its
-  bore's circle while the pad gives at least 4.9 N (49 kPa on 100 mm²). The reviewer's 100 N
-  estimate for a squeezed solid ring does not arise: the ring is not squeezed.
-- **Front clearances at 21.8.** The connector face is 0.15 behind the right rail, and the
-  plinth's top front edge is 0.39 behind the zone wall's slant. The plinth is inset 1.2, which
-  `sen_y0` (set by the block's edge) does not count.
-- **Check.** The check design puts the front of a 21.8 and a 20.8 module (their port faces on the
-  ring) against the cradle, the zone wall and the pad. Only the pad meets them, by 2.0 and 1.0 mm
-  free (`test_sen66_at_its_depth_extremes`). `airq_check.sen66_hold` gives the arithmetic
-  (`test_sen66_held_over_its_depth_tolerance`).
+- **Pad seat (fix round 3, B1).** The pad bears on a 2.4 plate (`seat_t`) from the floor,
+  joined to the left side rail along its height and standing just behind the cables' riser and
+  run.
+  - Taken as two cantilevers (from the floor and from the side rail, PETG at 1.8 GPa), it is about
+    77 N/mm. It gives 0.06 at the pad's least force and 0.19 at its most (15 N), and its root
+    stress across the layers at 15 N is 6.6 MPa.
+  - Its top follows the zone wall's slant, 0.8 under it, so it stays clear of the drawer grommet's
+    squeezed face.
+  - A 45° lead-in on its back edge (B4) meets the pad's free front face at every module depth, so
+    the pad is squeezed gradually as the module goes down.
+- **No tipping or yaw, the land loaded all round (round 3).** The pad's force passes through the
+  ring's centre. `gasket_in` is a soft 55° wiper (0.8 thick, 6.1 long, 0.5 preload): it pushes
+  0.28–0.54 N (TPU 95A at 26–50 MPa), 25.5 mm from the ring's axis. The ring's reaction must stay
+  inside the land's kern, (r_o² + r_i²)/(4 r_o) = 5.3 mm, so that the land stays loaded all round.
+  That needs a pad force of at least 3.1 N. With a 1.5 margin, the **pad spec** is:
+  - at least 4.7 N (47 kPa) at its least compression (26 %);
+  - at most 15 N (150 kPa) at its most (60 %);
+  - so a foam whose force rises at most 3.2× between those compressions.
+
+  The ring is a hard stop of TPU 95A at 0.05–0.15 MPa, so it closes little of the print's
+  waviness: check the first print for outlet leaks (README "To confirm").
+- **Front clearances at 21.8.**
+  - The connector face is 0.15 behind the right rail.
+  - The plinth's top front edge is 0.39 behind the zone wall's slant. The plinth is inset 1.2,
+    which `sen_y0` (set by the block's edge) does not count.
+  - The plug and its cable's bend move forward with the connector face (B2). A 0.6 pocket in the
+    slant's underside over them (`plug_room_d`) keeps them 0.29 clear of the zone wall; the slant
+    keeps 1.2 there.
+- **Check.** The check design puts the front of a 21.8 module (plinth, block, plug and bend) and of
+  a 20.8 module against the cradle, the zone wall, the pad and both gaskets, with the port faces
+  on the ring. Only the pad meets them, by 1.9 and 0.9 mm free
+  (`test_sen66_at_its_depth_extremes`). `airq_check.sen66_hold` gives the arithmetic
+  (`test_sen66_held_over_its_depth_tolerance`, `test_pad_seat_is_stiff_and_tied`).
+- **Inlet seal's root (B3).** The wiper's root is a 2.0 foot squeezed 0.05 into its slot in the
+  plate on its sides and back, so there is no bypass round it and no travel to eat the preload.
+  Its tip has a 45° lead-in at the top (0.8, B4), so the module's bottom edge pushes it back as
+  the module goes down.
 
 **The sealed sensor zone (I2, I3).** `base_plate` is the whole footprint and the sensor zone's
 tub, in one print: floor, front lip, rear wall, the side rails under the zone wall's profile, the
@@ -628,7 +653,9 @@ boss pockets, the plenum plate and its rib on the rear wall, the cradle, the HCH
 chimney, and the standoffs with collars.
 - **Zone wall.** It rests on the tub's rim: laps on the rails, the boss pockets, the plate, the rib
   and the standoff collars. At the front the intake slots leave no room for a lap, so `zone_seal`
-  (TPU) seals the ledge against the lip. It sits on the standoffs' spigots, and pads on its top
+  seals the ledge against the lip. It is a closed-cell foam strip, 1.6 free and 25 % compressed,
+  pushing 3–9 N along 77.8 mm (fix round 3). TPU 95A at 20 % would have pushed hundreds of newtons
+  and bowed the slotted lip. It sits on the standoffs' spigots, and pads on its top
   reach the board, so the board's two M2 screws clamp it (fix round 2, N5): it cannot lift off its
   laps.
 - **Base to shell (fix round 2, N1).** The shell has two datums. It stands on the floor (z), where
@@ -643,14 +670,33 @@ chimney, and the standoffs with collars.
   meet the base, and only on the rear wall's face and the floor (`test_shell_nudged_meets_the_base_only_on_its_datums`).
   So a shell or base printed up to `clr_remove` off size still goes together.
 - **Bosses.** The front boss pockets keep the shell's floor bosses out of the sensor zone.
+- **The space beside the ring (fix round 3).** Between the port face and the plate, left of the
+  inlet wiper and outside the ring, lies a dead space. It only matters if the ring leaks.
+  - It reached the inlets' side through the 0.3 gap over the module, round the wiper's tip: a
+    5 mm path with up to 6.4 mm² of section.
+  - `sen66_top_seal` closes that path: a 0.6 closed-cell foam strip across the module's top at the
+    wiper's tip, from the port face to the connector face, 17–67 % compressed over the module's
+    height tolerance and pushing 4–15 N near H1.
+  - The dead space now reaches only the front plenum, 21 mm forward through the 0.2 gap at the
+    module's left end (5.1 mm²) and the 0.3 gap over its left part. From there the air is ≥ 80 mm
+    of intake stream (114–411 mm² of section) from the inlets.
+  - Ring and wiper are therefore a seal and a baffle against recirculation, with no short way
+    round.
 
 **HCHO pocket (R26).** The SFA40 lies flat at the front right (x 13.4 … 38.8, y 9.8 … 35.2),
 opening up. Two pins (front right, rear left) go through its holes.
 - **Lid.** `hcho_lid` closes the pocket, with laps on its walls, the lip rib and three shelves.
-  Four posts on the lid press the board down. Two M2 × 8 self-tapping screws come from under the
-  floor, through the SFA40's front-left and rear-right holes, into two of the posts, and clamp
-  the board and the lid to the base (fix round 2, N5). Their heads sit in 0.4 counterbores, with
-  1.6 of floor left.
+  Four posts on the lid press the board down. Two **M2 × 6** self-tapping pan-head screws come
+  from under the floor, through the SFA40's front-left and rear-right holes, into two of the posts,
+  and clamp the board and the lid to the base (fix round 2, N5).
+  - Their tips end at z 6.4: in the pilots (which end at 7.1), with 2.8 of thread in the posts, and
+    under the tongue's pocket (8.19). An M2 × 8 would come through the lid under the tongue (round
+    3, B5).
+  - Their heads sit in 0.4 counterbores, with 1.6 of floor left, so they stand 1.2 under the
+    floor.
+  - The felt feet (`foot_t` 2.0, ⌀10) are thicker than that and are not over them. The front feet
+    cover the shell's screws, the rear feet sit at the rear corners
+    (`test_sfa40_screws_and_feet`).
 - **Grille.** A chimney in front of H2 takes the air to the HCHO grille: five slots in the right
   rail, behind a window in the shell's right side wall, from the 10 mm line up (67.8 mm² open,
   ≥ 54.7).
@@ -692,9 +738,18 @@ they enter (`interface.yaml`): Qwiic 6.0 × 2.95, GH 10.75 × 4.25, to confirm.
   - The drawer is a notch in the slant at the left, open to the zone wall's left end, so both
     cables are laid in from the side. No plug passes it; the GH plug passes no closed opening at
     all.
-  - `grommet_zone_a/_b` (front and rear halves, split along the cables) slide in from the left over
-    the left rail. Ribs in the notch's grooves hold them across the wall, they bear on the rail and
-    the notch's end with `gasket_squeeze`, and the shell's side wall stops them sliding out.
+  - `grommet_zone_a/_b` (front and rear halves, split along the cables) are closed round the cables
+    first, then slid in together from the left over the left rail.
+    - Ribs in the notch's grooves hold them across the wall. The ribs stand 0.45 proud of the
+      printed face at any squeeze (round 3, B6).
+    - They bear on the rail and the notch's end with `drawer_squeeze` 0.05 (18–35 N on the front
+      face).
+    - Where the boss notch leaves the zone wall a 2.3 mm sliver, a key on the left boss pocket's
+      back wall (a 1.4 × 0.5 ridge in a groove in the sliver) takes their push. It carries 10–20 N
+      at 1.7–3.3 MPa (`airq_check.seal_forces`).
+    - The shell's side wall stops them sliding out.
+  - The grommets' bores are 0.2 under the cables' diameters (`bore_squeeze`), so they hug the
+    cables. Sleeve the GH cable's six wires with heat-shrink through the drawer so they are round.
 - **Tongue and SFA40 → J4.** J3 cannot take a plug in the airQ: the panel and the light guide
   stand 1.4 mm into the plug's path at the board's front edge (owner item). The tongue therefore
   chains through the SFA40's two Qwiic ports, on the same I2C nets (`interface.yaml`
@@ -704,7 +759,9 @@ they enter (`interface.yaml`): Qwiic 6.0 × 2.95, GH 10.75 × 4.25, to confirm.
     the cable, each with a flange on the lid and a barb under it.
   - SFA40 J2 → the pocket's left wall → along the floor → the drawer → J4. The wall's J4 notch is
     open at its top, so the cable is laid in. `grommet_j4_a/_b` (lower and upper halves) straddle
-    the wall with flanges, the floor under them and the lid over them.
+    the wall with flanges, the floor under them and the lid over them. They squeeze the notch's
+    faces by `grommet_squeeze` 0.1, but meet the floor and the lid only at contact, so they do not
+    lift the lid (round 3, B6).
   - Check: the plug's section swept through the lid's hole meets nothing of the lid, and the
     drawer and the J4 notch are open from the cable's place out past their edges
     (`test_plugs_pass_their_openings`).
@@ -713,41 +770,50 @@ they enter (`interface.yaml`): Qwiic 6.0 × 2.95, GH 10.75 × 4.25, to confirm.
 
 | Part | Material | Prints | Supports |
 |---|---|---|---|
-| `shell` | shell material (ASA/PETG, warm white) | face down on textured PEI | none. Two small overhangs of about 60° are accepted: the rear boss's front disc (⌀6) and the HCHO window's step tops |
+| `shell` | shell material (ASA/PETG, warm white) | face down on textured PEI | none. Two small overhangs of about 60° are accepted: the rear boss's front disc (⌀6) and the HCHO window's rear edge |
 | `base_plate` | shell material | floor down: every wall, post, rib and slot stands vertical; the screw counterbores are on the bed | none |
 | `zone_wall` | an **opaque** filament (internal, any colour, e.g. black) | standing on its right end: the bent profile on the bed, the drawer and its grooves at the top, running vertical | one small support under the right boss notch's ledge, a 5 × 2 cantilever |
 | `hcho_lid` | an opaque filament | top face down, posts up | none. The tongue pocket's floor bridges 13.3 mm |
 | `gasket_out` | TPU 95A, opaque (black) | on its seat end | none |
-| `gasket_in` | TPU 95A, opaque | standing on its floor end: the wiper is a vertical prism | none |
-| `zone_seal` | TPU 95A, **opaque (black)** | flat | none |
+| `gasket_in` | TPU 95A, opaque | standing on its floor end: the root foot and the 55° wiper are a vertical prism; the tip's lead-in faces up | none |
+| `zone_seal`, `sen66_top_seal` | closed-cell foam, **black**, adhesive-backed (bought, cut) | – | – |
 | `grommet_zone_a/_b` | TPU 95A, opaque | on an end face: the rib profile on the bed | none |
-| `grommet_j4_a/_b`, `grommet_tongue_a/_b` | TPU 95A, opaque | on the split face, the half-channel up | none; the tongue halves' 0.4 barbs overhang 0.5 |
+| `grommet_j4_a/_b`, `grommet_tongue_a/_b` | TPU 95A, opaque | on the split face, the half-channel on the bed | none; the tongue halves' 0.4 barbs overhang 0.5 |
 | `sen66_foam`, `sen66_pad` | PU foam, cut (bought) | – | – |
 
-- **TPU sizes.** The TPU parts are sized at contact plus `gasket_squeeze` (0.3), except the wiper
-  (`wiper_squeeze` 0.5) and the ring, which is a stop (`ring_preload` 0). The check design sets
-  them all to 0.
+- **TPU and foam sizes.** Each part is sized at contact plus its own squeeze, and the check design
+  sets them all to 0:
+  - the J4 and lid grommets' sealing faces, `grommet_squeeze` 0.1 (4 %);
+  - the drawer's, `drawer_squeeze` 0.05;
+  - the bores, `bore_squeeze` 0.2;
+  - the wiper, `wiper_squeeze` 0.5, and its root, `root_squeeze` 0.05;
+  - the foams, `pad_squeeze`, `seal_squeeze` and `top_seal_squeeze`, modelled free;
+  - the ring is a stop (`ring_preload` 0).
 - **Opaque near the light paths (N3).** The light-sensor window sits 2.6 below the LED line.
   Inside, the barriers between the light guide and the tongue's channel are the ledge and
-  `zone_seal`, so both are opaque: natural TPU and warm-white plastic at 1.2 pass light. Task 3b's
+  `zone_seal`, so both are opaque: black foam, and a dark filament for the zone wall. Natural TPU
+  and warm-white plastic at 1.2 pass light. Task 3b's
   opaque-wall check must include this path: guide → ledge/`zone_seal` → the channel in front of
   the tongue → the VEML7700. It must also keep the guide's light off the 0.2 parting line at the
   crease (N1), which opens just under the LED slot.
 - **Order:**
   1. inserts;
   2. base;
-  3. SFA40 with its two cables plugged in: lay the J4 cable in the wall's notch on
+  3. `gasket_in` down its slot (root first) and `gasket_out` into its seat;
+  4. SFA40 with its two cables plugged in: lay the J4 cable in the wall's notch on
      `grommet_j4_a`, add `grommet_j4_b`, put on the lid (the tongue cable through its hole), then
-     drive the two screws from under the floor and fit `grommet_tongue_a/_b` round the cable;
-  4. tongue in its pocket, its cable plugged in;
-  5. `sen66_pad` stuck on the SEN66's connector face; lower the SEN66, pressed back against the
-     ring and the wiper, with its cable plugged in, past the pad's rail;
-  6. zone wall with `zone_seal`, onto the spigots; lay the two cables into the drawer from its
-     open end and slide `grommet_zone_a/_b` in round them;
-  7. board, then the cables into J2 and J4, and the board's two screws, which clamp the zone wall;
-  8. light guides;
-  9. shell, lowered along −z;
-  10. feet.
+     drive the two M2 × 6 screws from under the floor and fit `grommet_tongue_a/_b` round the cable;
+  5. tongue in its pocket, its cable plugged in;
+  6. `sen66_pad` stuck on the SEN66's connector face on the outlet's axis, `sen66_top_seal` across
+     its top at the wiper's tip; lower the SEN66, pressed back against the ring, past the seat's
+     and the wiper's lead-ins, with its cable plugged in;
+  7. zone wall, with `zone_seal` stuck on its ledge's front face, onto the spigots and the key; lay
+     the two cables into the drawer from its open end, close `grommet_zone_a/_b` round them, and
+     slide the pair in together;
+  8. board, then the cables into J2 and J4, and the board's two screws, which clamp the zone wall;
+  9. light guides;
+  10. shell, lowered along −z;
+  11. feet.
 - **Fastening:** three M2 screws into heat-set inserts in the shell.
   - Two front floor bosses take screws from underneath, the heads under the felt feet. On the way
     down the bosses pass the zone wall's notches, and they end up standing in the boss pockets.
@@ -768,17 +834,18 @@ screw → zone wall pad and H1's spigot → H1 → plate → floor and rails.
 | Body | Volume | Size | Min corner | What, material |
 |---|---|---|---|---|
 | `shell` | 17756 | 95.00 × 54.88 × 49.00 | −47.5, 0.12, 2.0 | 30° face, top and sides (R24); three M2 insert bosses; the panel pocket; the HCHO window |
-| `base_plate` | 30897 | 95.00 × 55.00 × 49.00 | −47.5, 0, 0 | the tub: floor, lip, rear wall, side rails, boss pockets, plenum plate and rib (the plan's `baffle` and outlet duct), cradle (`sen66_cradle`: the pad's tall rail, the guide rail), HCHO pocket and chimney (`hcho_pocket`), SFA40 pins and screw holes, standoffs H1 and H2 with collars and spigots, the HCHO grille, screw counterbores, the J4 notch |
-| `zone_wall` | 9083 | 91.00 × 50.00 × 18.06 | −45.5, 3.0, 12.94 | ledge behind the lip, slanted part behind the panel, horizontal part over the SEN66 and the plenum; the cable drawer; the pads the board clamps; the tongue hold-down |
-| `zone_seal` | 140 | 77.80 × 1.50 × 1.20 | −38.9, 1.5, 13.8 | the ledge's seal against the lip. TPU 95A, opaque |
+| `base_plate` | 31292 | 95.00 × 55.00 × 49.00 | −47.5, 0, 0 | the tub: floor, lip, rear wall, side rails, boss pockets, plenum plate and rib (the plan's `baffle` and outlet duct), cradle (`sen66_cradle`: the pad's seat tied to the side rail, the guide rail), HCHO pocket and chimney (`hcho_pocket`), SFA40 pins and screw holes, standoffs H1 and H2 with collars and spigots, the HCHO grille, screw counterbores, the J4 notch, the sliver key |
+| `zone_wall` | 9046 | 91.00 × 50.00 × 18.06 | −45.5, 3.0, 12.94 | ledge behind the lip, slanted part behind the panel, horizontal part over the SEN66 and the plenum; the cable drawer; the pocket over the SEN66's plug; the pads the board clamps; the tongue hold-down |
+| `sen66_top_seal` | 43 | 3.39 × 21.30 × 0.60 | −7.09, 18.44, 28.6 | foam strip across the SEN66's top at the wiper's tip (shown free). Closed-cell foam, black |
+| `zone_seal` | 149 | 77.80 × 1.60 × 1.20 | −38.9, 1.4, 13.8 | the ledge's seal against the lip (shown free). Closed-cell foam, black |
 | `sen66_foam` | 1176 | 55.20 × 21.30 × 1.00 | −43.7, 18.44, 2.0 | the 1 mm foam under the SEN66 |
 | `gasket_out` | 424 | 24.00 × 4.00 × 24.00 | −42.9, 39.74, 3.8 | outlet ring, from the port face (its stop) to its seat in the plate. TPU 95A |
-| `gasket_in` | 142 | 4.63 × 4.50 × 27.90 | −4.33, 39.24, 1.0 | the wiper between the inlets and the ring. TPU 95A |
-| `sen66_pad` | 300 | 10.00 × 3.00 × 10.00 | −35.9, 16.94, 10.8 | the foam pad pressing the SEN66 onto the ring (shown free) |
+| `gasket_in` | 197 | 6.44 × 4.55 × 27.90 | −6.09, 39.24, 1.0 | the 55° wiper between the inlets and the ring, its root foot in the plate. TPU 95A |
+| `sen66_pad` | 320 | 10.00 × 3.20 × 10.00 | −35.9, 16.65, 10.8 | the foam pad pressing the SEN66 onto the ring (shown free) |
 | `hcho_lid` | 1337 | 27.90 × 37.74 × 4.99 | 11.65, 2.0, 3.6 | the HCHO pocket's lid: the SFA40's hold-downs (two with pilots for the screws from below) and the tongue's pocket (the plan's `tongue_mount`) |
-| `grommet_zone_a/_b` | 77 each | 9.20 × 2.75 × 8.70 | −45.5, 9.85 / 12.60, 13.72 / 18.22 | the drawer's halves, round the SEN66 and Qwiic cables. TPU 95A |
-| `grommet_j4_a/_b` | 28 / 50 | 3.20 × 5.60 × 2.30 / 3.69 | 10.85, 2.6, 1.7 / 4.0 | lower and upper halves in the pocket's J4 notch. TPU 95A |
-| `grommet_tongue_a/_b` | 26 each | 4.00 × 4.95 × 2.20 | 22.1 / 26.1, 33.39, 6.99 | left and right halves in the lid's hole. TPU 95A |
+| `grommet_zone_a/_b` | 63 each | 8.95 × 2.80 × 7.77 | −45.5, 9.80 / 12.60, 14.65 / 18.72 | the drawer's halves, round the SEN66 and Qwiic cables. TPU 95A |
+| `grommet_j4_a/_b` | 25 / 47 | 3.20 × 5.60 × 2.00 / 3.39 | 10.85, 2.6, 2.0 / 4.0 | lower and upper halves in the pocket's J4 notch. TPU 95A |
+| `grommet_tongue_a/_b` | 24 each | 4.00 × 4.95 × 2.20 | 22.1 / 26.1, 33.39, 6.99 | left and right halves in the lid's hole. TPU 95A |
 
 **Parameters Task 3b and Task 4 use.** The plan's names are `W`, `D`, `H`, `tilt_deg`, `wall`,
 `grille_min_z`, `slot_w`, `clr_align`, `clr_remove`, `clr_snap`, plus `lip` and `gasket_squeeze`.
@@ -819,16 +886,21 @@ Task 3a filled the rows its features answer. Task 3b completes the table.
 | Check | Rule | Value | How measured | Result |
 |---|---|---|---|---|
 | Envelope | 95 × 55 × 48 ±1, R22: 95 × 55 × ≈50 | 95.00 × 55.00 × 51.00 | `measure`, union of the bodies (`test_build_and_bounding_box`) | pass (R22; H 51 recorded) |
-| Interference | 0 overlapping volume (R9) | 0 pairs; 403 bodies checked (all six references, `ref_main`'s 308 included; the keep-outs, probes and sweep), 0 unchecked | `inspect.interference` on the check design at every squeeze 0; each reference's own internal overlaps excluded | pass |
+| Interference | 0 overlapping volume (R9) | 0 pairs; 404 bodies checked (all six references, `ref_main`'s 308 included; the keep-outs, probes and sweep), 0 unchecked | `inspect.interference` on the check design at every squeeze 0; each reference's own internal overlaps excluded | pass |
 | Shell's way on (I1) | the shell lowers along −z onto the assembled base | swept boss columns and the shell raised 1–32 mm: 0 overlap | as above (`sweep_*`, `shell_up_*`) | pass |
 | Shell clearance (N1, review focus 1) | `clr_remove` off the datums | nudged 0.05: forward, sideways and up 0; back 8.46 mm³ only at y 53.20–53.25 (the rear wall's face); down 10.93 mm³ only at z 1.95–2.00 (the floor) | shell copies moved ±0.05 against the base, the zone wall and the seal (`test_shell_nudged_meets_the_base_only_on_its_datums`) | pass |
-| Gaskets touch the SEN66 and the lip | zero gap, zero overlap (R9) | 0 at squeeze 0; at 0.05: ring 5.30, wiper 1.45, ledge seal 4.67, pad 5.00 mm³ (contact area × 0.05) | interference at every squeeze 0 and 0.05 (`test_gaskets_touch_what_they_seal`) | pass |
-| Seal over the SEN66's depth (I3(b)) | the seals hold at 21.3 ± 0.5, no tipping | port face on the ring at every depth; pad 33 / 50 / 67 % compressed; a 21.8 front meets only the pad (2.0 free), a 20.8 front still meets it (1.0); 0.15 to the guide rail, 0.39 to the slant; wiper 0.7–1.4 N against a pad of ≥ 4.9 N | `ext_*` probes; `sen66_hold` (`test_sen66_at_its_depth_extremes`, `test_sen66_held_over_its_depth_tolerance`) | pass; the pad's foam to confirm (≥ 49 kPa at 33 %) |
-| Grommets (I2, N4) | split, squeezed, held | six halves; each touches its opening at 0 and overlaps it at 0.05 (0.33–1.33 mm³) | touch run (`test_grommets_touch_what_they_seal`) | pass |
+| Gaskets touch the SEN66 and the lip | zero gap, zero overlap (R9) | 0 at squeeze 0; at 0.05: ring 5.30, wiper 1.75, ledge seal 4.67, pad 5.00, top seal 3.62 mm³ (contact area × 0.05) | interference at every squeeze 0 and 0.05 (`test_gaskets_touch_what_they_seal`) | pass |
+| Seal over the SEN66's depth (I3(b)) | the seals hold at 21.3 ± 0.5, no tipping, the land loaded all round | port face on the ring at every depth; pad 28 / 44 / 60 % compressed (26–53 % with the seat's give); a 21.8 front (plinth, block, plug, bend) meets only the pad (1.9 free), a 20.8 front still meets it (0.9); 0.15 to the guide rail, 0.39 to the slant, the plug 0.29 under the slant's pocket; wiper 0.28–0.54 N, so the ring's reaction stays in the land's kern (5.3) for a pad ≥ 3.1 N; spec 4.7 N at 26 %, ≤ 15 N at 60 % | `ext_*` probes; `sen66_hold` (`test_sen66_at_its_depth_extremes`, `test_sen66_held_over_its_depth_tolerance`, `test_plug_room_at_the_deepest_module`) | pass; the pad's foam to confirm (47–150 kPa) |
+| Pad seat (B1) | stiff, tied, not creeping | 2.4 plate joined to the side rail: about 77 N/mm, 0.19 give and 6.6 MPa across the layers at 15 N; 45° lead-in met by the pad at every depth; top 0.8 under the slant | `sen66_hold` (`test_pad_seat_is_stiff_and_tied`) | pass (beam estimate) |
+| Inlet seal (B3, B4) | root squeezed, tip lead-in | 2.0 root, 0.05 a side and back (touch 5.51 mm³ at 0.05); 0.8 lead-in at the tip's top > 0.5 preload | `test_inlet_seal_root_and_lead_in`, touch run | pass |
+| SFA40 screws and feet (B5) | the screws stay in the posts, the heads clear the desk | M2 × 6: tip z 6.4 in pilots to 7.1, 2.8 of thread, 1.8 under the tongue's pocket; heads 1.2 under the floor, feet 2.0, not over them | `test_sfa40_screws_and_feet` | pass (feet to confirm) |
+| Seal forces (round 3) | nothing bows or cracks | zone seal (foam, 25 %) 3–9 N; drawer front 18–35 N, 10–20 N on the sliver, key at 1.7–3.3 MPa; J4 grommet on the lid 0 (contact); top seal 4–15 N | `airq_check.seal_forces` (`test_seal_forces_stay_small`) | pass (estimates) |
+| Space beside the ring (round 3) | no short way from it to the inlets | the gap over the module is closed at the wiper's tip; the space reaches only the front plenum, 21 mm through 5.1 + 11 mm² of slits, ≥ 80 mm of intake stream from the inlets | `test_space_beside_the_ring_is_closed` | pass |
+| Grommets (I2, N4, B6) | split, squeezed, held | six halves; each touches its opening at 0 and overlaps it at its squeeze (0.32–1.34 mm³ at 0.05); drawer ribs 0.45 proud of the printed face; bores 0.2 under the cables | touch run (`test_grommets_touch_what_they_seal`, `test_grommets_squeeze_and_are_held`) | pass |
 | Plugs through their openings (I2) | every plug fits every closed opening it passes | the lid's hole 6.4 × 3.35 passes the Qwiic plug 6.0 × 2.95 (0.2 a side); the drawer and the J4 notch are open to an edge, so no plug passes them | the plug's section swept through the lid; open-edge probes (`test_plugs_pass_their_openings`) | pass |
 | Gravity-only parts (N5) | held, not just resting | zone wall clamped by the board's screws; lid and SFA40 by two screws from below; tongue in its pocket under a pad (`clr_align`) | `test_gravity_parts_are_held` | pass |
 | HCHO window (N2) | does not open the electronics zone | each step backed by the rail and the zone wall but at its slot (fill = need: 2.80, 5.29, 7.79, 10.28, 10.22 mm³); 0 against the shell | `win_*` probes (`test_hcho_window_is_backed`) | pass |
-| Rebuild over the parameter range | no errors | wall 1.6 and 2.4, `clr_*` ±0.1: no feature errors, 15 bodies each, volume back to the default | `parameters.change` + `document.inspect` walk (`test_rebuilds_over_wall_and_clearances`) | pass |
+| Rebuild over the parameter range | no errors | wall 1.6 and 2.4, `clr_*` ±0.1: no feature errors, 16 bodies each, volume back to the default | `parameters.change` + `document.inspect` walk (`test_rebuilds_over_wall_and_clearances`) | pass |
 | Intake path (R25) | ≥ 77.3 | gap at the inlets 80.7; in front of the SEN66 114.4; over the HCHO lid 411.6 | free probe boxes, sections from `measure` (`test_air_paths_are_free_sections`) | pass |
 | Outlet path (R25) | ≥ 330.1 | ring bore 346.4; plenum branches (section / share of 330.1 by grille slots): ring to H1 235.7 / 226.9, at H1 204.6 / 185.7, right of H1 224.1 / 165.1 | as above | pass |
 | HCHO path (R25) | ≥ 27.4 (the SFA40's opening) | over the cap 35.6; window into the chimney 47.2; chimney 30.3 | as above | pass |
@@ -901,12 +973,18 @@ These values are parameters, so a correction is a parameter change and a rebuild
 
 **airQ SEN66 hold (fix round 2)**
 
-- The pad's foam (`sen66_pad`, 3.0 free, 10 × 10). It must give at least 4.9 N at 33 %
-  compression (49 kPa) and stay under about 20 N at 67 % (200 kPa), for example a firm
-  microcellular PU foam with adhesive. Check it on the first build: the module must not move when
-  pressed toward the front.
-- TPU 95A's modulus (26–50 MPa assumed) sets the wiper's push (0.7–1.4 N).
-- The SFA40's screws: M2 × 8 self-tapping from below, into 1.7 pilots in the lid's posts.
+- The pad's foam (`sen66_pad`, 3.2 free, 10 × 10). It must give at least 4.7 N (47 kPa) at 26 %
+  compression and at most 15 N (150 kPa) at 60 %, so its force may rise at most 3.2× in between.
+  For example, a medium microcellular PU foam with adhesive: check its compression-force curve.
+  Check it on the first build: the module must not move when pressed toward the front.
+- The ring is a hard stop of TPU 95A at 0.05–0.15 MPa, so it closes little of the print's
+  waviness. Check the first print for leaks from the outlet into the space beside the ring, for
+  example with smoke at the outlet grille while the SEN66 runs.
+- TPU 95A's modulus (26–50 MPa assumed) sets the wiper's push (0.28–0.54 N).
+- The seals' foam (`zone_seal` 1.6, `sen66_top_seal` 0.6): closed-cell, black, adhesive-backed,
+  30–100 kPa at 25 %.
+- The SFA40's screws: M2 × 6 self-tapping pan head (head 1.6) from below, into 1.7 pilots in the
+  lid's posts. The felt feet: at least 2.0 thick.
 
 **SFA40**
 
