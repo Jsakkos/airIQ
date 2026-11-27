@@ -19,6 +19,7 @@ import yaml
 
 import airq
 import airq_check
+import airq_face as F
 import board_sources as B
 import encbuild
 import layout_study as L
@@ -39,7 +40,9 @@ FACE = ["panel_x0", "panel_s0", "bezel", "window_xc", "pocket_x0", "pocket_x1", 
         "lsw_x", "lsw_z", "lsw_d", "slot_row1_z", "slot_row2_z", "row_x0", "row_x1", "lsw_gap_x0", "lsw_gap_x1",
         "out_gx0", "out_gx1", "out_gz0", "out_gz1", "out_pitch", "out_n", "exh_x0", "exh_x1", "exh_z0", "exh_z1",
         "usb_x", "usb_z", "usb_well", "usb_chamfer",
-        "win_x0", "win_x1", "win_s0", "win_s1", "win_chamfer"]
+        "win_x0", "win_x1", "win_s0", "win_s1", "win_chamfer",
+        "ffc_w", "ffc_t", "ffc_r", "ffc_s_c3", "ffc_s_b0", "ffc_t_a", "ffc_x_m", "ffc_xc", "ffc_x_c1", "ffc_insert", "ffc_service_dz",
+        "hold_s0", "hold_s1", "hold_t0", "hold_t1", "hold_x0", "hold_x1"]
 
 
 def test_bodies_and_plan_parameters():
@@ -476,6 +479,48 @@ def test_window_and_pocket_follow_the_panel():
     assert V("block_out") == pytest.approx(epd("block_out")) == pytest.approx(4.6)
 
 
+def test_ffc_route_length_and_service_lift():
+    """3b-1 feature 2: the FFC is 12.5 x 0.3 with bends of inner radius >= 1; its seated route (centre
+    line, from the adapter's mouth to J7's) plus the two insertions fits the bought length with a spare;
+    the shell can be lifted the service distance (the floor bosses clear the zone wall's notches) with
+    the FFC plugged in at J7 and the adapter."""
+    g = F.ffc_geometry(V, V("ffc_s_c3"))
+    assert (V("ffc_w"), V("ffc_t")) == pytest.approx((12.5, 0.3))
+    assert V("ffc_r") - V("ffc_t") / 2 >= 1.0                                        # inner bend radius >= 1
+    assert g["centre_len"] + 2 * V("ffc_insert") <= V("ffc_len")                    # fits the bought length
+    spare = V("ffc_len") - 2 * V("ffc_insert") - g["centre_len"]
+    assert 0 <= spare < 10                                                          # no more than a few mm to lose
+    assert V("ffc_len") == 80.0                                                     # a standard length
+    # J7: the ribbon enters its mouth between D2 and D3, inside the 15.5 body, flat, 1 mm over the board
+    leds = B.MAIN["leds"]["chain"]
+    d2, d3 = V("board_x0") + leds[1]["center_x"] + 2.0, V("board_x0") + leds[2]["center_x"] - 2.0
+    assert d2 < V("ffc_xc") - V("ffc_w") / 2 and V("ffc_xc") + V("ffc_w") / 2 < d3
+    assert V("j7_x0") <= V("ffc_xc") - V("ffc_w") / 2 and V("ffc_xc") + V("ffc_w") / 2 <= V("j7_x1")
+    assert V("ffc_z_j7") - V("board_z0") - V("board_t") == pytest.approx(B.MAIN["fpc"].get("slot_h", 1.0))
+    path = F.ffc_path(V, g)
+    assert path[-1][0] == pytest.approx(V("board_y0"), abs=0.02) and path[-1][1] == pytest.approx(V("ffc_z_j7"))
+    assert path[-1][2] == 0.0 and g["l_v"] >= 0 and g["u"] > 0                      # horizontal into J7, a real route
+    # the run under the LEDs stays below their faces; the adapter's mouth is where the route starts
+    led_lo = V("board_y0") * V("sin_t") + (V("led_z") - 1.0 - V("lip")) * V("cos_t")
+    assert V("ffc_s_c3") + V("ffc_w") / 2 <= led_lo - 0.29
+    assert V("ffc_x_m") == pytest.approx(V("adapter_x") + V("ad_l") / 2)
+    sv = F.ffc_service(V, g, V("ffc_service_dz"))
+    assert sv["ok"], sv                                                              # service lift with both ends plugged
+    assert V("ffc_service_dz") >= V("zw_z1") + 1 - (V("floor_t") + V("boss_h"))     # the bosses are out of the zone wall's notches
+    # the contacts side and pin 1 (hardware/interface.yaml mechanical.main.fpc.pin_order)
+    out = F.ffc_pin_outcome()
+    assert out == {"creases": 3, "contacts_up": True, "pin1_x": 1, "mirrored": False}
+    assert B.MAIN["fpc"]["pin1_x"] > B.MAIN["fpc"]["center_x"]                       # pin 1 on the viewer's right
+
+
+def test_adapter_holder_flanks_the_board():
+    assert V("hold_s0") - (V("adapter_s") + V("ad_w") / 2) == pytest.approx(V("clr_remove"))      # clr_remove over the upper edge
+    assert V("hold_t0") < V("adapter_t") - V("ad_pcb_t") and V("hold_t1") < V("zw_tf")             # beside the board, short of the zone wall
+    assert V("hold_x0") <= -V("inner_x") and V("hold_x1") == pytest.approx(V("adapter_x") + V("ad_l") / 2)
+    # it must not sit in the cables' strip (airq cable_params): the arm is above its top end
+    assert V("hold_s0") * V("cos_t") + V("lip") - V("hold_t1") * V("sin_t") > V("zw_z1") + 2.6      # z above the strip's top
+
+
 # --- SolidCraft --------------------------------------------------------------------------
 
 def test_build_and_bounding_box(cli):
@@ -622,3 +667,18 @@ def test_window_over_the_active_area_with_a_chamfer(check):
     bevel = sum(probe - (a + 2 * (c - (i + .5) * c / n)) * (b + 2 * (c - (i + .5) * c / n)) for i in range(n)) * c / n
     assert vol[("fp_win_cham", "shell")] == pytest.approx(bevel, rel=0.005)
     assert ("fp_pocket", "shell") not in vol and ("fp_block", "shell") not in vol
+
+
+def test_ffc_keepout_is_the_route_and_the_holder_flanks_the_adapter(check):
+    """3b-1 feature 2 on the geometry: `ref_ffc` is one body of exactly the route's volume (12.5 x 0.3,
+    four layers cut by their creases and the bend over to J7), between the adapter's mouth and J7's, and
+    it is in the main interference run (0 pairs: not crushed by, and clear of, every body); the holder
+    arm lies clr_remove over the adapter board's upper edge."""
+    bodies = {b["name"]: b for b in check["measure"]["bodies"]}
+    ffc = bodies["ref_ffc"]
+    assert ffc["volume_mm3"] == pytest.approx(airq_check.ffc_volume(S), rel=2e-3)
+    lo, hi = ffc["bbox"]["min"], ffc["bbox"]["max"]
+    assert lo[0] == pytest.approx(V("ffc_x_m"), abs=0.01) and hi[0] == pytest.approx(V("ffc_xc") + V("ffc_w") / 2, abs=0.01)
+    assert check["interference"]["count"] == 0
+    vol = airq_check.face_volumes(check["face"])
+    assert vol[("fp_hold", "shell")] == pytest.approx(0.05 * V("ad_l") * (V("hold_t1") - V("hold_t0")), rel=0.02)

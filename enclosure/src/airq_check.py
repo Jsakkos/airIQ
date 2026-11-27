@@ -285,16 +285,86 @@ def window_backing(s) -> dict:
 FACE_PARTS = ("shell",)          # parts the face probes are checked against (3b-1 adds the others as they appear)
 
 
-def sbox(s, name: str, x0: str, x1: str, s0: str, s1: str, t0: str, t1: str) -> list[dict]:
-    """A new body `name`: the box x0..x1, s0..s1, t0..t1 in the face frame (sketch on the slope plane
-    t0 deep, extruded to t1). Every bound is an expression over the design's parameters."""
+def sbox(s, name: str, x0: str, x1: str, s0: str, s1: str, t0: str, t1: str, join_to: str | None = None) -> list[dict]:
+    """A new body `name` (or, with `join_to`, a piece joined to that body): the box x0..x1, s0..s1,
+    t0..t1 in the face frame (sketch on the slope plane t0 deep, extruded to t1). Every bound is an
+    expression over the design's parameters."""
     y0, y1 = F.ys(s0), F.ys(s1)
+    sk = f"{name}_sk"
+    ex = {"name": name if not join_to else f"{join_to}_{name}", "sketch": sk, "distance": f"({t1}) - ({t0})", "direction": "negative"}
+    ex.update({"operation": "join", "targets": [join_to]} if join_to else {"body_name": name, "operation": "new"})
     return [
-        {"command": "sketch.create", "params": {"name": f"{name}_sk", "plane": F.slope_plane(s), "offset": F.toff(t0)}},
+        {"command": "sketch.create", "params": {"name": sk, "plane": F.slope_plane(s), "offset": F.toff(t0)}},
         {"command": "sketch.line", "params": {"closed": True, "points": [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]}},
         {"command": "sketch.solve", "params": {}}, {"command": "sketch.finish", "params": {}},
-        {"command": "solid.extrude", "params": {"name": name, "body_name": name, "sketch": f"{name}_sk",
-                                                 "distance": f"({t1}) - ({t0})", "operation": "new", "direction": "negative"}}]
+        {"command": "solid.extrude", "params": ex}]
+
+
+def spoly(s, name: str, pts: list[tuple[str, str]], t0: str, t1: str, join_to: str | None = None) -> list[dict]:
+    """Like `sbox` for a polygon: points (x, s) in the face frame, expressions."""
+    sk = f"{name}_sk"
+    ex = {"name": name if not join_to else f"{join_to}_{name}", "sketch": sk, "distance": f"({t1}) - ({t0})", "direction": "negative"}
+    ex.update({"operation": "join", "targets": [join_to]} if join_to else {"body_name": name, "operation": "new"})
+    return [
+        {"command": "sketch.create", "params": {"name": sk, "plane": F.slope_plane(s), "offset": F.toff(t0)}},
+        {"command": "sketch.line", "params": {"closed": True, "points": [[x, F.ys(sv)] for x, sv in pts]}},
+        {"command": "sketch.solve", "params": {}}, {"command": "sketch.finish", "params": {}},
+        {"command": "solid.extrude", "params": ex}]
+
+
+def ffc_pieces(s) -> list[tuple[str, list[tuple[str, str]], str, float]]:
+    """The FFC keep-out's pieces: (name, polygon (x, s) in the face frame, layer, volume): the four
+    layers, each cut by its crease lines (45 degrees across the ribbon), so the folds' triangles are
+    where the ribbon is. The layers touch (a fold has no air), so the pieces do not overlap; the bend
+    over to J7 is `ffc_bend`."""
+    v = s.v
+    w, th = v("ffc_w"), v("ffc_t")
+    h = "ffc_w / 2"
+    x1, x3, sa, sc = "ffc_x_c1", "ffc_xc", "adapter_s", "ffc_s_c3"
+    pieces = {
+        "a": ([("ffc_x_m", f"{sa} - {h}"), (f"{x1} + {h}", f"{sa} - {h}"), (f"{x1} - {h}", f"{sa} + {h}"), ("ffc_x_m", f"{sa} + {h}")], "ffc_t_a"),
+        "b": ([(f"{x1} - {h}", f"{sa} + {h}"), (f"{x1} + {h}", f"{sa} - {h}"), (f"{x1} + {h}", f"{sc} - {h}"), (f"{x1} - {h}", f"{sc} + {h}")], "ffc_t_b"),
+        "c": ([(f"{x1} + {h}", f"{sc} - {h}"), (f"{x3} - {h}", f"{sc} - {h}"), (f"{x3} + {h}", f"{sc} + {h}"), (f"{x1} - {h}", f"{sc} + {h}")], "ffc_t_c"),
+        "d": ([(f"{x3} - {h}", f"{sc} - {h}"), (f"{x3} + {h}", f"{sc} + {h}"), (f"{x3} + {h}", "ffc_s_b0"), (f"{x3} - {h}", "ffc_s_b0")], "ffc_t_d")}
+    out = []
+    for k, (pts, layer) in pieces.items():
+        xy = [(v(x), v(y)) for x, y in pts]
+        area = 0.5 * abs(sum(xy[i][0] * xy[(i + 1) % len(xy)][1] - xy[(i + 1) % len(xy)][0] * xy[i][1] for i in range(len(xy))))
+        out.append((k, pts, layer, area * th))
+    return out
+
+
+def ffc_bend(s) -> tuple[list[list[float]], float]:
+    """The bend over to J7 as a closed polygon in (y, z) (the ribbon's section along its centre line,
+    thickness ffc_t) and its area."""
+    v = s.v
+    g = F.ffc_geometry(v, v("ffc_s_c3"))
+    pts = F.ffc_path(v, g)
+    h = v("ffc_t") / 2
+    left = [[y - h * math.sin(a), z + h * math.cos(a)] for y, z, a in pts]
+    right = [[y + h * math.sin(a), z - h * math.cos(a)] for y, z, a in pts]
+    poly = left + right[::-1]
+    area = 0.5 * abs(sum(poly[i][0] * poly[(i + 1) % len(poly)][1] - poly[(i + 1) % len(poly)][0] * poly[i][1] for i in range(len(poly))))
+    return poly, area
+
+
+def ffc_body(s) -> list[dict]:
+    """`ref_ffc`: the FFC keep-out, one body (12.5 x 0.3, bends of centre-line radius ffc_r), from
+    the adapter's mouth to J7's mouth."""
+    cmds = []
+    for i, (k, pts, layer, _) in enumerate(ffc_pieces(s)):
+        cmds += spoly(s, "ref_ffc" if i == 0 else f"ffc_{k}", pts, f"{layer} - ffc_t / 2", f"{layer} + ffc_t / 2", join_to=None if i == 0 else "ref_ffc")
+    poly, _ = ffc_bend(s)
+    cmds += [{"command": "sketch.create", "params": {"name": "ffc_bend_sk", "plane": "YZ", "offset": "ffc_xc - ffc_w / 2"}},
+             {"command": "sketch.line", "params": {"closed": True, "points": [[round(y, 5), round(z, 5)] for y, z in poly]}},
+             {"command": "sketch.solve", "params": {}}, {"command": "sketch.finish", "params": {}},
+             {"command": "solid.extrude", "params": {"name": "ffc_bend", "sketch": "ffc_bend_sk", "distance": "ffc_w",
+                                                     "operation": "join", "targets": ["ref_ffc"]}}]
+    return cmds
+
+
+def ffc_volume(s) -> float:
+    return sum(p[3] for p in ffc_pieces(s)) + ffc_bend(s)[1] * s.v("ffc_w")
 
 
 def face_probes(s) -> list[dict]:
@@ -311,6 +381,8 @@ def face_probes(s) -> list[dict]:
               "panel_s0 - clr_remove", "panel_s0 + panel_w + clr_remove", "bezel", "bezel + panel_t")
     b += sbox(s, "fp_block", "panel_x0 - block_out", "panel_x0",
               f"panel_s0 + panel_w - {_EPD('block_y1')}", f"panel_s0 + panel_w - {_EPD('block_y0')}", "bezel", "bezel + panel_t")
+    # adapter holder: clr_remove over the board's upper edge, the arm's lower face 0.05 in
+    b += sbox(s, "fp_hold", "adapter_x - ad_l / 2", "adapter_x + ad_l / 2", "adapter_s + ad_w / 2", "hold_s0 + 0.05", "hold_t0", "hold_t1")
     return b
 
 
@@ -394,7 +466,7 @@ def check_script(save: Path = CHECK_SC, budget_s: float = 900) -> dict:
             params["configuration"] = pl["configuration"]
         steps.append({"command": "component.insert_design", "params": params})
     steps.append({"command": "parameters.change", "params": {"changes": {n: "0 mm" for n in SQUEEZES}}})
-    extra = keepouts(s) + air_probes(s) + sweeps(s)
+    extra = keepouts(s) + air_probes(s) + sweeps(s) + ffc_body(s)
     steps += extra
     names = check_bodies(s)
     mark = {"interference": len(steps)}
