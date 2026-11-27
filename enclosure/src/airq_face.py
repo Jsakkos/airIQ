@@ -368,3 +368,74 @@ def crease_seal(s: Script) -> None:
     line between the shell's lower edge and the lip from crease_y0 to the lip's inner face (1.4 of
     foam): the light guide's light cannot run out along the crease."""
     s.box("Crease seal", ["-W / 2", "crease_y0", "lip"], ["W", "wall - crease_y0", "clr_remove + crease_squeeze"], body="crease_seal")
+
+
+# --- orange dot and button flexure (feature 4) -----------------------------------------------------
+
+def flex_params(s: Script) -> None:
+    """SW1's push axis, the flexure beam in the face wall and its hard stop. The dot sits on the beam's
+    free end, top right on the face; a rod from the beam's inner face to SW1's actuator carries the push
+    along the actuator's axis (+y, horizontal). `flex_t`, `flex_len` and `flex_gap` are the coupon's
+    (clearances.py)."""
+    btn = MAIN["button"]
+    p = s.param
+    p("sw_travel", B.sw_travel(), "SW1 travel (interface.yaml button comment, board_sources)")
+    p("sw_force", B.sw_force(), "SW1 operating force, N (interface.yaml button comment, board_sources)", unit="")
+    p("sw_aw", btn["actuator_width"], "SW1 actuator width (interface.yaml button)")
+    p("sw_tip", f"board_y0 + board_d - {btn['actuator_tip_y']}", "SW1 actuator tip y at rest: 0.24 past the front edge (interface.yaml button)")
+    p("dot_s", "dot_f - lip", "orange dot centre: up the slope from the crease (SW1's push axis meets the face here)")
+    p("dot_depth", 0.6, "orange dot: its depth, flush with the face (an AMS colour region: it prints first, on the bed, face down)")
+    p("flex_w", 4.9, "flexure beam width (the coupon's 1.0 x 4.9 x 12 cantilever, clearances.py flex_t comment)")
+    p("flex_slot", 0.5, "slots round the flexure beam (cut through its skin)")
+    p("flex_s0", "dot_s - flex_len", "flexure beam: its root's slope position (the beam runs up the slope from the solid wall)")
+    p("flex_s1", "dot_s + dot_d / 2 + 0.5", "flexure beam: its free end")
+    p("flex_x0", "sw_x - flex_w / 2", "flexure beam: tail-side edge")
+    p("flex_x1", "sw_x + flex_w / 2", "flexure beam: far edge")
+    p("flex_stop_back", 3.5, "hard stop: the strap over the beam is this far down the slope from the dot")
+    p("flex_stop_w", 1.2, "hard stop: the strap's width up the slope")
+    p("flex_ratio", "(flex_len - flex_stop_back) * (flex_len - flex_stop_back) * (3 * flex_len - (flex_len - flex_stop_back)) / (2 * flex_len * flex_len * flex_len)",
+      "cantilever: the beam's deflection under the strap over its deflection at the dot (load point) = x^2 (3L - x) / (2 L^3)", unit="")
+    p("flex_stop_gap", "(flex_gap + sw_travel) / cos_t * flex_ratio",
+      "hard stop: the beam can move this far at the strap when the dot has moved flex_gap + the switch's full travel (along the push axis, on the face's normal)")
+    p("rod_d", 2.4, "pad rod diameter (the actuator is 2.0 wide)")
+    p("rod_y0", "(sw_z - lip) * sin_t / cos_t + 0.3", "pad rod: where it starts, 0.3 behind the face's outer surface on the axis (the rod's front corner is trimmed flush)")
+    p("y_pad", "sw_tip - flex_gap", "pad rod: its end face, flex_gap in front of the actuator's tip")
+
+
+def flexure(s: Script) -> None:
+    """The button flexure in the shell's face wall (clearances.py `flex_*`): a beam of the wall's skin (flex_t
+    thick, flex_len long from its root up the slope to the dot), cut free by a U slot, with the wall's
+    inner part cut away over it, except a strap across it (the hard stop, flex_stop_gap over the beam). A
+    rod from the beam's inner face carries the push to the actuator. The face-wall skin keeps its
+    outer surface: the dot's colour region is cut in it by `orange_dot`."""
+    sl = "flex_slot"
+    x0, x1 = f"flex_x0 - {sl}", f"flex_x1 + {sl}"
+    st0 = "dot_s - flex_stop_back - flex_stop_w / 2"
+    st1 = "dot_s - flex_stop_back + flex_stop_w / 2"
+    top = "flex_s1 + flex_slot"
+    deep = "wall - flex_t + 0.3"
+    for name, s0, s1, t_off, dist in (("Flex thin A", "flex_s0", st0, "flex_t", deep), ("Flex thin B", st1, top, "flex_t", deep),
+                                      ("Flex thin C", st0, st1, "flex_t", "flex_stop_gap")):
+        with s.sketch(f"{name} outline", slope_plane(s), offset=toff(t_off)) as sk:
+            sk.rect(x0, ys(s0), x1, ys(s1))
+        s.extrude(name, f"{name} outline", dist, operation="cut", targets=["shell"], direction="negative")
+    pts = [(x0, "flex_s0"), ("flex_x0", "flex_s0"), ("flex_x0", "flex_s1"), ("flex_x1", "flex_s1"), ("flex_x1", "flex_s0"),
+           (x1, "flex_s0"), (x1, top), (x0, top)]
+    with s.sketch("Flex slot outline", slope_plane(s), offset=toff("-1")) as sk:
+        sk.polyline([(x, ys(y)) for x, y in pts])
+    s.extrude("Flex slot", "Flex slot outline", "1 + flex_t + flex_stop_gap", operation="cut", targets=["shell"], direction="negative")
+    s.cylinder("Pad rod", ["sw_x", "rod_y0", "sw_z"], "rod_d", "y_pad - rod_y0", axis="Y", operation="join", targets=["shell"])
+    # the rod's front corner would stand proud of the face: trim everything in front of the face over the beam
+    with s.sketch("Flex trim outline", slope_plane(s), offset=toff("0")) as sk:
+        sk.rect("flex_x0", ys("dot_s - 3"), "flex_x1", ys("dot_s + 3"))
+    s.extrude("Flex trim", "Flex trim outline", "2", operation="cut", targets=["shell"])
+
+
+def orange_dot(s: Script) -> None:
+    """`orange_dot`: an AMS colour region of the shell's print, a disc flush with the face on the beam's free
+    end, on SW1's push axis, top right (right of the pocket). It is a separate body in the same job: cut
+    from the shell and filled by this body, which touches it everywhere (no clearance)."""
+    with s.sketch("Dot outline", slope_plane(s), offset=toff("0")) as sk:
+        sk.circle(("sw_x", ys("dot_s")), "dot_d")
+    s.extrude("Dot recess", "Dot outline", "dot_depth", operation="cut", targets=["shell"], direction="negative")
+    s.extrude("Orange dot", "Dot outline", "dot_depth", body="orange_dot", direction="negative")

@@ -55,6 +55,14 @@ def led_body_d() -> float:       # leds.face_y: "body 4.0 x 1.6 x 2.0 high": the
     return comment_number(r"body [\d.]+ x ([\d.]+) x [\d.]+ high")
 
 
+def sw_travel() -> float:         # button: "1.6 N, 0.2 mm travel"
+    return comment_number(r"([\d.]+) mm travel")
+
+
+def sw_force() -> float:          # button: "1.6 N, 0.2 mm travel"
+    return comment_number(r"([\d.]+) N, [\d.]+ mm travel")
+
+
 def module_h() -> float:         # antenna.module_body: "18 x 25.5, 3.1 high"
     return comment_number(r"module_body: .*# [\d.]+ x [\d.]+, ([\d.]+) high")
 

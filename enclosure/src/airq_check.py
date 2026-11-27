@@ -286,7 +286,7 @@ def window_backing(s) -> dict:
 
 
 # --- the shell face (Task 3b-1): probes in the face frame (x, s up the slope, t into the case) ----------
-FACE_PARTS = ("shell",)          # parts the face probes are checked against (3b-1 adds the others as they appear)
+FACE_PARTS = ("shell", "orange_dot")          # parts the face probes are checked against (3b-1 adds the others as they appear)
 
 
 def sbox(s, name: str, x0: str, x1: str, s0: str, s1: str, t0: str, t1: str, join_to: str | None = None) -> list[dict]:
@@ -387,12 +387,20 @@ def face_probes(s) -> list[dict]:
               f"panel_s0 + panel_w - {_EPD('block_y1')}", f"panel_s0 + panel_w - {_EPD('block_y0')}", "bezel", "bezel + panel_t")
     # adapter holder: clr_remove over the board's upper edge, the arm's lower face 0.05 in
     b += sbox(s, "fp_hold", "adapter_x - ad_l / 2", "adapter_x + ad_l / 2", "adapter_s + ad_w / 2", "hold_s0 + 0.05", "hold_t0", "hold_t1")
+    # 3b-1 feature 4: the flexure's beam, its hard stop and the pad rod's end
+    st0 = "dot_s - flex_stop_back - flex_stop_w / 2"
+    st1 = "dot_s - flex_stop_back + flex_stop_w / 2"
+    b += sbox(s, "fp_beam", "flex_x0 + 0.5", "flex_x1 - 0.5", "flex_s0 + 1", "flex_s0 + 2", "0", "wall + 0.3")
+    b += sbox(s, "fp_stop_gap", "flex_x0", "flex_x1", st0, st1, "flex_t", "flex_t + flex_stop_gap")
+    b += sbox(s, "fp_stop_over", "flex_x0", "flex_x1", st0, st1, "flex_t + flex_stop_gap", "flex_t + flex_stop_gap + 0.1")
+    b.append(_box("fp_pad_end", "sw_x - 0.5", "y_pad - 0.1", "sw_z - 0.5", "sw_x + 0.5", "y_pad", "sw_z + 0.5"))
+    b.append(_box("fp_pad_gap", "sw_x - 0.5", "y_pad", "sw_z - 0.5", "sw_x + 0.5", "sw_tip", "sw_z + 0.5"))
     return b
 
 
 def face_pairs(s) -> list[list[str]]:
     """The face probes' own pairs (excluded from the check: probes may overlap each other)."""
-    names = [c["params"]["body_name"] for c in face_probes(s) if c["command"] == "solid.extrude"]
+    names = [c["params"]["body_name"] for c in face_probes(s) if c["params"].get("body_name")]
     return [[a, c] for i, a in enumerate(names) for c in names[i + 1:]]
 
 
@@ -623,7 +631,7 @@ def exclusions(names: list[str]) -> list[list[str]]:
     out += [[a, b] for i, a in enumerate(ko) for b in ko[i + 1:]]
     sw = [n for n in names if n.startswith(("sweep_", "shell_up_", "guide_up_"))]
     out += [[a, b] for i, a in enumerate(sw) for b in sw[i + 1:]]
-    out += [[a, "shell"] for a in sw] + [[a, "light_guide"] for a in sw]
+    out += [[a, "shell"] for a in sw] + [[a, "light_guide"] for a in sw] + [[a, "orange_dot"] for a in sw]
     out += [[a, f"{r}:1"] for a in sw for r in SHELL_BORNE]
     return out
 
@@ -684,7 +692,7 @@ def check_script(save: Path = CHECK_SC, budget_s: float = 900) -> dict:
     # 3b-1: the shell's face (window, pocket, ...) against its probes
     fprobes = face_probes(s)
     steps += fprobes
-    names_f = [c["params"]["body_name"] for c in fprobes if c["command"] == "solid.extrude"]
+    names_f = [c["params"]["body_name"] for c in fprobes if c["params"].get("body_name")]
     mark["face"] = len(steps)
     steps.append({"command": "inspect.interference", "params": {
         "budget_s": 120, "bodies": [*names_f, *FACE_PARTS], "exclude_pairs": face_pairs(s)}})

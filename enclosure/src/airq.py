@@ -82,7 +82,7 @@ def build() -> Script:
     p("led_f0", 16.5, "LED slot lower edge, along the front (f): its inner edge above the ledge; 16.5 (3a: 16.2) leaves 1.2 of face wall between the slot and the crease (3b-1, light_paths)")
     p("led_h_slot", m.led_slot_h, "LED slot height on the face")
     p("led_len", 30.0, "LED line length (plan)")
-    p("panel_s0", "led_f0 + led_h_slot + 1.4 - lip", "panel's lower edge, up the slope from the crease (1.2 face + 0.2 pocket)")
+    p("panel_s0", "led_f0 + led_h_slot + 1.15 - lip", "panel's lower edge, up the slope from the crease (0.95 face bar + 0.2 pocket; 3b-1: 0.25 lower than 3a so the panel's top keeps >= clr_remove under the top wall)")
     p("panel_x0", "-inner_x + clr_remove + block_out", "panel's tail end (user's left), the hatched block at the wall")
     p("window_xc", "panel_x0 + panel_l - va_far - va_w / 2", "view-area centre x: the LED line centres on it")
 
@@ -221,6 +221,7 @@ def build() -> Script:
     F.ffc_derived_params(s)
     F.adapter_holder_params(s)
     F.guide_params(s)
+    F.flex_params(s)
     cable_params(s)
     drawer_params(s)
     # --- bodies ------------------------------------------------------------------------------
@@ -229,6 +230,7 @@ def build() -> Script:
     F.window(s)
     F.adapter_holder(s)
     F.led_slot(s)
+    F.flexure(s)
     hcho_window(s)
     C.base_plate(s)
     C.rails(s)
@@ -253,6 +255,7 @@ def build() -> Script:
     grommets(s)
     F.light_guide(s)
     F.crease_seal(s)
+    F.orange_dot(s)
     # outlet grille in the lower rear wall (M6, R18, R26): 1.2 slots at a 2.4 pitch from the left
     p("out_pitch", 2.4, "outlet grille slot pitch (1.2 slots, 1.2 bars: R26 higher open fraction)")
     p("out_n", 32, "outlet grille slot count: 32 x 1.2 x 17.3 = 664 mm2 >= 660.1 (R18). Whole number", unit="")

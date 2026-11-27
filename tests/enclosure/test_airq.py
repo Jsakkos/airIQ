@@ -32,7 +32,7 @@ S = airq.build()
 V = S.v
 GROMMETS = ["grommet_zone_a", "grommet_zone_b", "grommet_j4_a", "grommet_j4_b", "grommet_tongue_a", "grommet_tongue_b"]
 BODIES = ["shell", "base_plate", "zone_wall", "sen66_top_seal", "zone_seal", "sen66_foam", "gasket_out", "gasket_in", "sen66_pad", "hcho_lid",
-          *GROMMETS, "light_guide", "crease_seal"]
+          *GROMMETS, "light_guide", "crease_seal", "orange_dot"]
 TPU = ["gasket_out", "gasket_in", *GROMMETS]
 # positions Task 3b needs (task-3-scope, M6), fixed here as parameters
 FACE = ["panel_x0", "panel_s0", "bezel", "window_xc", "pocket_x0", "pocket_x1", "led_f0", "led_h_slot", "led_len", "led_z",
@@ -43,7 +43,8 @@ FACE = ["panel_x0", "panel_s0", "bezel", "window_xc", "pocket_x0", "pocket_x1", 
         "win_x0", "win_x1", "win_s0", "win_s1", "win_chamfer",
         "ffc_w", "ffc_t", "ffc_r", "ffc_s_c3", "ffc_s_b0", "ffc_t_a", "ffc_x_m", "ffc_xc", "ffc_x_c1", "ffc_insert", "ffc_service_dz",
         "hold_s0", "hold_s1", "hold_t0", "hold_t1", "hold_x0", "hold_x1",
-        "led_x0", "led_x1", "led_s0", "led_s1", "gd_t0", "gd_t1", "gd_s0", "gd_y_e", "gd_l1x0", "gd_l1x1", "gd_l2x0", "gd_l2x1", "crease_y0", "crease_squeeze"]
+        "led_x0", "led_x1", "led_s0", "led_s1", "gd_t0", "gd_t1", "gd_s0", "gd_y_e", "gd_l1x0", "gd_l1x1", "gd_l2x0", "gd_l2x1", "crease_y0", "crease_squeeze",
+        "dot_s", "flex_s0", "flex_s1", "flex_x0", "flex_x1", "flex_stop_gap", "y_pad", "sw_tip", "rod_y0"]
 
 
 def test_bodies_and_plan_parameters():
@@ -542,7 +543,7 @@ def test_led_slot_and_light_guide_follow_the_leds():
     zmin = V("lip") + V("gd_s0") * V("cos_t") - V("gd_t1") * V("sin_t")
     assert zmin >= V("lip") + V("clr_remove") + 0.2 - 1e-9                                  # no part of the guide lower than 0.4 over the lip's top
     assert V("gd_top_z") == pytest.approx(V("led_z") + V("led_face_h") / 2)                 # no surface sees over the LEDs
-    assert V("panel_s0") - V("clr_remove") - V("led_s1") >= 1.2 - 1e-9                   # a bar of 1.2 between slot and pocket
+    assert V("panel_s0") - V("clr_remove") - V("led_s1") >= 0.9                                  # a bar of about 1 between slot and pocket
 
 
 def test_guide_light_stays_off_the_crease_the_sensor_and_u4():
@@ -558,6 +559,30 @@ def test_guide_light_stays_off_the_crease_the_sensor_and_u4():
     assert sight["samples"]["entry_windows"] > 100
     # the crease seal: the lip's top to the shell's lowest plane, over 1.2 of foam
     assert V("wall") - V("crease_y0") >= 1.2                                                 # foam tape: 1.2 or more along the line
+
+
+def test_panel_top_keeps_clr_remove_under_the_top_wall():
+    top_z = V("lip") + (V("panel_s0") + V("panel_w")) * V("cos_t") - (V("bezel") + V("panel_t")) * V("sin_t")
+    assert V("H") - V("wall") - top_z >= V("clr_remove") - 1e-9
+
+
+def test_dot_and_flexure_on_sw1s_axis():
+    """3b-1 feature 4: the dot is on SW1's push axis (the axis meets the face at the dot), top right; the flexure
+    is the coupon's (flex_t, flex_len, flex_gap); the pad stops flex_gap short of the actuator tip; the hard
+    stop lets the dot move flex_gap + the switch's travel and no more; beam stress stays small."""
+    z_on_face = V("lip") + V("dot_s") * V("cos_t")
+    assert z_on_face == pytest.approx(V("sw_z"))
+    assert V("sw_x") - V("dot_d") / 2 > V("pocket_x1")
+    assert (V("sw_travel"), V("sw_force")) == pytest.approx((0.2, 1.6))
+    assert V("flex_s1") - V("flex_s0") >= V("flex_len") and V("flex_x1") - V("flex_x0") == pytest.approx(V("flex_w"))
+    assert V("sw_tip") - V("y_pad") == pytest.approx(V("flex_gap"))
+    assert V("rod_d") >= V("sw_aw")
+    # the beam's deflection at the stop when the dot has pushed the actuator its full travel
+    dot_travel = (V("flex_gap") + V("sw_travel")) / V("cos_t")                  # along the face's normal
+    assert V("flex_stop_gap") == pytest.approx(dot_travel * V("flex_ratio")) and 0.1 < V("flex_stop_gap") < dot_travel
+    k = 3 * 2100 * (V("flex_w") * V("flex_t") ** 3 / 12) / V("flex_len") ** 3     # N/mm, PETG 2100 MPa
+    assert k * dot_travel < 1.0                                                  # well under the switch's 1.6 N
+    assert 3 * V("flex_t") * dot_travel / (2 * V("flex_len") ** 2) < 0.005      # strain < 0.5 %
 
 
 # --- SolidCraft --------------------------------------------------------------------------
@@ -739,3 +764,20 @@ def test_light_guide_and_crease_seal_on_the_geometry(check):
     vols = airq_check.touch_volumes(check["touch"])
     expect = V("W") * (V("wall") - V("crease_y0")) * airq_check.TOUCH_SQUEEZE
     assert vols[("crease_seal", "shell")] == pytest.approx(expect, rel=0.08)
+
+
+def test_flexure_beam_stop_and_pad_on_the_geometry(check):
+    """3b-1 feature 4 on the geometry: the beam's skin is flex_t thick; the hard stop's strap sits flex_stop_gap over
+    it (free gap, then the strap's volume); the pad rod ends flex_gap short of the tip with nothing in the gap;
+    the whole shell, rod and dot clear every body (interference 0), at rest."""
+    vol = airq_check.face_volumes(check["face"])
+    assert vol[("fp_beam", "shell")] == pytest.approx((V("flex_w") - 1.0) * 1.0 * V("flex_t"), rel=0.01)
+    assert ("fp_stop_gap", "shell") not in vol
+    assert vol[("fp_stop_over", "shell")] == pytest.approx(V("flex_w") * V("flex_stop_w") * 0.1, rel=0.02)
+    assert vol[("fp_pad_end", "shell")] == pytest.approx(0.1, rel=0.02)
+    assert ("fp_pad_gap", "shell") not in vol
+    bodies = {b["name"]: b for b in check["measure"]["bodies"]}
+    d = bodies["orange_dot"]["bbox"]
+    assert (d["min"][0] + d["max"][0]) / 2 == pytest.approx(V("sw_x"), abs=0.01)
+    assert bodies["orange_dot"]["volume_mm3"] == pytest.approx(3.14159 / 4 * V("dot_d") ** 2 * V("dot_depth"), rel=0.01)
+    assert check["interference"]["count"] == 0
