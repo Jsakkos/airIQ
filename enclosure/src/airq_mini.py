@@ -66,6 +66,30 @@ HAND = 1            # the sensor zone mirrored from the airQ: inlet end left (en
 INTAKE_OPEN = "3 * in_n * in_len * slot_w"                 # the intake rows' open area (R18 >= 154.5), mm2
 OUTLET_OPEN = "out_n * slot_w * (out_gz1 - out_gz0)"       # the outlet grille's open area (R18), mm2
 
+# Task 5b: one export per PRINTED body (the foam parts are bought and not exported: zone_seal, sen66_foam,
+# sen66_pad, sen66_top_seal, guide_stop), each turned into its print orientation (README "Print and assembly
+# guide (airQ mini)"). Same table as the airQ's `PRINT_PARTS` (airq.py): `turns` are (axis, degrees) about the
+# world origin, in order; `ref` names the body whose bottom sets the bed height. `encbuild.print_exports`
+# writes `export/airq-mini-<part>.3mf` and `.step`. The face is 24 deg off the vertical, so x +114 puts it flat.
+PRINT_PARTS = {
+    "shell": {"turns": [("x", 114)]},                      # the 24 deg face down
+    "orange_dot": {"turns": [("x", 114)], "ref": "shell"}, # same job as the shell: an AMS colour region
+    "base_plate": {"turns": []},                           # floor down, as designed
+    # the slanted front face (the one that hugs the shell's face) down: 772 mm2 on the bed. Flat top down (x 180)
+    # floats 2,555 mm2 of the plate 0.3 over its 31.0 rises, and standing on an end (y 90, the airQ's) is 73 mm2 on 65 tall
+    "zone_wall": {"turns": [("x", 114)]},
+    # exit face down (the face's own plane): the only faces that hang are the flange fronts, which carry none of the
+    # delivered rays (airq_mini_check.guide_delivery, per-face trace); every TIR face is vertical or leans up
+    "light_guide_co2": {"turns": [("x", 114)]},
+    "light_guide_pm": {"turns": [("x", 114)]},
+    "gasket_out": {"turns": [("x", -90)]},                 # on its seat end (the rear end, into the plenum plate)
+    "gasket_in": {"turns": [("y", -90)]},                  # on its side: the wiper lies flat, nothing hangs
+    "grommet_zone_a": {"turns": []},                       # flat, as designed (bores vertical)
+    "grommet_zone_b": {"turns": [("y", 90)]},              # on its closed end, the split face up
+    "tongue_mount": {"turns": [("y", -90)]},               # standing on the spigot end, shank up
+}
+EXPORTS = [f"export/airq-mini-{part}.{ext}" for part in PRINT_PARTS for ext in ("3mf", "step")]
+
 
 def build() -> Script:
     m = MODEL
