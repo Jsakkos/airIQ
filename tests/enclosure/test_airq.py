@@ -38,7 +38,8 @@ FACE = ["panel_x0", "panel_s0", "bezel", "window_xc", "pocket_x0", "pocket_x1", 
         "guide_t", "adapter_x", "adapter_s", "adapter_t", "ffc_len", "j7_x0", "j7_x1", "sw_x", "sw_z", "dot_f", "dot_d",
         "lsw_x", "lsw_z", "lsw_d", "slot_row1_z", "slot_row2_z", "row_x0", "row_x1", "lsw_gap_x0", "lsw_gap_x1",
         "out_gx0", "out_gx1", "out_gz0", "out_gz1", "out_pitch", "out_n", "exh_x0", "exh_x1", "exh_z0", "exh_z1",
-        "usb_x", "usb_z", "usb_well", "usb_chamfer"]
+        "usb_x", "usb_z", "usb_well", "usb_chamfer",
+        "win_x0", "win_x1", "win_s0", "win_s1", "win_chamfer"]
 
 
 def test_bodies_and_plan_parameters():
@@ -460,6 +461,21 @@ def test_face_positions_follow_their_parts():
     assert V("row_x0") < V("lsw_gap_x0") < V("lsw_x") < V("lsw_gap_x1") < V("row_x1")
 
 
+def test_window_and_pocket_follow_the_panel():
+    """3b-1 feature 1: the window is the active area (3.00 from the far end, 3.82 from the long
+    edges, 66.90 x 29.06) and the pocket is the panel plus clr_remove, with the block's room."""
+    epd = ref_epd.build().v
+    assert (V("aa_w"), V("aa_h"), V("aa_far"), V("aa_edge")) == pytest.approx((66.90, 29.06, 3.00, 3.82))
+    assert V("panel_x0") + V("panel_l") - V("win_x1") == pytest.approx(3.00)
+    assert V("win_s0") - V("panel_s0") == pytest.approx(3.82) and V("panel_s0") + V("panel_w") - V("win_s1") == pytest.approx(3.82)
+    assert V("win_x1") - V("win_x0") == pytest.approx(66.90) and V("win_s1") - V("win_s0") == pytest.approx(29.06)
+    assert V("win_chamfer") < V("bezel")                                    # a land is left at the panel
+    assert V("pocket_x1") - (V("panel_x0") + V("panel_l")) == pytest.approx(V("clr_remove"))
+    assert V("panel_x0") - V("block_out") - V("pocket_x0") == pytest.approx(V("clr_remove"))   # room for the hatched block
+    assert V("pocket_x0") >= -V("inner_x") - 1e-9                           # inside the side walls
+    assert V("block_out") == pytest.approx(epd("block_out")) == pytest.approx(4.6)
+
+
 # --- SolidCraft --------------------------------------------------------------------------
 
 def test_build_and_bounding_box(cli):
@@ -590,3 +606,19 @@ def test_rebuilds_over_wall_and_clearances(cli, tmp_path):
         vols.append(sum(b["volume_mm3"] for b in ins["bodies"]))
     assert vols[1] > vols[2] > vols[0]                              # thicker walls, more material
     assert all(math.isclose(v, vols[2], rel_tol=1e-9) for v in vols[2::3])   # each back to the default
+
+
+def test_window_over_the_active_area_with_a_chamfer(check):
+    """3b-1 feature 1 on the geometry: the shell is open over the whole active area, solid round
+    it (the 1 mm ring's volume is exact, so the window is the active area and no larger), and the
+    chamfer takes the volume of a 45-degree bevel off the outer edge; the pocket takes the panel's
+    envelope plus clr_remove and the hatched block's room without touching the shell."""
+    vol = airq_check.face_volumes(check["face"])
+    assert ("fp_win_open", "shell") not in vol
+    a, b, c, bz = V("aa_w"), V("aa_h"), V("win_chamfer"), V("bezel")
+    probe = (a + 2) * (b + 2)
+    assert vol[("fp_win_ring", "shell")] == pytest.approx((probe - a * b) * (bz - c - 0.05), rel=0.005)
+    n = 2000                                                              # the bevel: the opening is aa + 2 (c - t) at depth t
+    bevel = sum(probe - (a + 2 * (c - (i + .5) * c / n)) * (b + 2 * (c - (i + .5) * c / n)) for i in range(n)) * c / n
+    assert vol[("fp_win_cham", "shell")] == pytest.approx(bevel, rel=0.005)
+    assert ("fp_pocket", "shell") not in vol and ("fp_block", "shell") not in vol

@@ -36,6 +36,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+import airq_face as F
 import board_sources as B
 import enclosure_common as C
 import layout_study as L
@@ -214,11 +215,13 @@ def build() -> Script:
     p("row_x1", "bp_x0 - slot_bar", "intake slot rows' right end")
     p("lsw_gap_x0", "lsw_x - lsw_d / 2 - slot_bar", "gap in the slot rows for the light-sensor window: left")
     p("lsw_gap_x1", "lsw_x + lsw_d / 2 + slot_bar", "gap in the slot rows for the light-sensor window: right")
+    F.window_params(s)
     cable_params(s)
     drawer_params(s)
     # --- bodies ------------------------------------------------------------------------------
     C.shell(s)
     C.panel_pocket(s)
+    F.window(s)
     hcho_window(s)
     C.base_plate(s)
     C.rails(s)

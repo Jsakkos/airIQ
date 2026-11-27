@@ -32,9 +32,11 @@ import sys
 from pathlib import Path
 
 import airq
+import airq_face as F
 import board_sources as B
 import enclosure_common as C
 import encbuild
+import ref_epd
 import ref_sen66
 import ref_sfa40
 from sclib import ENCLOSURE
@@ -93,6 +95,7 @@ TQ = B.TONGUE["qwiic"]
 TQH = B.connector_h("qwiic", board="tongue")
 _SFA = ref_sfa40.build().v
 _SEN = ref_sen66.build().v
+_EPD = ref_epd.build().v
 SFA_QW = (f"sfa_x0 + {_SFA('qwiic_y')} - {_SFA('qwiic_w')} / 2", f"sfa_x0 + {_SFA('qwiic_y')} + {_SFA('qwiic_w')} / 2")   # its Qwiic plugs' x span (ref_sfa40)
 
 
@@ -278,6 +281,54 @@ def window_backing(s) -> dict:
     return out
 
 
+# --- the shell face (Task 3b-1): probes in the face frame (x, s up the slope, t into the case) ----------
+FACE_PARTS = ("shell",)          # parts the face probes are checked against (3b-1 adds the others as they appear)
+
+
+def sbox(s, name: str, x0: str, x1: str, s0: str, s1: str, t0: str, t1: str) -> list[dict]:
+    """A new body `name`: the box x0..x1, s0..s1, t0..t1 in the face frame (sketch on the slope plane
+    t0 deep, extruded to t1). Every bound is an expression over the design's parameters."""
+    y0, y1 = F.ys(s0), F.ys(s1)
+    return [
+        {"command": "sketch.create", "params": {"name": f"{name}_sk", "plane": F.slope_plane(s), "offset": F.toff(t0)}},
+        {"command": "sketch.line", "params": {"closed": True, "points": [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]}},
+        {"command": "sketch.solve", "params": {}}, {"command": "sketch.finish", "params": {}},
+        {"command": "solid.extrude", "params": {"name": name, "body_name": name, "sketch": f"{name}_sk",
+                                                 "distance": f"({t1}) - ({t0})", "operation": "new", "direction": "negative"}}]
+
+
+def face_probes(s) -> list[dict]:
+    """Probes over the window and the pocket: the shell may overlap them only where the face's
+    solid (3b-1: window, panel pocket, hatched block's room)."""
+    b = []
+    # window: open over the active area; solid in a 1 mm ring round it (to the chamfer's depth);
+    # the chamfer shows as the ring's missing volume
+    b += sbox(s, "fp_win_open", "win_x0", "win_x1", "win_s0", "win_s1", "0", "bezel")
+    b += sbox(s, "fp_win_ring", "win_x0 - 1", "win_x1 + 1", "win_s0 - 1", "win_s1 + 1", "win_chamfer + 0.05", "bezel")
+    b += sbox(s, "fp_win_cham", "win_x0 - 1", "win_x1 + 1", "win_s0 - 1", "win_s1 + 1", "0", "win_chamfer")
+    # pocket: the panel's envelope with clr_remove all round, and the hatched block's room
+    b += sbox(s, "fp_pocket", "panel_x0 - block_out - clr_remove", "panel_x0 + panel_l + clr_remove",
+              "panel_s0 - clr_remove", "panel_s0 + panel_w + clr_remove", "bezel", "bezel + panel_t")
+    b += sbox(s, "fp_block", "panel_x0 - block_out", "panel_x0",
+              f"panel_s0 + panel_w - {_EPD('block_y1')}", f"panel_s0 + panel_w - {_EPD('block_y0')}", "bezel", "bezel + panel_t")
+    return b
+
+
+def face_pairs(s) -> list[list[str]]:
+    """The face probes' own pairs (excluded from the check: probes may overlap each other)."""
+    names = [c["params"]["body_name"] for c in face_probes(s) if c["command"] == "solid.extrude"]
+    return [[a, c] for i, a in enumerate(names) for c in names[i + 1:]]
+
+
+def face_volumes(face: dict) -> dict:
+    """{(probe, part): overlap volume} from the face run."""
+    out = {}
+    for p in face["interferences"]:
+        a, b = (p["a"], p["b"]) if p["a"].startswith("fp_") else (p["b"], p["a"])
+        out[(a, b)] = out.get((a, b), 0.0) + p["volume_mm3"]
+    return out
+
+
 EXTREME_PARTS = ("base_plate", "zone_wall", "sen66_pad", "gasket_out", "gasket_in")
 
 
@@ -387,6 +438,13 @@ def check_script(save: Path = CHECK_SC, budget_s: float = 900) -> dict:
     steps.append({"command": "inspect.interference", "params": {
         "budget_s": 120, "bodies": [*names_e, *EXTREME_PARTS],
         "exclude_pairs": [[a, b] for i, a in enumerate(names_e) for b in names_e[i + 1:]]}})
+    # 3b-1: the shell's face (window, pocket, ...) against its probes
+    fprobes = face_probes(s)
+    steps += fprobes
+    names_f = [c["params"]["body_name"] for c in fprobes if c["command"] == "solid.extrude"]
+    mark["face"] = len(steps)
+    steps.append({"command": "inspect.interference", "params": {
+        "budget_s": 120, "bodies": [*names_f, *FACE_PARTS], "exclude_pairs": face_pairs(s)}})
     steps.append({"command": "parameters.change", "params": {"changes": {n: f"{TOUCH_SQUEEZE} mm" for n in SQUEEZES}}})
     mark["touch"] = len(steps)
     steps.append({"command": "inspect.interference", "params": {"budget_s": 120, "bodies": sorted({b for p in TOUCHES for b in p})}})
@@ -412,7 +470,7 @@ def run(cli: str | None = None) -> dict:
     m = sc["mark"]
     return {"inserted": res[:6], "interference": res[m["interference"]], "measure": res[m["measure"]],
             "touch": res[m["touch"]], "nudge": res[m["nudge"]], "window": res[m["window"]], "extremes": res[m["extremes"]],
-            "plugs": res[m["plugs"]]}
+            "plugs": res[m["plugs"]], "face": res[m["face"]]}
 
 
 def nudge_faults(nudge: dict, s=None) -> list[str]:
