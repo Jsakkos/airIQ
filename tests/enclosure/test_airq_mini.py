@@ -196,8 +196,9 @@ def test_tongue_on_edge_in_the_passage():
     assert V("tongue_y0 + tongue_dp") < V("sen_y1")
     assert V("veml_wz") > V("ledge_z0")                     # high: the window is below it (4b)
     # the pin through the hole, inside the passage; the shank stays in the hole with the tongue against the module
-    assert V("tm_out") > V("clr_remove + clr_align") - V("tongue_t") + 0.1 or V("tm_out") > 0
-    assert V("tm_collar_d") <= V("tongue_hole_clear")
+    assert V("tm_out") > V("clr_remove + clr_align")        # slid against the module, the board is still on the shank
+    assert V("tm_collar_d") <= V("tongue_hole_clear") and V("tm_pin_d") < V("tongue_hole_d")
+    assert V("-tub_x - tm_hole_depth") > V("-tub_x - iwall")  # the pin's hole is blind: the rail is not opened
     d = mini_distances()
     assert d["tongue_to_u3"] >= 20 and d["tongue_to_u2"] >= 20
 
@@ -271,3 +272,16 @@ def test_build_and_bounding_box(cli):
     assert box["max"] == pytest.approx([34.75, 50.0, 42.0], abs=0.01)
     assert not r["warnings"]
     assert sorted(r["bodies"]) == sorted(BODIES)
+
+
+def test_readme_check_table_labels_every_row():
+    """Task 4a: the README's "Check table (airQ mini)" says how each value was got: measured,
+    analytic or arithmetic, in bold."""
+    from sclib import ENCLOSURE
+    text = (ENCLOSURE / "README.md").read_text(encoding="utf-8")
+    table = text.split("### Check table (airQ mini)", 1)[1].split("\n### ", 1)[0]
+    rows = [r for r in table.splitlines() if r.startswith("| ") and not r.startswith("| Check") and not r.startswith("|---")]
+    assert len(rows) >= 20
+    for r in rows:
+        cells = r.split(" | ")
+        assert any(f"**{k}**" in cells[3] for k in ("measured", "analytic", "arithmetic")), r

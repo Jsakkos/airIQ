@@ -18,12 +18,14 @@ Contents:
 - [Coupon results](#coupon-results)
 - [Layout studies](#layout-studies)
 - [airQ enclosure](#airq-enclosure)
+- [airQ mini enclosure](#airq-mini-enclosure)
 - [Print and assembly guide (airQ)](#print-and-assembly-guide-airq)
 - [Sources](#sources)
 - [To confirm](#to-confirm)
 
-The print and assembly guide for the airQ (Task 5) is under "Print and assembly guide (airQ)"; the
-airQ mini's follows once its envelope is decided. The print-test coupons (Task 2) are below.
+The print and assembly guide for the airQ (Task 5) is under "Print and assembly guide (airQ)". The
+airQ mini (69.5 × 50 × 42, owner decision R51) is under "airQ mini enclosure"; its guide follows
+with Task 5b. The print-test coupons (Task 2) are below.
 
 ## Files
 
@@ -39,6 +41,9 @@ airQ mini's follows once its envelope is decided. The print-test coupons (Task 2
 | `src/airq_check.py` | The airQ check design: every reference placed, cable keep-outs, air-path probes, the shell's sweep; interference, sections, gasket contact, distances |
 | `src/board_sources.py` | Board positions read from their sources (R27): `interface.yaml` values and comment sizes, and `layout.yaml` placements with footprint courtyards (U2, U4) |
 | `airq.sc` | The airQ enclosure design (committed) |
+| `src/airq_mini.py` | The airQ mini's generator: `airq-mini.sc` (the airQ's construction, the sensor zone mirrored) |
+| `src/airq_mini_check.py` | The airQ mini's check design, on `airq_check`'s helpers: references, keep-outs, probes, sweeps, passage slabs |
+| `airq-mini.sc` | The airQ mini enclosure design (committed) |
 | `src/layout_study.py` | The layout studies' section arithmetic for both models (pure Python; `tests/enclosure/test_layout_study.py`) |
 | `coupons.sc` | The coupons design, built from `src/coupons.py` (committed) |
 | `export/` | Printable exports, written by `build.py` (committed): `coupons.3mf` / `.step`, and `airq-<part>.3mf` / `.step` for each printed airQ part, in its print orientation |
@@ -565,6 +570,10 @@ case would need to be 6.7 mm deeper than its maximum.
 
 ### airQ mini (Task 4): re-check with the airQ's construction
 
+**Owner decision (2026-11-27, R51): option 1, 69.5 × 50 × 42.** The model built on it is under
+"airQ mini enclosure" below. It raises the lip to 18.0 for the intake rows and the SEN66's plug;
+the rest is this study's place a.
+
 **Status (2026-11-27, Task 4a): BLOCKED at 66 × 50 × 42, owner decision (spec §10).** The
 addendum above placed the SEN66 ports-forward with the tongue lying in front of it. Since then
 the airQ's construction has settled: the SEN66 faces its ports to the rear (R31, because R25's
@@ -1084,6 +1093,172 @@ Every row is measured on the geometry where the check design can (probes with `i
 | Positions from their sources (R27) | read, not retyped | every board and reference position compared with `interface.yaml`, the references and `layout.yaml` | `test_positions_are_read_from_their_sources`, `test_generator_retypes_no_board_numbers` | pass |
 | Intake and outlet grilles apart (review focus 2) | ≥ 20, on different faces | **51.4** between the intake slots' inner faces (y 1.8) and the outlet's (y 53.2), 55.0 outer face to outer face; the intake is in the lip's front face (faces −y), the outlet and the exhaust in the rear wall (+y), the HCHO grille in the right side (+x) | arithmetic: `inspect.clearance` between probe boxes built from the parameters (D − 2·wall), not a model of the part; the faces from the cuts' y (`test_openings_are_cut_where_the_parameters_say`) | pass |
 
+## airQ mini enclosure
+
+The owner chose **69.5 × 50 × 42** (R51): option 1 of "airQ mini (Task 4)" above, the smallest
+envelope that keeps every rule. `src/airq_mini.py` builds `airq-mini.sc` on the airQ's
+construction: the shell (face, top, sides, printed face down), the base U (floor, lip, rear wall
+and the sealed sensor tub), the zone wall, the board above the standing SEN66 and the seals. The
+sensor zone is the airQ's mirrored: `enclosure_common` builds it with `hand` +1. Task 4a built the
+body and internals. Task 4b adds the split light band, the labels, the light-sensor window, the dot
+and flexure, the openings and the rest of the check table, on the positions named here.
+
+Build it with `uv run --with pyyaml python enclosure/build.py airq-mini`, and check it with
+`uv run --with pyyaml python enclosure/src/airq_mini_check.py --run`.
+
+### Layout (place a of the study, inlet end left)
+
+| Part | Where (mm) | Source |
+|---|---|---|
+| Envelope | 69.5 × 50 × 42, 24° face, lower lip **18.0** | R51; the lip is a judgement call (below) |
+| Board | horizontal, bottom z 31.0, front edge y 12.01, x −27.25 … 32.75 (against the right wall, `clr_remove`) | `mini_recheck`: the zone rule and the antenna strip's end 0.2 inside the rear wall |
+| SEN66 | standing (R17), ports to the rear, inlet end left (square inlet low): x −24.25 … 30.95, y 11.16 … 32.46 | `mini_recheck` place a: the plate just in front of H1's post |
+| Intake passage | between the left rail and the module's left end: 6.9 wide, 26.9 tall | study |
+| Port gap, plate, plenum | gap 3.0 (y 32.46 … 35.46), plate 1.6, plenum 11.14 deep with H1's post in it (a web joins the post to the plate) | study |
+| Outlet ring | x 18.15, z 15.8, bore 21.0 | `ref_sen66` |
+| Inlet seal (wiper) | its root 1 mm right of the inlets (x −13.05), the blade leaning 55° to the right | the airQ's, mirrored |
+| Tongue | on edge in the passage: board back x −29.2, parts toward the module (0.35 off its end), y 12.9 … 25.9, z 2.15 … 24.15; VEML7700 window at (−25.65, 13.15, 20.5) | below |
+| Cables | J2 (SEN66) and J4 (the tongue's Qwiic, R30) leave the board's left edge; both pass the zone wall in one drawer (x −32.75 … −27.2, y 25.31 … 33.11) over the passage's rear | below |
+| Bosses | front floor bosses ±30.95, y 4.8 (screws from below, under felt feet); rear boss x −30.45, z 37.7, through the rear wall (R29) | `enclosure_common` (R10b) |
+
+### Judgement calls (Task 4a)
+
+- **Lip 18.0, not the study's 15.5.**
+  - The intake rows must open under the zone wall's ledge. At 15.5 only two 1.2 mm rows fit
+    between the 10 mm line and the ledge (14.3). Over the 47.5 mm the lip offers between the
+    light-sensor window and the right boss pocket, that gives about 105 mm². This is short of
+    R18's 154.5 and of its 112 floor.
+  - At 18.0 there are three rows (top 16.0, ledge 16.8): 3 × 4 slots × 10.98 × 1.2 =
+    **158.0 mm²**.
+  - At 15.5, the deepest module's plug corner also sits 0.68 mm inside the slant at place a. At
+    18.0 the plug and the cable's bend clear the zone wall by at least `clr_remove`. This is
+    measured: a 21.8 mm module's front meets only the pad.
+  - A taller lip moves the slope forward at every height, so the board, the antenna and place a
+    do not change. R12 stays 10.35 and the outlet stays 498.2.
+  - Owner look item: the lip is 43 % of the height, against 37 % at 15.5.
+- **The zone wall's slant hugs the slope.** `zw_tf` is `wall + clr_remove`, as in the study: the
+  mini has no panel or FFC in front of it. Its ledge therefore ends at y 3.6, in front of the
+  boss pockets' back walls (y 8.0 … 9.6).
+  - The pockets' inner and back walls rise to the slant's underside, so the slant laps on them.
+  - The rails start under the flat part (`rails(slant_front=True)`).
+  - The pockets stay on the electronics side; the sensor zone stays closed.
+- **H2 has no post.** H2 (x 30.15, y 19.21) lies over the SEN66. Its screw (M2 × 3) goes into
+  a blind pilot in the zone wall's pad: 1.6 deep, 0.5 of zone wall left under it, 1.4 mm of
+  thread. H1 keeps the airQ's post, collar and spigot, and it is the USB-C support boss (7.73 mm
+  from the USB-C's centre).
+- **The tongue stands with its VEML7700 high.** With its VEML7700 looking forward and its parts
+  toward the module, its handedness puts the 22 mm edge with the VEML7700 at the top. The flipped
+  board would face its parts to the rail, and the VEML7700 would look into the left boss pocket.
+  - The VEML7700 sits at z 20.5, 12 mm behind the lip.
+  - The light-sensor window goes low on the lip, left of the slot rows (`lsw_x` −24.75,
+    `lsw_z` 14.0). The line between their centres passes 1.75 under the ledge's back edge (the
+    ray from the window's top edge passes 0.28 under it): about 30° down, inside the sensor's
+    55° half-angle.
+  - 4b places and checks the window.
+- **The tongue's mount is a pin (`tongue_mount`).**
+  - The pin's spigot sits in a blind hole in the left rail, 0.6 of rail left behind it, so there
+    is no leak.
+  - Its collar spaces the board's back `clr_align` off.
+  - Its shank goes through the tongue's mounting hole.
+  - The module's left end, 0.35 away, keeps the tongue on the pin.
+  - The floor, 0.15 under the tongue's bottom edge, stops it turning (under 1°).
+  - It blocks only 4.4 × 1.8 of the passage.
+- **The cables' route.**
+  - The SEN66 cable runs from its plug down to the floor and left along the front.
+  - It passes behind the left boss pocket into the passage's front and rises in front of the
+    tongue (the passage's mouth keeps 89.6 mm² beside it).
+  - It runs back over the tongue's top edge and goes up through the drawer to J2.
+  - The tongue's Qwiic cable leaves its plug's rear and goes straight up the drawer to J4.
+  - A vertical riser across the passage would take 3 × 26.9 mm² of it. So the drawer sits at the
+    passage's rear, behind the tongue's plug, and nothing rises beside the tongue.
+- **The drawer is a notch in the zone wall's flat part, open to its left end.** The split grommet
+  is cut on the cables' line, x −29.5. The inner half goes in first, then the cables with their
+  plugs on, then the outer half, which rests on the left rail and is held by the shell's side wall.
+- **The cradle.**
+  - The pad's seat lies right of the plug (x 5.75 … 27.75), joined to the right boss pocket's
+    inner wall. It does not reach the rail, where it met the shell's right boss: the check design
+    found that overlap.
+  - The seat's top is its 45° lead-in. It ends 0.9 under the slant.
+  - There is no front guide rail: the SEN66 cable runs there.
+  - A left stop (1.6 × 2 × 4) at the module's rear-left corner locates its inlet end.
+- **Felt feet are ⌀7.5, not the airQ's ⌀10.** They cover the ⌀4.4 heads and stay inside the side
+  and front faces. The airQ's ⌀10 overhang is its deferred R35 minor.
+
+### Bodies
+
+| Body | Material | Volume (mm³) | Box min (x, y, z) | Box max (x, y, z) |
+|---|---|---|---|---|
+| shell | PETG / ASA | 14324.4 | −34.75, 0.09, 2.00 | 34.75, 50.00, 42.00 |
+| base_plate | PETG / ASA | 21433.6 | −34.75, 0.00, 0.00 | 34.75, 50.00, 40.00 |
+| zone_wall | PETG / ASA | 5942.7 | −32.75, 2.19, 16.80 | 32.75, 48.00, 31.00 |
+| tongue_mount | PETG | 39.4 | −32.15, 21.00, 4.35 | −27.00, 25.60, 8.95 |
+| gasket_out | TPU 95A | 424.1 | 6.15, 32.46, 3.80 | 30.15, 36.46, 27.80 |
+| gasket_in | TPU 95A | 197.3 | −13.10, 31.96, 1.00 | −6.66, 36.51, 28.90 |
+| grommet_zone_a | TPU 95A | 39.7 | −32.75, 24.81, 28.85 | −29.50, 33.61, 30.70 |
+| grommet_zone_b | TPU 95A | 25.5 | −29.50, 24.81, 28.90 | −27.15, 33.61, 30.70 |
+| sen66_pad | foam (bought) | 320.0 | 13.15, 9.36, 10.80 | 23.15, 12.56, 20.80 |
+| sen66_foam | foam (bought) | 1175.8 | −24.25, 11.16, 2.00 | 30.95, 32.46, 3.00 |
+| sen66_top_seal | closed-cell foam (bought) | 43.4 | −9.05, 11.16, 28.60 | −5.66, 32.46, 29.20 |
+| zone_seal | closed-cell foam (bought) | 100.4 | −26.15, 1.40, 16.80 | 26.15, 3.00, 18.00 |
+
+The seals are modelled free (their squeeze as printed or bought). The check design sets every
+squeeze to 0.
+
+### Check table (airQ mini)
+
+Task 4a started this table, and 4b completes it with the openings, the band, the window, the dot
+and the no-straight-path check.
+
+| Check | Rule | Value | How | Result |
+|---|---|---|---|---|
+| Bounding box | 69.5 × 50 × 42 (R51) | 69.50 × 50.00 × 42.00 | **measured**: `measure`, union of the bodies (`test_build_and_bounding_box`) | pass |
+| Interference with every `ref_*` | 0 (R9) | 0 pairs; 375 bodies (`ref_sen66`, `ref_tongue`, `ref_main` with its 308, the keep-outs, the air probes, the sweeps), 0 unchecked | **measured**: `inspect.interference` at every squeeze 0 (`test_no_interference_with_the_references`) | pass |
+| Shell's way on (I1) | lowers along −z | boss columns swept, shell raised 1–32 mm: 0 | **measured** (`sweep_*`, `shell_up_*`) | pass |
+| Shell clearance (N1) | `clr_remove` off the datums | nudged 0.05: forward, sideways, up 0; back 6.84 mm³ only at y 48.20–48.25 (rear wall); down 10.03 mm³ only at z 1.95–2.00 (floor) | **measured** (`test_shell_nudged_meets_the_base_only_on_its_datums`) | pass |
+| Seals touch (R9) | zero gap, zero overlap | at 0.05: ring 5.30, wiper 1.75, wiper root 5.51, ledge seal 3.14, pad 5.00, top seal 3.62, grommets 0.33 / 0.96 (zone wall), 0.63 (rail) mm³ | **measured**: squeeze 0, then 0.05 (`test_seals_touch_what_they_seal`) | pass |
+| Port groups sealed (I3) | inlets apart from the outlet and the case | ring round the outlet into the plate; wiper between the inlets and the ring; top seal over the module at the wiper's tip; sensor tub one print, the zone wall lapped on it, the ledge sealed to the lip | **measured** (touch run); the closure **analytic** (the airQ's construction, one print for the tub) | pass |
+| SEN66 depth extremes (I3(b)) | 21.3 ± 0.5 held, nothing but the pad met | 21.8 front (plinth, block, plug, bend) meets only the pad, 1.90 deep; 20.8 still meets it, 0.90 | **measured**: `ext_*` probes (`test_sen66_at_its_depth_extremes`) | pass |
+| Intake path (R25) | ≥ 77.3 | port gap 80.7; in front of the module, over its cable 101.6; passage mouth beside the cable's drop 89.6 | **measured**: free probes (`test_air_paths_are_free_sections`) | pass |
+| Passage with the tongue in it (R25) | ≥ 77.3 | at the VEML7700 125.4, middle 144.5, pin 126.6, socket 129.9, plug 145.2, Qwiic turn **107.8**, left stop 112.7 | **measured**: 0.5 mm slabs across the passage against the tongue's STEP, its pin and the cables' keep-outs (`test_passage_keeps_r25_with_the_real_tongue_in_it`) | pass. As an envelope (4.6 × 22, collar, cable) it is 69.1 on paper (**arithmetic**); the real board is sparse |
+| Outlet path (R25) | ring ≥ 330.1; branches ≥ their share | ring 346.4; plenum left of the ring 297.1 ≥ 192.6; behind H1 166.7 ≥ 41.3 | **measured** probes; shares **arithmetic** (slots left of the cut) | pass |
+| R12 antenna to SEN66 | ≥ 15 (maximise) | **10.35** | **measured**: `inspect.clearance` | owner item (RSSI on the prototype) |
+| R12 antenna to USB plug, inserts, screws | ≥ 15 | 18.55, 41.25, 21.6 | **measured** | pass |
+| Tongue to U3 / U2 | ≥ 20 | 39.27 / 24.18 | **measured** | pass |
+| Tongue in the intake air | in the intake stream | in the passage, which every inlet draws through | **analytic**: the passage is the only way from the slots to the port gap (the study) | pass |
+| R18 intake | ≥ 154.5 | 158.0 (3 rows × 4 × 10.98 × 1.2) | **arithmetic** (4b cuts and measures) | pass (margin 3.5) |
+| R18 outlet | ≥ 660.1 (floor 296) | **498.2** (24 × 1.2 × 17.3) | **arithmetic** (4b cuts and measures) | owner item (R18 shortfall, as the study) |
+| Intake to outlet | ≥ 20, different faces | lip (front) and rear wall: 50 apart | **arithmetic** | pass |
+| 10 mm rule | no opening below z 10 | rows from 10.0, window from 13.0, outlet from 10.0, exhaust from 31.7 | **arithmetic** (positions; 4b measures) | pass |
+| Plug room | 5.0 envelope | J2 5.85, J4 6.14 | **arithmetic**; plug keep-outs **measured** clear of `ref_main` | pass |
+| Cables installable with plugs on | split grommets, open-edge drawer | drawer open to the zone wall's left end: way out 0 | **measured**: `edge_drawer` (`test_drawer_opens_to_the_side`) | pass |
+| H2 screw | does not open the zone | blind pilot 1.6 in pad + wall, 0.5 left | **arithmetic** (`test_h2_lies_over_the_sen66_so_it_has_no_post`) | pass |
+| USB-C support boss | within 8 mm | H1 7.73 from the USB-C's centre | **arithmetic** | pass |
+| Rebuild (`check_parameters`) | `wall` 1.6 / 2.4, `clr_*` ±0.1 | no errors or warnings, 12 bodies, volume back to the default each time | **measured**: `parameters.change` walk (`test_rebuilds_over_wall_and_clearances`) | pass (rebuild) |
+| … at those states | the rules keep | intake 159.5 / **153.7** (wall 1.6 / 2.4), 158.8 / 157.3 (`clr_remove` 0.1 / 0.3); passage 7.3 / **5.7** (≈ 75 mm² at the Qwiic turn at wall 2.4); J2 room 6.25 / **4.65**; collar 2.2 / 0.6 | **arithmetic** from the parameters | wall 2.4 loses the intake, passage and J2 margins (owner item, as the airQ's intake at wall 2.4) |
+| Felt feet | cover the heads, stay on the face | ⌀7.5 at the front screws, 2.0 thick over 1.2 of head | **arithmetic** (`test_feet_cover_the_screw_heads`) | pass (feet to confirm) |
+
+### What Task 4b does here
+
+- **Cut the openings** at the named positions:
+  - the intake rows (`slot_row1_z` … `slot_row3_z`, `row_x0`/`row_x1`, `in_n`);
+  - the light-sensor window (`lsw_*`), checking its line to the VEML7700 (`veml_w*`) under the
+    ledge;
+  - the outlet grille (`out_*`);
+  - the upper-rear exhaust (`exh_*`, over the zone wall);
+  - the USB-C opening (`usb_*`).
+
+  Then measure each one, as the airQ's 3b-2 did.
+- **Build the split band** over D1/D2 (CO₂) and D3/D4 (PM2.5) (`band_*`, `div_x*`, `led_f`):
+  - the two guides, with the opaque divider between them (`divider_t`);
+  - the no-straight-path check;
+  - the labels (`label_*`);
+  - the dot and flexure on SW1's axis (`sw_*`, `dot_*`).
+
+  The LED faces' top corner is 4.22 behind the slope's outer surface (`front_t_need`), 2.4
+  behind its inner face.
+- **R13 (MS5611)** against the band.
+- **Complete this table.**
+
 ## Print and assembly guide (airQ)
 
 For one airQ (95 × 55 × 51 mm). The airQ mini gets its own section here when its envelope is decided.
@@ -1267,7 +1442,14 @@ print ("Print and assembly guide (airQ)", section 6) is what settles most of the
   of each: a touch kills the total internal reflection there. Check its placement on the print.
 - **Mask light.** About 2 % of D3's and D4's light passes `led_mask`'s edges into the case.
 - **Licence and repo size (R19).** `enclosure/` is CC-BY-SA 4.0; the STEP wrappers are 4.1 MB each.
-- **Mini.** Its envelope waits for an owner decision (spec section 10); see "airQ mini (Task 4)".
+- **Mini.**
+  - Envelope 69.5 × 50 × 42 (R51).
+  - Lip 18.0, a look item.
+  - R12 10.35 mm: an RSSI check on the prototype.
+  - Outlet grille 498 mm² against 660.1: R18, confirm with Sensirion's guide.
+  - The VEML7700 sees its window about 30° off-axis: calibrate lux on the prototype.
+  - The H2 screw takes 1.4 mm of thread in the zone wall: M2 × 3, check the hold on the print.
+  - The tongue's Qwiic and SEN66 cable sizes: see "airQ mini enclosure".
 
 **FFC and adapter (3b)**
 
