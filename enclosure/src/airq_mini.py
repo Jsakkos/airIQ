@@ -137,7 +137,9 @@ def build() -> Script:
     p("tm_pin_d", "tongue_hole_d - 2 * clr_align", "tongue pin (tongue_mount) diameter: through the tongue's hole and into the rail")
     p("tm_collar_d", "tongue_hole_clear - 2 * clr_remove", "tongue pin collar diameter: inside the hole's copper-free circle")
     p("tm_hole_depth", 1.0, "the pin's blind hole in the left rail (0.6 of rail behind it: no leak to the outside of the tub)")
-    p("tm_out", 0.6, "the pin past the tongue board's top face: it stays in the hole if the tongue slides to the module (clr_remove + clr_align)")
+    p("tm_out", "sen_x0 - clr_remove - tongue_x0 - tongue_t", "derived: the pin past the tongue board's top face, to clr_remove from the module's left end (as the left stop): the module's end keeps the pin in its hole (review M4)")
+    p("sen_l_short", 0.4, "SEN66 up to this much shorter than 55.2 (datasheet Fig. 8: 55.2 +0.2 / -0.4; to confirm)")
+    p("tm_travel", "clr_remove + clr_remove + sen_l_short", "derived: the most the pin can slide out (its tip's gap to the module, the module's float to the right rail, a short module)")
 
     # --- the zone wall's cable drawer over the passage's rear (J2 and J4) -------------------
     p("cab_x", "-tub_x + cable_gh_d / 2 + clr_align", "cables' line through the drawer, x: left of the board's edge, right of the rail")
@@ -425,8 +427,9 @@ def grommets(s: Script) -> None:
 def tongue_mount(s: Script) -> None:
     """`tongue_mount`: the tongue's pin, printed standing. Its spigot sits in the blind hole in the
     left rail, its collar spaces the tongue's back clr_align off it, its shank goes through the
-    tongue's mounting hole and tm_out past the tongue's parts face. The module's left end, clr_remove
-    + clr_align from the tongue's parts, keeps the tongue on the shank; the floor under its bottom
+    tongue's mounting hole and on to clr_remove from the module's left end (review M4): the module's
+    end keeps the pin in its hole (it can slide out at most tm_travel of its tm_hole_depth) and, clr_remove
+    + clr_align from the tongue's parts, the tongue on the shank; the floor under the tongue's bottom
     edge (clr_align) stops it turning about the pin."""
     s.cylinder("Tongue pin", ["-tub_x - tm_hole_depth", "tm_y", "tm_z"], "tm_pin_d",
                "tm_hole_depth + tongue_x0 + tub_x + tongue_t + tm_out", axis="X", body="tongue_mount")

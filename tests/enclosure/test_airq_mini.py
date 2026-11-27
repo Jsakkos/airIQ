@@ -299,6 +299,12 @@ def test_tongue_on_edge_in_the_passage():
     assert V("veml_wz") > V("ledge_z0")                     # high: the window is below it (4b)
     # the pin through the hole, inside the passage; the shank stays in the hole with the tongue against the module
     assert V("tm_out") > V("clr_remove + clr_align")        # slid against the module, the board is still on the shank
+    # review M4: the pin's tip clr_remove from the module's end, so the pin stays in its blind hole: at most
+    # tm_travel out (tip gap, the module's float to the right rail, a 0.4 short module) of tm_hole_depth
+    pin = next(c["params"] for c in S.commands if c["params"].get("name") == "Tongue pin")
+    assert V(f"{pin['base'][0]} + {pin['height']}") == pytest.approx(V("sen_x0 - clr_remove"))
+    assert V("tm_travel") == pytest.approx(V("2 * clr_remove + sen_l_short"))
+    assert V("tm_hole_depth - tm_travel") >= 0.15
     assert V("tm_collar_d") <= V("tongue_hole_clear") and V("tm_pin_d") < V("tongue_hole_d")
     assert V("-tub_x - tm_hole_depth") > V("-tub_x - iwall")  # the pin's hole is blind: the rail is not opened
     d = mini_distances()
