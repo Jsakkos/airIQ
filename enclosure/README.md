@@ -1262,10 +1262,16 @@ the hard stop (no printed stop gap). Face down, the rod stands 24° off the vert
   them) stand on its flat top at contact. `airq_mini_check.seal_forces` redoes the airQ's analysis for the
   mini: the top seal pushes up 4.3 N (soft foam, ≤ 30 kPa at 25 %, now the spec) to 14.5 N (firm); the push
   lies 8.2 mm inside the holds' polygon, so every hold pushes down (H1 42 %, the right rib 21 %, the divider
-  16 %, the left rib 11 %, the left pad 11 %). As a 20 mm strip between the pads and H1 (the wider plate and
-  the board ignored: a bound) the zone wall lifts ≤ 0.09 at the seal and ≤ 0.035 at the plenum plate's lap
-  with the soft foam (0.18 / 0.067 firm), and the seal keeps ≥ 34 % compression (20 %). The rail fronts' and
-  the boss-pocket rises' laps are under or beside the pads. The drawer grommet's bottom now lands on the rail
+  16 %, the left rib 11 %, the left pad 11 %). As a 20 mm strip on the seal's line between the pads and H1
+  (the plate's width and the board ignored) the zone wall lifts ≤ 0.09 at the seal and ≤ 0.035 at the plenum
+  plate's lap on that line with the soft foam (0.18 / 0.067 firm), and the seal keeps ≥ 34 % compression (20 %).
+  That strip covers only the seal's line (round 2, minor 1). Away from it, the reviewer's Kirchhoff plate model (round 2): the rear right lifts most, as H1 at x −18.7 is the only rear hold. With no rotational restraint at the pads (the worst case) the right rail's and the rear-wall rib's laps lift 0.11 (soft foam) / 0.29 (firm), the plenum plate's lap at its right end 0.09 / 0.24, the right rail beside the module 0.04–0.08 (soft); with the pads also restraining rotation 0.024–0.026 / 0.068–0.074 at the rear right and ≤ 0.012 / 0.035 beside the module. The inlet side's laps (left rail, front) stay ≤ 0.012. The zone seal's
+  push acts about 12 mm below the flat part (22–72 N·mm about the ledge), so it too tilts the front slightly.
+  The rail fronts' and the boss-pocket rises' laps are under or beside the pads. The pads are at contact across
+  two independent ≈ 29 mm print stacks (the shell's floor to its pads; the base's floor, the tub's rim and the
+  zone wall): on the gap side the zone wall can lift by that gap; on the interference side (round 2, minor 2)
+  the pads hold the shell off its floor datum at the front, or the face bows as the screws pull it down. First
+  print: if the shell does not sit on the floor with the screws loose, sand the pads' bearing faces. The drawer grommet's bottom now lands on the rail
   at contact (`drawer_floor_squeeze` 0): squeezed, it would push the zone wall up beside the drawer, outside
   the holds.
 - **The intake throat (M1).** All the intake turns into the passage round the left boss pocket's outer corner;
@@ -1289,6 +1295,21 @@ the hard stop (no printed stop gap). Face down, the rod stands 24° off the vert
   SEN66's housing (`h2_screw_len`).
 - **The CO₂ subscript is 4.0 (M7)**: a first-print check.
 
+### Fix round 2 (re-review of Task 4)
+
+- **The drawer grommet (M2).** Three pieces, `grommet_zone_a` (front), `_b` (between the cables) and `_c` (rear),
+  split across y through the two cables' axes as the airQ's: the notch's front and rear faces squeeze both
+  splits (`drawer_squeeze` each). The press now acts between two faces of the zone wall, so the shell's x float
+  (±0.2, its screws in 2.4 holes) and the zone wall's (±0.15, H1's spigot) do not enter it at any corner. Round
+  1's press against the shell's side wall is gone. A y split through both cables, not a front/rear pair, because
+  the cables lie one behind the other at the same x (5.5 mm left of the board's edge cannot take them side by side).
+- **`guide_stop`'s tolerance is 1.2 +0.1 / −0** including the adhesive: its front is on the ribs, and a thinner
+  stop leaves the feet proud of its back face (at 1.0 the no-path check finds 2,116 lines in air and R13 99
+  samples reaching U4). At 1.3 every light check passes and its back face keeps 0.1 from the board and the LEDs.
+- **The zone wall's lift away from the seal's line** (minor 1) and **the pads' interference side** (minor 2):
+  recorded under "Fix round 1" and in the feeler checks (the right rail and the rear-wall rib added).
+- Table numbers re-synced (the grommets as built, the CO₂ letters 20.3 mm²); stale docstrings fixed.
+
 ### Bodies
 
 | Body | Material | Volume (mm³) | Box min (x, y, z) | Box max (x, y, z) |
@@ -1298,13 +1319,14 @@ the hard stop (no printed stop gap). Face down, the rod stands 24° off the vert
 | light_guide_co2 | PETG, clear / natural | 172.0 | −22.20, 6.87, 31.48 | −2.00, 11.71, 34.60 |
 | light_guide_pm | PETG, clear / natural | 172.0 | 5.10, 6.87, 31.48 | 25.30, 11.71, 34.60 |
 | guide_stop | black closed-cell foam (bought) | 273.4 | −23.55, 10.61, 31.08 | 26.65, 11.81, 36.15 |
-| base_plate | PETG / ASA | 19853.1 | −34.75, 0.00, 0.00 | 34.75, 50.00, 40.00 |
+| base_plate | PETG / ASA | 19851.9 | −34.75, 0.00, 0.00 | 34.75, 50.00, 40.00 |
 | zone_wall | PETG / ASA, an **opaque filament** (black or dark grey: the light checks count it opaque, review M5) | 5942.7 | −32.75, 2.19, 16.80 | 32.75, 48.00, 31.00 |
 | tongue_mount | PETG | 46.6 | −32.15, 21.00, 4.35 | −24.45, 25.60, 8.95 |
 | gasket_out | TPU 95A | 424.1 | 6.15, 32.46, 3.80 | 30.15, 36.46, 27.80 |
 | gasket_in | TPU 95A | 197.3 | −13.10, 31.96, 1.00 | −6.66, 36.51, 28.90 |
-| grommet_zone_a | TPU 95A | 39.1 | −32.95, 24.86, 28.90 | −29.50, 33.56, 30.70 |
-| grommet_zone_b | TPU 95A | 22.9 | −29.50, 24.86, 28.90 | −27.20, 33.56, 30.70 |
+| grommet_zone_a | TPU 95A | 19.4 | −32.75, 24.81, 28.90 | −27.15, 27.61, 30.70 |
+| grommet_zone_b | TPU 95A | 26.3 | −32.75, 27.61, 28.90 | −27.15, 31.11, 30.70 |
+| grommet_zone_c | TPU 95A | 18.5 | −32.75, 31.11, 28.90 | −27.15, 33.61, 30.70 |
 | sen66_pad | foam (bought) | 320.0 | 13.15, 9.36, 10.80 | 23.15, 12.56, 20.80 |
 | sen66_foam | foam (bought) | 1175.8 | −24.25, 11.16, 2.00 | 30.95, 32.46, 3.00 |
 | sen66_top_seal | closed-cell foam (bought) | 43.4 | −9.05, 11.16, 28.60 | −5.66, 32.46, 29.20 |
@@ -1326,9 +1348,9 @@ design, `airq_mini_check --run`), **analytic** (a model of the physics in Python
 | Interference with every `ref_*` | 0 (R9) | 0 pairs; 413 bodies (`ref_sen66`, `ref_tongue`, `ref_main` with its 308, the guides, the stop, the keep-outs, the air probes incl. those behind the openings, the sweeps), 0 unchecked | **measured**: `inspect.interference` at every squeeze 0 (`test_no_interference_with_the_references`) | pass |
 | Shell's way on (I1) | lowers along −z | boss columns swept; the shell, both guides and `guide_stop` raised 1–32 mm: 0 | **measured** (`sweep_*`, `shell_up_*`, `gco2_up_*`, `gpm_up_*`, `gstop_up_*`) | pass |
 | Shell clearance (N1, review focus 1) | `clr_remove` off the datums | nudged 0.05: forward, sideways, up 0; back 6.84 mm³ only at y 48.20–48.25 (rear wall); down 10.03 mm³ only at z 1.95–2.00 (floor) and 1.81 on the zone wall's top under the hold-down pads (review I1) | **measured** (`test_shell_nudged_meets_the_base_only_on_its_datums`) | pass |
-| Seals touch (R9, review focus 2) | zero gap, zero overlap | at 0.05: ring 5.30, wiper 1.75, wiper root 5.51, ledge seal 3.14, pad 5.00, top seal 3.62, grommets 0.33 / 0.96 (zone wall), 0.63 (rail), 0.62 (outer half on the shell's side wall, review M2); the shell's hold-down pads on the zone wall 1.81 (review I1) mm³ | **measured**: squeeze 0, then 0.05 (`test_seals_touch_what_they_seal`) | pass |
+| Seals touch (R9, review focus 2) | zero gap, zero overlap | at 0.05: ring 5.30, wiper 1.75, wiper root 5.51, ledge seal 3.14, pad 5.00, top seal 3.62, grommets on the zone wall (the notch's faces and closed end) 0.50 / 0.32 / 0.47 and on the rail 0.19 / 0.28 / 0.16 (a / b / c, round 2); the shell's hold-down pads on the zone wall 1.81 (review I1) mm³ | **measured**: squeeze 0, then 0.05 (`test_seals_touch_what_they_seal`) | pass |
 | Port groups sealed (I3) | inlets apart from the outlet and the case | ring round the outlet into the plate; wiper between the inlets and the ring; top seal over the module at the wiper's tip; sensor tub one print, the zone wall lapped on it and held down (next row), the ledge sealed to the lip | **measured** (touch run); the closure **analytic** (next row) | pass |
-| Zone wall held down (review I1) | the top seal, the zone seal and the laps stay closed | H1's clamp and four shell pads at contact (touch 0.05 run: the pads overlap the zone wall; the −z nudge meets it only on its top). Top seal 4.3 N (soft foam, the spec) … 14.5 N (firm), 8.2 mm inside the holds, every hold pushing down (H1 42 %, pads 11–21 %); lift ≤ 0.09 at the seal, ≤ 0.035 at the plenum plate's lap (firm: 0.18 / 0.067), seal ≥ 34 % compressed (firm 20 %); zone seal 1.9–6.3 N and the drawer grommet's faces 5.3–10.2 N push sideways (no lift); the grommet's bottom at contact (0 N up) | **measured** (pads touch, nudge); forces and lift **analytic**: rigid plate on equal springs for the split, a 20 mm PETG strip between the pads and H1 for the lift, the plate's width and the board ignored (a bound; `seal_forces`, `test_zone_wall_is_held_down`) | pass; the pads' contact and the laps: first-print check |
+| Zone wall held down (review I1) | the top seal, the zone seal and the laps stay closed | H1's clamp and four shell pads at contact (touch 0.05 run: the pads overlap the zone wall; the −z nudge meets it only on its top). Top seal 4.3 N (soft foam, the spec) … 14.5 N (firm), 8.2 mm inside the holds, every hold pushing down (H1 42 %, pads 11–21 %); on the seal's line (a 20 mm strip) lift ≤ 0.09 at the seal, ≤ 0.035 at the plenum plate's lap (firm: 0.18 / 0.067), seal ≥ 34 % compressed (firm 20 %); away from it the reviewer's plate model (round 2) lifts the rear right most: the right rail's and the rear-wall rib's laps 0.11 / 0.29 with no rotational restraint at the pads, 0.024–0.026 / 0.068–0.074 with it; the inlet side ≤ 0.012; zone seal 1.9–6.3 N (acting 12 mm under the flat part: 22–72 N·mm) and the drawer grommet's faces push sideways; the grommet's bottom at contact (0 N up); the pads at contact across two ≈ 29 mm print stacks, the interference side recorded (shell held off its floor, or the face bowing) | **measured** (pads touch, nudge); forces and the strip lift **analytic** (`seal_forces`, `test_zone_wall_is_held_down`); the plate numbers **analytic** (the reviewer's plate model, not in the repo) | pass on the seal's line; the rear-right laps and the pads' seating: first-print feeler check (soft foam specified) |
 | SEN66 depth extremes (I3(b)) | 21.3 ± 0.5 held, nothing but the pad met | 21.8 front (plinth, block, plug, bend) meets only the pad, 1.90 deep; 20.8 still meets it, 0.90 | **measured**: `ext_*` probes (`test_sen66_at_its_depth_extremes`) | pass |
 | Intake path (R25) | ≥ 77.3 | port gap 80.7; in front of the module, over its cable 101.6; passage mouth beside the cable's drop 89.6 | **measured**: free probes (`test_air_paths_are_free_sections`) | pass |
 | Intake throat (R25, review M1) | ≥ 77.3 | the turn into the passage round the left boss pocket's chamfered corner: **97.5** nominal, **87.1** at the tolerance corner (module on its left stop, 21.8 deep), the SEN66 cable counted as blocking its whole height | **arithmetic**: per-z gap to the SEN66's front-left (foam, block, plinth, corner fillets), 0.01 steps (`intake_throat`, `test_intake_throat_keeps_r25`) | pass (57.4 at wall 2.4: below) |
@@ -1353,10 +1375,10 @@ design, `airq_mini_check --run`), **analytic** (a model of the physics in Python
 | No cladding on light-path faces (R40, R48) | no coat, no optical contact | every guide face bare; the nearest solids `clr_align` away (wall, slot, ribs, stop), the LEDs `clr_remove` + 0.1 | **arithmetic** (`test_guide_fits_come_from_the_clearances`) | pass |
 | Opaque walls to the light sensor (review focus 3) | ≥ 1.2 of opaque from any guide face or LED face to the VEML7700, its window and the crease | sensor **1.92** (through the zone wall), the window's outer face **3.30**, the crease's front **6.44**; counted: the lip, the zone wall (ledge, slant, flat part), `zone_seal` (foam), the shell's wall (less the labels' 0.4) and ribs, `guide_stop`; the crease's 0.2 parting line as air | **arithmetic**: exact straight lines against the parts' prisms (`light_paths`, `test_light_stays_off_the_sensor_its_window_and_the_crease`); not a ray trace | pass |
 | MS5611 line of sight (R13, R50) | no straight line from a LED or guide face to U4 | 0 of **24,125** samples on every exposed face of both guides whose outward half-space holds U4's port (bars, feet, sides, ends, entry faces; every 0.25 along x, 41 along each profile edge, a 61 × 61 grid on each end) reach it: the LED bodies, the board, the ribs and `guide_stop` stop them. Without `guide_stop` 4,251 would. The LED faces emit away from U4 | **arithmetic** (`ms5611_sight`, `test_ms5611_sees_no_led_or_guide`) | pass |
-| Labels | "CO₂" and "PM2.5", 0.4 deep, ≥ 5 tall | 5.0 tall, the subscript 4.0 (review M7; first-print check); debossed exactly 0.4 (the 0.05 under them is all shell); letters 19.4 / 32.9 mm² | **measured**: `fp_label_*` probes (`test_face_probes`) | pass |
+| Labels | "CO₂" and "PM2.5", 0.4 deep, ≥ 5 tall | 5.0 tall, the subscript 4.0 (review M7; first-print check); debossed exactly 0.4 (the 0.05 under them is all shell); letters 20.3 / 32.9 mm² | **measured**: `fp_label_*` probes (`test_face_probes`) | pass |
 | Dot and flexure | on SW1's axis, stop on SW1's body, printable face down | dot at x 29.75, z 34.3 (SW1's actuator); beam the 1.0 skin (`fp_beam` 3.9 mm³ = 3.9 × 1 × 1.0); rod end 0.10 in front of the actuator (`fp_pad_end` 0.1, `fp_pad_gap` 0); stop 0.34, 0.04 past the switch's travel; rod 24° off vertical face down | **measured** probes; the stop **arithmetic** (`test_dot_and_flexure_on_sw1s_axis`) | pass; feel at the first print (R43) |
 | Plug room | 5.0 envelope | J2 5.85, J4 6.14 | **arithmetic**; plug keep-outs **measured** clear of `ref_main` | pass |
-| Cables installable with plugs on | split grommets, open-edge drawer | drawer open to the zone wall's left end: way out 0; the split pressed shut by the shell's side wall (the outer half touches it: 0.05 run), the bottom at contact on the rail (review M2) | **measured**: `edge_drawer` (`test_drawer_opens_to_the_side`), touch run; the split **arithmetic** (`test_drawer_grommet_split_is_pressed_shut`) | pass |
+| Cables installable with plugs on | split grommets, open-edge drawer | drawer open to the zone wall's left end: way out 0; the grommet in three pieces split across y through the cables' axes, both splits squeezed by the notch's front and rear faces (one part: the shell's ±0.2 and the zone wall's ±0.15 x floats do not enter, round 2), the bottoms at contact on the rail | **measured**: `edge_drawer` (`test_drawer_opens_to_the_side`), touch run; the split **arithmetic** (`test_drawer_grommet_split_is_pressed_shut`) | pass |
 | Tongue pin retained (review M4) | the pin stays in its blind hole | its tip `clr_remove` from the SEN66's end: out at most 0.8 of its 1.0 | **arithmetic** (`test_tongue_on_edge_in_the_passage`) | pass |
 | H2 screw | does not open the zone, does not reach the SEN66 | blind pilot 1.6 in pad + wall, 0.5 left; **M2 × 3 only** (1.4 of thread): 1 mm longer reaches the SEN66 (review M6) | **arithmetic** (`test_h2_lies_over_the_sen66_so_it_has_no_post`) | pass; screw length in the guide and BOM (5b) |
 | Clearances are parameters (review focus 1) | every fit a `clr_*` parameter | the guides' fits `clr_align` / `clr_remove` (no literal gap but `lg_ein` 0.1, a sight-line choice); the stop and ribs `clr_remove` off the board, J7 and the zone wall | **arithmetic** (`test_guide_fits_come_from_the_clearances`) | pass |
@@ -1624,8 +1646,9 @@ Keep the base and the shell separate until step 9.
     - Press `guide_stop` onto the three ribs' back faces over the four feet (windows 0.15 clear of each).
     - Check that the dot and its flexure move freely.
 9. **Close.** Lower the shell along −z onto the base: it stands on the floor, the guides' entry faces stop 0.3 in front
-   of the LEDs, and the four pads touch the zone wall's top. Drive the three M2 screws. Check the pads with a feeler
-   (0.05 mm: they must bear, and the zone wall's laps must stay shut).
+   of the LEDs, and the four pads touch the zone wall's top. With the screws loose the shell must sit on the floor
+   (if the pads hold it off, sand their faces). Drive the three M2 screws. Check the pads with a feeler (0.05 mm:
+   they must bear, and the zone wall's laps must stay shut, the right rail's and the rear-wall rib's included).
 10. **Feet.** Stick the four felt feet on, the front two over the screw heads.
 
 **Before power.** The SEN66 must not move when you press its connector face toward the front. Check that J2 and J4
@@ -1650,8 +1673,10 @@ What to look for:
 - **Fits.** The shell on the base (the 0.2 parting line, the way on), the inserts, the screws' lengths, the zone
   wall's laps and its drawer, the SEN66 in its cradle, the tongue on its pin, every grommet.
 - **Zone-wall pads (review I1).** With a 0.05 feeler: each of the four pads bears on the zone wall's top, the rail
-  fronts', the boss pockets' and the plenum plate's laps stay shut, and the top seal and `zone_seal` keep their
-  compression. Also the zone wall's flat top and underside, which print as steps on a leaning wall.
+  fronts', the boss pockets', the plenum plate's, **the right rail's and the rear-wall rib's** laps stay shut (the
+  rear right lifts most: up to 0.11 with soft foam in the reviewer's plate model, round 2), and the top seal and
+  `zone_seal` keep their compression. With the screws loose the shell sits on the floor (the pads' interference
+  side). Also the zone wall's flat top and underside, which print as steps on a leaning wall.
 - **Seal.** The outlet ring (smoke at the grille with the SEN66 running: nothing leaks into the space beside the
   ring), the wiper, the pad's force, the soft top seal.
 - **Light band.** Both halves' brightness and evenness: the model gives about 10.5 % delivery per LED and light only
@@ -1734,8 +1759,10 @@ print ("Print and assembly guide (airQ)", section 6) is what settles most of the
   - The tongue's SHT45 faces the SEN66's inlet end about 2.8 mm away: check on the prototype that the module's
     warmth does not bias it (review M9).
   - The zone wall's hold-down pads touch its top at contact (review I1): check with a feeler at the first print
-    that the pads bear and the laps (rail fronts, boss-pocket rises, plenum plate) stay shut; the top seal's
-    foam is soft (≤ 30 kPa at 25 %, to confirm with the foam bought).
+    that the pads bear and the laps (rail fronts, boss-pocket rises, plenum plate, the right rail and the rear-wall
+    rib, where the plate model lifts most) stay shut, and that the shell sits on its floor with the screws loose
+    (the pads' interference side: sand them if not); the top seal's foam is soft (≤ 30 kPa at 25 %, to confirm
+    with the foam bought).
   - The CO₂ label's 4.0 mm subscript (strokes about 0.54) is under the coupon's 5 mm finding: check it reads at
     the first print (review M7).
   - The band's end ribs and the gap's edges are 1.2 of warm-white (the coupon needed 2.0): at 2.0 the gap's dark

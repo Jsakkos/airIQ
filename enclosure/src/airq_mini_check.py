@@ -1009,10 +1009,13 @@ def seal_forces(s=None) -> dict:
     - holds (`hold_supports`): H1's clamp and the shell's pads, all pushing down. Statics as a rigid plate on equal
       springs at the holds (the least-squares split): every hold's reaction must be >= 0 (downward), i.e. the
       top seal's push lies inside the holds' polygon (its distance inside, `inside_mm`);
-    - flexibility (a bound): the zone wall as a STRIP_W strip simply supported between the front pads' line and
-      H1's line, the push at the seal's centre, PETG at ZW_E; with the foam as a spring in series, the lift at
-      the seal and at the plenum plate's lap (the nearest lap in that span), and the top seal's compression
-      left. The rail fronts' and the boss-pocket rises' laps are under or beside the pads (lift 0 at contact)."""
+    - flexibility, ON THE SEAL'S LINE only: the zone wall as a STRIP_W strip simply supported between the front
+      pads' line and H1's line, the push at the seal's centre, PETG at ZW_E; with the foam as a spring in series,
+      the lift at the seal and at the plenum plate's lap on that line, and the top seal's compression left. Away
+      from that line the rear right lifts most (H1 is the only rear hold): the reviewer's plate model (round 2)
+      gives the right rail's and the rear-wall rib's laps 0.024-0.11 (soft foam, with / without the pads'
+      rotational restraint), so those laps are first-print feeler checks (README). The zone seal's push, about
+      12 mm under the flat part, tilts the front a little too."""
     s = s or airq_mini.build()
     v = s.v
     comp = v("top_seal_squeeze") / v("top_seal_t")

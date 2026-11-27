@@ -221,7 +221,7 @@ def test_drawer_grommet_split_is_pressed_shut():
 
 def test_labels_and_light_sensor_window():
     """Task 4b: "CO2" under the left half and "PM2.5" under the right, debossed 0.4, 5 mm tall (the
-    coupon's legible size); the CO2 label's subscript is a 3.5 mm "2" (strokes about 0.48 above the
+    coupon's legible size); the CO2 label's subscript is a 4.0 mm "2" (strokes about 0.54 above the
     0.4 nozzle). The light-sensor window: low on the lip, left of the rows, its lower edge over the
     10 mm line; the VEML7700's line to it passes under the zone wall's ledge and the zone seal, right
     of the left boss pocket's inner wall."""

@@ -211,7 +211,7 @@ def hold_pads(s: Script) -> None:
 def label_params(s: Script) -> None:
     """The labels' layout. The built-in font's own subscript two is 0.58 of the cap height: at 5 mm its
     strokes are about 0.40, at the 0.4 nozzle's limit, so the CO2 label's subscript is a plain "2" at
-    label_sub_h (strokes about 0.48), dropped under the baseline. Widths of the built-in font, measured
+    label_sub_h (4.0: strokes about 0.54), dropped under the baseline. Widths of the built-in font, measured
     on solidcraft-cli 0.50.0 text outlines: "CO" 2.04 x its cap height, "2" 0.664 x."""
     p = s.param
     p("label_sub_h", 4.0, "the CO2 label's subscript 2: its cap height, 0.8 of the label's (strokes about 0.136 x this, 0.54 mm; review M7: enlarged from 3.5, still under the coupon's 5 mm finding: a first-print check)")
