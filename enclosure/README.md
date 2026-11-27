@@ -1800,6 +1800,26 @@ print ("Print and assembly guide (airQ)", section 6) is what settles most of the
 - **`gap_stop`.** The 1.3 mm foam strip sits in a 1.7 mm gap between the D1 and D2 feet, 0.2 clear
   of each: a touch kills the total internal reflection there. Check its placement on the print.
 - **Mask light.** About 2 % of D3's and D4's light passes `led_mask`'s edges into the case.
+- **Shell glow (R50).** About 95 % of D1's and D2's light leaves the bare guide into the case, not
+  through the exit. The warm-white shell may glow round the line: look at it on the first print.
+- **R13 margin (thin).** No line from the guide or the LEDs reaches U4 at the nominal place. At U4
+  port offsets of ±0.25–0.5 mm, 1–4 samples get through. At `clr_remove` 0.21 or more, one sample
+  gets through behind `gap_stop`, through the guide's entry gap ("Coupon results", supported
+  window per rule). Check U4's place on the board and the coupons' `clr_remove` before the build.
+  The cure, if needed, is to deepen `gap_stop` toward the board's edge.
+- **Adapter holder (R41 M4).** It is a single arm over the adapter's upper edge, with nothing under
+  its lower edge. Check that it holds the adapter flat when the FFC is plugged.
+- **Dot height (R41 M5, a look item).** The orange dot sits 69 % up the face (on SW1's push axis).
+  The mockup has it at 79 %.
+- **Pad lead-in (B4, final review I2).** The seat's 45° lead-in meets the pad's free face for modules
+  up to 21.37 deep. A 21.8 module's pad meets the seat's top first. Check on the first build that
+  the pad goes down without snagging.
+- **Left boss-pocket lap and zone-seal lead-in (3a; first-print checks).** At the left boss pocket
+  the zone wall's lap is lost: a 0.7 mm² labyrinth is left. The zone-seal foam has no lead-in at the
+  lip's top, so the shell's way down could catch its top edge. Look at both on the first print, and
+  test with smoke at the intake while the SEN66 runs.
+- **Mini rib glow (Task 4b).** About 90 % of the mini's light leaves the guides into their pockets,
+  so the warm-white ribs and the band's edges may glow. Look at it on the first print.
 - **Licence and repo size (R19).** `enclosure/` is CC-BY-SA 4.0; the STEP wrappers are 3.6 + 0.5 = 4.1 MB together.
 - **Mini.**
   - Envelope 69.5 × 50 × 42 (R51).
