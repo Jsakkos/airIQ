@@ -572,7 +572,7 @@ depth (airQ 55, mini 50) with a horizontal board.
 
 `airq.sc`, built from `src/airq.py` with the shared construction in `src/enclosure_common.py`
 (Task 4 reuses it with the mini's values). Board positions come from `src/board_sources.py`
-(R27). Task 3a builds the body and the internals; Task 3b adds the face features.
+(R27). Task 3a builds the body and the internals; Task 3b-1 adds the face features and 3b-2 the base openings and the full check table.
 
 **Layout (R22).** The envelope is 95 × 55 × 51 with a 15 mm vertical lower lip. The study's lip
 row needed 95 × 55 × 50.1. Rounding the lip to 15 still fits D 55, which needs 54.62. The face
@@ -833,8 +833,8 @@ screw → zone wall pad and H1's spigot → H1 → plate → floor and rails.
 
 | Body | Volume | Size | Min corner | What, material |
 |---|---|---|---|---|
-| `shell` | 17756 | 95.00 × 54.88 × 49.00 | −47.5, 0.12, 2.0 | 30° face, top and sides (R24); three M2 insert bosses; the panel pocket; the HCHO window |
-| `base_plate` | 31292 | 95.00 × 55.00 × 49.00 | −47.5, 0, 0 | the tub: floor, lip, rear wall, side rails, boss pockets, plenum plate and rib (the plan's `baffle` and outlet duct), cradle (`sen66_cradle`: the pad's seat tied to the side rail, the guide rail), HCHO pocket and chimney (`hcho_pocket`), SFA40 pins and screw holes, standoffs H1 and H2 with collars and spigots, the HCHO grille, screw counterbores, the J4 notch, the sliver key |
+| `shell` | 15737 | 95.00 × 54.88 × 49.00 | −47.5, 0.12, 2.0 | 30° face, top and sides (R24); three M2 insert bosses; the panel pocket; the HCHO window |
+| `base_plate` | 29343 | 95.00 × 55.00 × 49.00 | −47.5, 0, 0 | the tub: floor, lip, rear wall, side rails, boss pockets, plenum plate and rib (the plan's `baffle` and outlet duct), cradle (`sen66_cradle`: the pad's seat tied to the side rail, the guide rail), HCHO pocket and chimney (`hcho_pocket`), SFA40 pins and screw holes, standoffs H1 and H2 with collars and spigots, the HCHO grille, screw counterbores, the J4 notch, the sliver key |
 | `zone_wall` | 9046 | 91.00 × 50.00 × 18.06 | −45.5, 3.0, 12.94 | ledge behind the lip, slanted part behind the panel, horizontal part over the SEN66 and the plenum; the cable drawer; the pocket over the SEN66's plug; the pads the board clamps; the tongue hold-down |
 | `sen66_top_seal` | 43 | 3.39 × 21.30 × 0.60 | −7.09, 18.44, 28.6 | foam strip across the SEN66's top at the wiper's tip (shown free). Closed-cell foam, black |
 | `zone_seal` | 149 | 77.80 × 1.60 × 1.20 | −38.9, 1.4, 13.8 | the ledge's seal against the lip (shown free). Closed-cell foam, black |
@@ -863,7 +863,8 @@ positions 3b needs (M6):
   `slot_bar`. With 1.2 bars they give 154.8 mm² open;
 - outlet grille: `out_gx0` … `out_gx1`, `out_gz0` … `out_gz1`, `out_pitch` 2.4, `out_n` 32;
 - upper-rear exhaust: `exh_x0` … `exh_x1`, `exh_z0` … `exh_z1`, kept apart from the outlet;
-- USB-C: `usb_x`, `usb_z`, `usb_well` (6.6), `usb_chamfer`.
+- USB-C: `usb_x`, `usb_z`, `usb_well` (6.6), `usb_chamfer`; 3b-2 adds `usb_plug_w` / `usb_plug_h` (the overmold, 12.5 × 7, to confirm) and `usb_open_w` / `usb_open_h`;
+- 3b-2 counts: `in_n_l` 5 and `in_n_r` 2 intake slots per row in the two spans (lengths `in_len_l`, `in_len_r` derived), `exh_n` 14 exhaust slots.
 
 The board's front edge `board_y0` is the study's binding constraint, written as an expression: the
 corner of the LED faces, with the panel and the light guide in front of it.
@@ -879,6 +880,22 @@ keep-outs (`ko_*`), the air probes (`air_*`) and the shell's sweep (`sweep_*`, `
 
 `tests/enclosure/test_airq.py` repeats it.
 
+### Base openings (Task 3b-2)
+
+All cut in `base_plate` by `airq.openings` (`enclosure/src/airq.py`), after every join. Each
+position is a parameter 3a fixed; 3b-2 adds only the slot counts and the USB-C sizes. Open areas
+are measured on the geometry (probe volume less its overlap with the base, over the wall's
+thickness; `airq_check.opening_probes`).
+
+| Opening | Where | Open area (mm²) | Lowest edge z | Source |
+|---|---|---|---|---|
+| Intake slot rows | lower front lip (y 0 … 1.8), two rows z 10.0 … 11.2 and 12.4 … 13.6, 5 + 2 slots per row either side of the window's gap, x −37.7 … 37.7 | 154.80 | 10.0 | `airq.py:294` |
+| Light-sensor window | lip, ⌀ 2.5 at x 16.4, z 11.74, in the rows' gap, in front of the tongue's VEML7700 | 4.91 | 10.49 | `airq.py:296` |
+| Outlet grille | lower rear wall, 32 slots, x −41.9 … 33.7, z 10.0 … 27.3, behind the plenum plate | 664.32 | 10.0 | `airq.py:298` |
+| Electronics exhaust | upper rear wall, 14 slots, x 9.4 … 41.8, z 37.0 … 47.0 | 168.00 | 37.0 | `airq.py:302` |
+| HCHO grille | right rail, 5 slots (3a), behind the window in the shell's side wall | 67.81 | 10.0 | `airq.py:454` |
+| USB-C opening | rear wall, 12.9 × 7.4 on J1's axis (x 1.4, z 34.18), 0.5 chamfer on the outside | – | 30.48 | `airq.py:308` |
+
 ### Shell face (Task 3b-1): print and finish
 
 | Part | Print | Finish / material |
@@ -890,12 +907,12 @@ keep-outs (`ko_*`), the air probes (`air_*`) and the shell's sweep (`sweep_*`, `
 
 ### Check table
 
-Task 3a filled the rows its features answer. Task 3b completes the table.
+Every row is measured on the geometry where the check design can (probes with `inspect.interference` and `inspect.clearance`); the rows that are arithmetic or analytic say so. Task 3b-2 completed it with the openings cut.
 
 | Check | Rule | Value | How measured | Result |
 |---|---|---|---|---|
-| Envelope | 95 × 55 × 48 ±1, R22: 95 × 55 × ≈50 | 95.00 × 55.00 × 51.00 | `measure`, union of the bodies (`test_build_and_bounding_box`) | pass (R22; H 51 recorded) |
-| Interference | 0 overlapping volume (R9) | 0 pairs; 404 bodies checked (all six references, `ref_main`'s 308 included; the keep-outs, probes and sweep), 0 unchecked | `inspect.interference` on the check design at every squeeze 0; each reference's own internal overlaps excluded | pass |
+| Bounding box (R22) | 95 × 55 × 48 ±1 (plan); R22: 95 × 55 × 51 | 95.00 × 55.00 × 51.00 (x −47.5 … 47.5, y 0 … 55, z 0 … 51) | `measure`, union of the bodies (`test_build_and_bounding_box`) | pass. **Why 51 and not 48 (R22):** the plan's 48 is for a pure single slope. With the 15 mm vertical lower lip that carries the intake slots (R15), the study needs 50.1; the zone wall's ledge between the slots and the LED slot takes 1 mm more. W and D are the plan's. Owner item (R22) |
+| Interference with every `ref_*` | 0 overlapping volume (R9) | 0 pairs; 419 bodies checked (all six references, `ref_main`'s 308 included; the keep-outs, air probes incl. the ones in front of the openings, the FFC keep-out and the sweeps), 0 unchecked | `inspect.interference` on the check design at every squeeze 0; each reference's own internal overlaps excluded (`test_no_interference_with_the_references`) | pass |
 | Shell's way on (I1) | the shell lowers along −z onto the assembled base | swept boss columns and the shell raised 1–32 mm: 0 overlap | as above (`sweep_*`, `shell_up_*`) | pass |
 | Shell clearance (N1, review focus 1) | `clr_remove` off the datums | nudged 0.05: forward, sideways and up 0; back 8.46 mm³ only at y 53.20–53.25 (the rear wall's face); down 10.93 mm³ only at z 1.95–2.00 (the floor) | shell copies moved ±0.05 against the base, the zone wall and the seal (`test_shell_nudged_meets_the_base_only_on_its_datums`) | pass |
 | Gaskets touch the SEN66 and the lip | zero gap, zero overlap (R9) | 0 at squeeze 0; at 0.05: ring 5.30, wiper 1.75, ledge seal 4.67, pad 5.00, top seal 3.62 mm³ (contact area × 0.05) | interference at every squeeze 0 and 0.05 (`test_gaskets_touch_what_they_seal`) | pass |
@@ -909,24 +926,32 @@ Task 3a filled the rows its features answer. Task 3b completes the table.
 | Plugs through their openings (I2) | every plug fits every closed opening it passes | the lid's hole 6.4 × 3.35 passes the Qwiic plug 6.0 × 2.95 (0.2 a side); the drawer and the J4 notch are open to an edge, so no plug passes them | the plug's section swept through the lid; open-edge probes (`test_plugs_pass_their_openings`) | pass |
 | Gravity-only parts (N5) | held, not just resting | zone wall clamped by the board's screws; lid and SFA40 by two screws from below; tongue in its pocket under a pad (`clr_align`) | `test_gravity_parts_are_held` | pass |
 | HCHO window (N2) | does not open the electronics zone | each step backed by the rail and the zone wall but at its slot (fill = need: 2.80, 5.29, 7.79, 10.28, 10.22 mm³); 0 against the shell | `win_*` probes (`test_hcho_window_is_backed`) | pass |
-| Rebuild over the parameter range | no errors | wall 1.6 and 2.4, `clr_*` ±0.1: no feature errors, 16 bodies each, volume back to the default | `parameters.change` + `document.inspect` walk (`test_rebuilds_over_wall_and_clearances`) | pass |
+| Rebuild over the parameter range (`check_parameters`) | `wall` 1.6 and 2.4, each `clr_*` ±0.1: no errors | no feature errors or warnings, 19 bodies each (every opening included), volume back to the default after each. Open areas at those states, from the parameters: intake 155.8 / **151.9** (wall 1.6 / 2.4), 155.3 / **154.3** (`clr_remove` 0.1 / 0.3); outlet 664.3 and HCHO 66.1–72.8 hold | `parameters.change` + `document.inspect` walk (`test_rebuilds_over_wall_and_clearances`); areas from `airq_check.distances` with the constants moved | pass (rebuild). The intake rows' margin is 0.3 at the defaults; it is lost at wall 2.4 and `clr_remove` 0.3 (the rows run between the boss pockets, which move with both): owner item |
 | Intake path (R25) | ≥ 77.3 | gap at the inlets 80.7; in front of the SEN66 114.4; over the HCHO lid 411.6 | free probe boxes, sections from `measure` (`test_air_paths_are_free_sections`) | pass |
 | Outlet path (R25) | ≥ 330.1 | ring bore 346.4; plenum branches (section / share of 330.1 by grille slots): ring to H1 235.7 / 226.9, at H1 204.6 / 185.7, right of H1 224.1 / 165.1 | as above | pass |
 | HCHO path (R25) | ≥ 27.4 (the SFA40's opening) | over the cap 35.6; window into the chimney 47.2; chimney 30.3 | as above | pass |
-| Outlet grille (R18, R26) | ≥ 660.1, lower edge ≥ 10 | 664.3 (32 slots × 1.2 × 17.3, parameters for 3b); z 10 | arithmetic from the parameters; 3b cuts it | pass (by parameters) |
-| Intake rows (R18, M6) | ≥ 154.5 | 154.8 (two rows between the boss pockets, without the window's gap) | arithmetic from the parameters; 3b cuts them | pass (by parameters), small margin |
-| HCHO grille | ≥ 2 × the SFA40 opening (54.7), lower edge ≥ 10 | 67.8 mm²; z 10 | slot sizes (cut in 3a) | pass |
+| Outlet grille (R18, R26) | ≥ 660.1 (2 × 330.1), lower edge ≥ 10 | **664.32** measured (32 slots × 1.2 × 17.3, x −41.9 … 33.7, z 10.0 … 27.3, in the rear wall behind the plenum plate); 2.01 × the port | open area = (probe volume − overlap with `base_plate`) / wall, probe `op_outlet` (`test_openings_measured_open_areas`); the air behind it (probe `air_outlet_grille`, 3 mm deep over the slots) is free | pass, margin 4.2 |
+| Intake rows (R18, M6) | ≥ 154.5 (2 × 77.3), lower edge ≥ 10, only slots facing free air | **154.80** measured (14 slots in two rows, 5 + 2 per row each side of the light-sensor window, 1.2 high, 1.2 bars, z 10.0 … 13.6 under the ledge at 13.8); 2.00 × the port. The air behind all of them is free to the tongue's front edge (probe `air_slots_front`, 4.6 deep); the slots in front of the tongue (x 12.8 … 34.8) breathe through the 4.6 channel and its exits (M4: exits 48.0 ≥ 35.3) | `op_intake_l/r` probes as above; `air_slots_front` interference 0 | pass, small margin 0.3 |
+| HCHO grille (R26) | ≥ 2 × the SFA40's opening (54.7), lower edge ≥ 10, aligned with the shell's window | **67.81** measured (5 slots 4.16, 9.15, 14.14, 19.13, 21.24; z from 10.0, tops follow the zone wall's underside less 1.2), 2.5 × the opening. The shell's side window covers each slot's step (N2 probes `win_0 … win_4`: 0 against the shell, rail and zone wall behind it) | `op_hcho_1 … 5` probes (cut in 3a); `test_hcho_window_is_backed` | pass |
 | Tongue's slots (M4) | the slots in front of the tongue stay open | channel exits 48.0 ≥ the slots' 35.3 | probes `air_tongue_*` | pass |
-| Antenna to SEN66 | ≥ 15 (R12) | 16.7 | box distance from the placements (`airq_check.distances`) | pass |
-| Antenna to the USB plug and cable | ≥ 15 (R12) | 18.6 | as above, 12.5 × 7 overmold | pass |
-| Antenna to the inserts and screws | ≥ 15 (R12) | 45.5 (shell bosses), 21.8 (standoff screws) | as above | pass |
+| Antenna to SEN66 (R12) | ≥ 15 | **17.39** between the antenna strip's probe solid (`cl_antenna`, from `interface.yaml`) and the SEN66's body; 16.72 as the box arithmetic | `inspect.clearance` on the check design (`test_distances_on_the_geometry`); `airq_check.distances` | pass |
+| Antenna to the USB plug and cable (R12) | ≥ 15 | **18.55** to the 12.5 × 7 overmold out the rear (`usb_plug_w`, `usb_plug_h`, typical, to confirm) | `inspect.clearance`, probe `cl_usb_plug` | pass |
+| Antenna to the inserts and screws (R12) | ≥ 15 | **45.54** (the three shell insert bosses), **21.6** (the standoffs' M2 screws) | `inspect.clearance`, probes `cl_boss_*`, `cl_screw_*` | pass |
 | Antenna to the SFA40 | its metal is kept out of the 15 mm too | 28.5 | as above | pass |
-| Tongue to U3 / U2 | ≥ 20 | 20.9 / 29.5 (U2 from `layout.yaml` and its courtyard) | as above | pass |
+| Tongue to U3 / U2 | ≥ 20 | **21.26 / 29.71** (U2 from `layout.yaml` and its courtyard) | `inspect.clearance`: the tongue's envelope against the U3 and U2 probe solids | pass |
 | Support boss near the USB-C (M7) | within 8 mm, stiff | H1: 7.7 to J1's centre, 3.2 to its shell; braced by the plenum plate, 2.1 mm free | as above | pass |
 | Antenna end to the rear wall | inside the case | 0.58 mm at the default wall. At wall 2.4 the inner face reaches the strip, so D needs +0.1 there | arithmetic | pass at the default, note at wall 2.4 |
+| Openings' lower edges (review focus 4) | every opening's lower edge ≥ 10 above z = 0, feet not counted | intake rows 10.0, light-sensor window 10.49, outlet 10.0, HCHO 10.0, exhaust 37.0, USB-C 30.48. Below the line the lip, the rear wall, the rail and the shell's right wall are whole (open volume 0) | cut features' lower edges (`test_openings_are_cut_where_the_parameters_say`); slabs z 0 … 10 over each wall are all material (probes `low_*`, `test_nothing_opens_below_the_10_mm_line`) | pass |
+| Light-sensor window | in front of the VEML7700, free line to it | ⌀ 2.5 hole at x 16.4, z 11.74 (centre = the tongue's window, R27) in the lip's gap in the rows; open area 4.91 = π ⌀² / 4; the line from the window to the tongue's front edge is free (probe `air_lsw`, interference 0); window's lower edge 10.49 | `op_lsw` probe; `air_lsw` | pass |
+| USB-C opening (review focus 5) | on J1's plug axis, passes the overmold, 0.5 chamfer | 12.9 × 7.4 (the 12.5 × 7 overmold + `clr_remove` a side) centred on x 1.4, z 34.18 (J1's axis); chamfer 0.5 on the outer edge: the wall keeps 5.408 mm³ over the chamfer's depth against 5.414 for the frustum; the probe 0.05 under the opening meets nothing, the one 0.05 over meets the 2.550 mm³ ring, so the opening is within 0.05 of its place and size; J1's shell axis is free to the outside (`air_usb_axis`); lower edge 30.48, 0.22 under the zone wall's top (opens only the dead-end 0.2 slit over the rib, not the sensor zone) | probes `usb_in`, `usb_out`, `usb_cham`, `air_usb_axis` (`test_usb_opening_fit_and_chamfer`) | pass; overmold size to confirm |
+| Upper-rear exhaust | stays apart from the outlet (R26), faces free air | 14 slots 1.2 × 10 at x 9.4 … 41.8, z 37.0 … 47.0, above the antenna module (top 36.9), 168.0 mm²; 9.7 above the outlet grille's top, 1.55 from the USB-C opening | `op_exhaust` probe, `air_exhaust` | pass |
+| Opaque walls (review focus 3; guide → VEML7700) | ≥ 1.2 of opaque path from any non-exit guide surface to the sensor | 1.20 to the sensor (through the ledge, `zone_seal` and the lip), 1.48 to the lip's window, 1.30 to the crease's open end (plugged by `crease_seal`); the guide's non-window surfaces are coated black | analytic section at the sensor's x with 3b-1's `light_paths` (`test_guide_light_stays_off_the_crease_the_sensor_and_u4`); not a ray trace | pass (margin 0 at the sensor: the slot's `led_f0` was raised 0.3 for it) |
+| MS5611 line of sight (R13) | no straight line from the LEDs or the guide to U4's port | 0 of 196 LED-face samples and 0 of 196 entry-window samples reach U4; the LED bodies and the board stop them; the guide's other faces are coated | analytic ray against the LED and board boxes, `airq_check.ms5611_sight` | pass |
+| Clearances are parameters (review focus 1) | every fit is a `clr_*` parameter, swept | `clr_align`, `clr_remove`, `clr_snap` ±0.1 and `wall` 1.6 / 2.4 rebuild every feature, the openings included; the shell nudged 0.05 meets only its datums | the rebuild walk and the nudge run above | pass |
+| Intake and outlet separate, gasket faces touch (review focus 2) | no warm or exhaust air to the intake | grilles 51.4 apart on opposite faces (above); the outlet's ring, the inlet wiper, the pad and the seals touch the SEN66 at squeeze 0 and overlap by area × 0.05 at 0.05 | rows above (gaskets, grilles apart) | pass |
+| Grilles without feet (review focus 4) | ≥ 10 with the feet off | see "Openings' lower edges" | as above | pass |
 | Positions from their sources (R27) | read, not retyped | every board and reference position compared with `interface.yaml`, the references and `layout.yaml` | `test_positions_are_read_from_their_sources`, `test_generator_retypes_no_board_numbers` | pass |
-| Intake to outlet grille | ≥ 20, on different faces | 55.0: the lip's outer face (y 0) to the rear wall's (y D), over overlapping x and z | `distances()["intake_to_outlet_grille"]` (N7: labelled outer face to outer face) | pass (by parameters; 3b cuts the slots) |
-| LED/guide wall, MS5611 line of sight, light-sensor window, USB-C opening | plan, R13; the opaque path guide → ledge/`zone_seal` → tongue channel → VEML7700, and the crease parting line (N3) | – | Task 3b | pending (3b) |
+| Intake and outlet grilles apart (review focus 2) | ≥ 20, on different faces | **51.4** between the intake slots' inner faces (y 1.8) and the outlet's (y 53.2), 55.0 outer face to outer face; the intake is in the lip's front face (faces −y), the outlet and the exhaust in the rear wall (+y), the HCHO grille in the right side (+x) | `inspect.clearance` between the probes `op_intake_l/r` and `op_outlet` (`test_distances_on_the_geometry`); the faces from the cuts' y (`test_openings_are_cut_where_the_parameters_say`) | pass |
 
 ## Sources
 
