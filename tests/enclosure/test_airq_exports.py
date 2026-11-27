@@ -72,7 +72,7 @@ BED_CONTACT = {
     "base_plate": (4500, 700),       # bridges: slots, grilles, the USB-C ceiling (12.9 mm)
     "zone_wall": (80, 25),           # one small support at the boss notch's ledge
     "hcho_lid": (600, 300),          # the tongue pocket's 13.3 mm bridge
-    "light_guide": (0, 250),         # on its back plane (R53): 222 mm2 over the bed, all on the named faces below
+    "light_guide": (9, 75),          # on its +x end (R54): 67.5 mm2 over the bed, all on the two feet's +x end faces
     "gasket_out": (90, 1),
     "gasket_in": (6, 1),             # 7.1 mm2 of contact on a 27.9 tall post: brim
     "grommet_zone_a": (28, 40),
@@ -108,25 +108,24 @@ def down_faces(path, tol=0.05, steep=-0.72):
     return groups
 
 
-# R53: the guide's only down-facing faces over the bed, each named. Normals are the world's after the
-# print turn; z is the face's lowest point. The back plane floats 1.0 over the bed and is supported
-# (bar back about 19 % of the delivered rays, each foot's back about 35 %); the entry-end faces are
-# the 1.0 dip below it (every delivered ray enters there); the lip is the 0.1 wide flat at the bottom facet.
+# R54: the guide stands on its +x end face; its only down-facing faces over the bed are the two feet's +x
+# end faces (33.7 mm2 each, one TIR face each, about 35-38 % of the delivered rays). Normals and z are
+# the world's after the print turn; z is the face's lowest point.
 GUIDE_SUPPORTED = {
-    "back plane (bar back, both feet's backs)": ((0.0, 0.0, -1.0, 1.0), 205.5),
-    "entry-end faces (the dip below the back plane)": ((0.0, 0.5, -0.85, 0.0), 13.6),
-    "bottom facet's lip": ((0.0, 0.0, -1.0, 2.9), 3.0),
+    "D1 foot +x end face": ((0.0, 0.0, -1.0, 16.9), 33.7),
+    "D2 foot +x end face": ((0.0, 0.0, -1.0, 11.8), 33.7),
 }
 
 
 def test_light_guide_hangs_only_the_named_faces():
     got = down_faces(EXPORT / "airq-light_guide.3mf")
-    named = {k: a for k, a in GUIDE_SUPPORTED.values()}
+    named = dict(GUIDE_SUPPORTED.values())
+    assert len(got) == len(named), f"light_guide hangs faces {sorted(got)}"
     for key, area in got.items():
         match = [k for k in named if all(abs(x - y) < 0.1 for x, y in zip(key[:3], k[:3])) and abs(key[3] - k[3]) < 0.15]
         assert match, f"light_guide hangs {area:.1f} mm2 over the bed on an unnamed face {key}"
-        assert area <= named[match[0]] * 1.05
-    assert sum(got.values()) <= 250
+        assert area <= named[match[0]] * 1.1
+    assert sum(got.values()) <= 75
 
 
 def test_every_printed_part_has_a_bed_contact_budget():

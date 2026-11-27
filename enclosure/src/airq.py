@@ -62,10 +62,10 @@ PRINT_PARTS = {
     "base_plate": {"turns": []},                           # floor down, as designed
     "zone_wall": {"turns": [("y", 90)]},                   # standing on its right end
     "hcho_lid": {"turns": [("x", 180)]},                   # top face down, posts up
-    # lying on its back plane (the +t side of the bar and legs), x horizontal: every end face is a vertical
-    # wall (R53). The back plane floats 1.0 over the bed (the legs' entry end dips 1.0 below it), so the
-    # supports sit under it and under the entry-end faces; no orientation is scar-free (README, section 2)
-    "light_guide": {"turns": [("x", -60)]},
+    # standing on its +x end face (9.4 mm2), R54. Every face carries some light, so no orientation is scar-free;
+    # on its end every optical face is a vertical wall except the two feet's +x end faces (one TIR face each,
+    # about 35-38 % of the delivered rays), which hang and take the supports
+    "light_guide": {"turns": [("y", 90)]},
     "gasket_out": {"turns": [("x", -90)]},                 # on its seat end (the rear end)
     "gasket_in": {"turns": []},                            # standing on its floor end
     "grommet_zone_a": {"turns": [("x", -60)]},             # on the large slanted end face
