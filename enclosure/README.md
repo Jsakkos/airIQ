@@ -601,6 +601,11 @@ In front of the module go the SEN66's plug and its cable's bend (6.94) and its p
 
 **Blocker 1: the tongue has no place in the intake air** (global rule: the tongue sits in the
 intake air, at least 20 mm from U3 and U2).
+
+Whichever way the tongue lies, its VEML7700 faces the lip only when the tongue's 13 mm depth runs
+along y. Its Qwiic plug then leaves the rear edge along +y too. So it needs 17.56 of free y from
+the lip at some x and z. Only two places could offer that: in front of the module, or beside it.
+
 - **Lying flat in front of the SEN66.** It needs 17.56 from the lip: 0.5 of air, 12.36 to its
   Qwiic socket's mating face, 4.5 for the plug, and 0.2. The most any place leaves is 12.77, so
   it is 4.8 to 8.9 mm short.
