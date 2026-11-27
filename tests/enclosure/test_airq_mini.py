@@ -22,7 +22,7 @@ from sclib import evaluate
 S = airq_mini.build()
 V = S.v
 BODIES = ["shell", "base_plate", "zone_wall", "zone_seal", "sen66_foam", "gasket_out", "gasket_in", "sen66_pad", "sen66_top_seal",
-          "tongue_mount", "grommet_zone_a", "grommet_zone_b"]
+          "tongue_mount", "grommet_zone_a", "grommet_zone_b", "light_guide_co2", "light_guide_pm", "guide_stop"]
 STUDY = L.mini_recheck(L.MINI_WAY_OUT, inlet_end="left")
 # positions Task 4b needs (task-4-scope "Split light band", "Rules and checks"), fixed here as parameters
 FACE_4B = ["d1_x", "d2_x", "d3_x", "d4_x", "div_x0", "div_x1", "led_z", "led_f", "band_half", "band_h", "band_co2_x0", "band_co2_x1",
@@ -141,13 +141,41 @@ def test_band_halves_and_labels():
     """The split band's halves are centred on their LED pairs (CO2 D1/D2 left, PM2.5 D3/D4 right),
     about 21 mm each, the visible gap >= 4 over the board's divider gap; the labels sit under the
     band on the slope; the dot is on SW1's axis and keeps an opaque wall off the PM2.5 half."""
-    assert V("band_co2_x1 - band_co2_x0") == V("band_pm_x1 - band_pm_x0") == 21.0
+    assert V("band_co2_x1 - band_co2_x0") == V("band_pm_x1 - band_pm_x0") == 20.5     # about 21 (Task 4b: 20.5, the flexure's room)
     assert V("band_gap") >= 4.0
     assert V("div_x0") < V("band_co2_x1") and V("band_pm_x0") < V("div_x1")       # the halves' ends over the LED-free gap
     assert V("band_co2_x0") > V("-inner_x") and V("band_pm_x1") < V("inner_x")
     assert V("label_f0") > V("lip") and V("band_f1") < V("lip + (H - lip) / cos_t - edge_chamfer")
     assert V("sw_x - dot_d / 2 - band_pm_x1") >= 1.2
     assert V("dot_f") == pytest.approx(V("lip + (sw_z - lip) / cos_t"))
+
+
+def test_guide_fits_come_from_the_clearances():
+    """Task 4b: every fit of the two guides is a clr_* parameter (no literals, no zero-gap contact):
+    the tongue clr_align in its slot (sides and ends), the flange clr_align behind the wall's inner
+    face, the bar clr_align in front of `guide_stop`, the feet clr_align inside the stop's windows,
+    the entry faces clr_remove in front of the LED faces; the guides' ends clr_align off the ribs;
+    the ribs and the stop clr_remove over the zone wall and in front of the board's edge."""
+    import airq_mini_face as MF
+    assert S.params["lg_tg"].expression == "clr_align" and S.params["lg_ye"].expression == "board_y0 - clr_remove"
+    assert V("lg_tf - wall") == pytest.approx(V("clr_align"))
+    assert V("lg_ysf - lg_yb") == pytest.approx(V("clr_align"))
+    assert V("board_y0 - lg_ye") == pytest.approx(V("clr_remove"))
+    assert V("stop_t") >= 1.2 and V("end_rib_t") >= 1.2 and V("band_pm_x0 - band_co2_x1") >= V("divider_t")
+    assert V("rib_z0") >= V("zw_z1 + clr_remove") - 1e-9          # the ribs and the stop come down over the zone wall
+    # retention: the flange laps the wall's inner face round the slot, the stop catches the bar's back
+    bar = [(V(a), V(b)) for a, b in MF.bar_profile()]
+    assert bar[3][0] > V("lg_s1") + 0.5 and bar[6][0] < V("lg_s0") - 0.5
+    for x0, x1, z0, z1 in MF.stop_windows():
+        assert V(f"({x1}) - ({x0})") > 0 and V(z0) > V("rib_z0") and V(z1) < V("stop_z1")
+    # the feet inside their LED faces (R13: a line from a foot toward U4 enters the LED body)
+    for i in (1, 2, 3, 4):
+        assert V(f"lg_f{i}_x0") > V(f"d{i}_x - led_face_w / 2") and V(f"lg_f{i}_x1") < V(f"d{i}_x + led_face_w / 2")
+    assert V("led_z - led_face_h / 2") < V("lg_fz0") < V("lg_fz1") < V("led_z + led_face_h / 2")
+    # the PM2.5 half's end rib keeps clear of the flexure's slot; >= 1.2 of face between them
+    chk = MF.band_x_check(V) if "flex_x0" in S.params else None
+    if chk:
+        assert chk["rib_to_flex"] > 0 and chk["face_to_flex"] >= 1.2
 
 
 def test_h2_lies_over_the_sen66_so_it_has_no_post():

@@ -45,6 +45,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+import airq_mini_face as MF
 import board_sources as B
 import enclosure_common as C
 import layout_study as L
@@ -184,6 +185,12 @@ def build() -> Script:
     C.top_seal(s, hand=HAND)
     tongue_mount(s)
     grommets(s)
+    # --- Task 4b: the split light band (airq_mini_face) ---------------------------------------
+    MF.guide_params(s)
+    MF.band_slots(s)
+    MF.band_ribs(s)
+    MF.light_guides(s)
+    MF.guide_stop(s)
     return s
 
 
@@ -220,7 +227,7 @@ def face_params(s: Script) -> None:
     p("led_cz", main["leds"]["light_center_z"], "LED light centre above the board (interface.yaml leds)")
     p("led_z", "board_z0 + board_t + led_cz", "LED light centre z")
     p("led_f", "lip + (led_z - lip) / cos_t", "LED light centre's height along the front (f): the band's centre line")
-    p("band_half", 21.0, "each half's visible length (plan: about 21 mm)")
+    p("band_half", 20.5, "each half's visible length (plan: about 21 mm; 20.5 so the PM2.5 half's end rib and 1.35 of opaque face stand between it and the flexure's slot, Task 4b)")
     p("band_h", 2.0, "the band's visible height along the slope")
     p("band_co2_x0", "(d1_x + d2_x) / 2 - band_half / 2", "CO2 half, left end: centred on D1/D2")
     p("band_co2_x1", "(d1_x + d2_x) / 2 + band_half / 2", "CO2 half, right end")
