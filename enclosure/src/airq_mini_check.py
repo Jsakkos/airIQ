@@ -557,7 +557,7 @@ def _x_ranges(s, skip: list[tuple[float, float]]) -> list[tuple[float, float]]:
     return out
 
 
-def opaque_prisms(s, stop: bool = True) -> list[dict]:
+def opaque_prisms(s, stop: bool = True, stop_extra: float = 0.0) -> list[dict]:
     """The opaque solids round the band, as prisms (each named by its part; `material` says what it is):
     - the shell's face wall (t 0 ... wall, from its lower edge at the crease, z = lip + clr_remove, to the top
       wall's underside), less the band slots, the flexure's whole width (its U slot and thinned beam: no
@@ -597,7 +597,7 @@ def opaque_prisms(s, stop: bool = True) -> list[dict]:
         pr["material"] = "shell"
         out.append(pr)
     if stop:
-        y0, y1, z0, z1 = v("lg_ysf"), v("stop_y1"), v("rib_z0"), v("stop_z1")
+        y0, y1, z0, z1 = v("lg_ysf"), v("stop_y1") + stop_extra, v("rib_z0"), v("stop_z1")      # stop_extra: its thickness tolerance (its front is on the ribs)
         wins = [tuple(v(e) for e in wn) for wn in MF.stop_windows()]
         wz0, wz1 = min(wn[2] for wn in wins), max(wn[3] for wn in wins)
         for name, za, zb, xs in (("low", z0, wz0, [(v("stop_x0"), v("stop_x1"))]), ("high", wz1, z1, [(v("stop_x0"), v("stop_x1"))]),
@@ -847,7 +847,7 @@ def u4_port(s) -> tuple[float, float, float]:
     return A.u4_port(s)
 
 
-def ms5611_sight(s, dx: float = 0.25, n_edge: int = 40, n_side: int = 60, stop: bool = True) -> dict:
+def ms5611_sight(s, dx: float = 0.25, n_edge: int = 40, n_side: int = 60, stop: bool = True, stop_extra: float = 0.0) -> dict:
     """R13 / R50 (arithmetic: exact straight lines against the opaque prisms, not a SolidCraft ray trace): every
     exposed face of both guides (the bars, the feet, their side, top, bottom, end and entry faces; the exit faces
     too), sampled every `dx` along x, n_edge + 1 points along each profile edge, an (n_side + 1)^2 grid on each
@@ -857,7 +857,7 @@ def ms5611_sight(s, dx: float = 0.25, n_edge: int = 40, n_side: int = 60, stop: 
     out, to show it is the stop that closes the guides' backs. Returns {samples, unblocked, first, by_face}."""
     fr = _fr(s)
     tgt = u4_port(s)
-    obst = [o for o in opaque_prisms(s, stop=stop) if o["material"] != "base"]
+    obst = [o for o in opaque_prisms(s, stop=stop, stop_extra=stop_extra) if o["material"] != "base"]
     n, un, first, by = 0, 0, None, {}
     for p, nw, face in surface_samples(s, guide_prisms(s), dx, n_edge, n_side):
         if sum((tgt[k] - p[k]) * nw[k] for k in range(3)) <= 0:
@@ -873,7 +873,7 @@ def ms5611_sight(s, dx: float = 0.25, n_edge: int = 40, n_side: int = 60, stop: 
     return {"target": tgt, "samples": n, "unblocked": un, "first": first, "by_face": by, "led_faces_facing_u4": led_front}
 
 
-def guide_to_guide(s, dx: float = 2.0, n_edge: int = 4, n_side: int = 4) -> dict:
+def guide_to_guide(s, dx: float = 2.0, n_edge: int = 4, n_side: int = 4, stop_extra: float = 0.0) -> dict:
     """The no-straight-path check (plan Task 4 Step 3), two ways:
     - sampled (arithmetic): every exposed face of `light_guide_co2` against every exposed face of
       `light_guide_pm` (`surface_samples`), each line's opaque length through `opaque_prisms` (the divider rib,
@@ -886,7 +886,7 @@ def guide_to_guide(s, dx: float = 2.0, n_edge: int = 4, n_side: int = 4) -> dict
       opaque material."""
     fr = _fr(s)
     v = s.v
-    obst = opaque_prisms(s)
+    obst = opaque_prisms(s, stop_extra=stop_extra)
     a = surface_samples(s, guide_prisms(s, "co2"), dx, n_edge, n_side)
     b = surface_samples(s, guide_prisms(s, "pm"), dx, n_edge, n_side)
     air, under, least = 0, 0, math.inf

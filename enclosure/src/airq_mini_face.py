@@ -50,7 +50,7 @@ def guide_params(s: Script) -> None:
     p("stop_y1", "board_y0 - clr_remove", "guide_stop: back face, clr_remove in front of the board's edge, the LEDs and J7")
     p("lg_ein", 0.1, "light guide: the feet's entry faces this far in front of the stop's back face (so no line between the two guides' feet runs in the stop's back plane, behind the divider)")
     p("lg_ye", "stop_y1 - lg_ein", "light guide: the feet's entry faces (vertical), clr_remove + lg_ein in front of the LED faces")
-    p("stop_t", 1.2, "guide_stop: foam thickness along y (>= 1.2 opaque), INCLUDING its adhesive: 1.2 at most (+0 / -0.2), as its back face is only clr_remove from the board's edge and the LEDs (review M3)")
+    p("stop_t", 1.2, "guide_stop: foam thickness along y (>= 1.2 opaque), INCLUDING its adhesive: 1.2 +0.1 / -0 (review round 2). Its front is on the ribs, so a thicker stop moves its back face toward the board: at 1.3 it is still 0.1 from the board's edge, the LEDs and J7. A thinner one leaves the feet's entry faces standing proud of it, and lines between the guides and to U4 pass behind it")
     p("lg_ysf", "stop_y1 - stop_t", "guide_stop: front face (on the ribs' back faces)")
     p("lg_yb", "lg_ysf - clr_align", "light guide: the bar's back face, clr_align in front of the stop")
     p("lg_z1", "min(led_z + led_face_h / 2, lip + ((lg_yb - 0.1) * cos_t - lg_tf) / sin_t)",

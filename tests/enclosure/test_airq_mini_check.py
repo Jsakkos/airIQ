@@ -113,6 +113,19 @@ def test_ms5611_sees_no_led_or_guide():
     assert K.ms5611_sight(S, dx=1.0, n_edge=10, n_side=10, stop=False)["unblocked"] > 0
 
 
+def test_stop_tolerance_keeps_the_light_checks():
+    """Review round 2: guide_stop is 1.2 +0.1 / -0 including its adhesive. At its thick end (1.3, its back face
+    0.1 nearer the board) no line between the guides runs in air and none reaches U4, and its back face keeps
+    0.1 from the board's edge and the LEDs; at a thinner stop the feet stand proud of its back face and lines
+    pass behind it (why the spec has no minus side)."""
+    thick = 0.1
+    g = K.guide_to_guide(S, stop_extra=thick)
+    assert g["air"] == 0 and g["hull_uncovered"] == 0
+    assert K.ms5611_sight(S, stop_extra=thick)["unblocked"] == 0
+    assert V("board_y0") - (V("stop_y1") + thick) >= 0.1 - 1e-9
+    assert K.guide_to_guide(S, stop_extra=-0.2)["air"] > 0
+
+
 def test_light_stays_off_the_sensor_its_window_and_the_crease():
     """Review focus 3: >= 1.2 of opaque material (the lip, the zone wall, zone_seal, the shell's wall and
     ribs, guide_stop; the crease's parting line counted as air) on every straight line from the guides and
