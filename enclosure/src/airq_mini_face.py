@@ -214,7 +214,7 @@ def label_params(s: Script) -> None:
     label_sub_h (strokes about 0.48), dropped under the baseline. Widths of the built-in font, measured
     on solidcraft-cli 0.50.0 text outlines: "CO" 2.04 x its cap height, "2" 0.664 x."""
     p = s.param
-    p("label_sub_h", 3.5, "the CO2 label's subscript 2: its cap height (strokes about 0.136 x this, 0.48 mm, above the 0.4 nozzle)")
+    p("label_sub_h", 4.0, "the CO2 label's subscript 2: its cap height, 0.8 of the label's (strokes about 0.136 x this, 0.54 mm; review M7: enlarged from 3.5, still under the coupon's 5 mm finding: a first-print check)")
     p("label_sub_drop", 1.0, "the subscript's baseline under the label's baseline")
     p("label_sub_gap", 0.4, "gap between the label's O and its subscript")
     p("label_co_w", "2.04 * label_h", "width of 'CO' in the built-in font (measured: 2.04 x the cap height)")
