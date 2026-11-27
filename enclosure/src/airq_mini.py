@@ -191,7 +191,18 @@ def build() -> Script:
     MF.band_ribs(s)
     MF.light_guides(s)
     MF.guide_stop(s)
+    MF.label_params(s)
+    MF.labels(s)
+    openings(s)
     return s
+
+
+def openings(s: Script) -> None:
+    """Task 4b: the openings in `base_plate`, cut last (every join is done), at the positions 4a fixed.
+    - the light-sensor window: a round hole in the lip in front of the tongue's VEML7700, low and left
+      of the slot rows, so the sensor's line to it (about 30 deg down, the tongue's handedness puts the
+      VEML7700 high) passes under the zone wall's ledge and the zone seal."""
+    s.cylinder("Light-sensor window", ["lsw_x", "-wall", "lsw_z"], "lsw_d", "3 * wall", axis="Y", operation="cut", targets=["base_plate"])
 
 
 def cable_params(s: Script) -> None:

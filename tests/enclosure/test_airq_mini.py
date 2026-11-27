@@ -178,6 +178,28 @@ def test_guide_fits_come_from_the_clearances():
         assert chk["rib_to_flex"] > 0 and chk["face_to_flex"] >= 1.2
 
 
+def test_labels_and_light_sensor_window():
+    """Task 4b: "CO2" under the left half and "PM2.5" under the right, debossed 0.4, 5 mm tall (the
+    coupon's legible size); the CO2 label's subscript is a 3.5 mm "2" (strokes about 0.48 above the
+    0.4 nozzle). The light-sensor window: low on the lip, left of the rows, its lower edge over the
+    10 mm line; the VEML7700's line to it passes under the zone wall's ledge and the zone seal, right
+    of the left boss pocket's inner wall."""
+    assert V("label_h") >= 5.0 and V("label_depth") == 0.4 and 0.136 * V("label_sub_h") >= 0.45
+    co_x0 = V("label_co_x - label_co_w / 2")
+    sub_x1 = V("label_sub_x + label_sub_w / 2")
+    assert V("band_co2_x0") < co_x0 and sub_x1 < V("band_co2_x1")
+    assert (co_x0 + sub_x1) / 2 == pytest.approx(V("label_co2_x"))
+    pm_w = 4.02 * V("label_h")                                         # "PM2.5" in the built-in font: 20.1 wide at 5
+    assert V("band_pm_x0") < V("label_pm_x") - pm_w / 2 and V("label_pm_x") + pm_w / 2 < V("band_pm_x1")
+    assert V("label_f0 - label_sub_drop") > V("lip") + 1.0 and V("label_f1") < V("band_f0")
+    assert V("lsw_z - lsw_d / 2") >= V("grille_min_z")
+    vw, ww = (V("veml_wy"), V("veml_wz")), (V("wall"), V("lsw_z"))
+    y_seal = V("wall + seal_t")
+    z_at = vw[1] + (ww[1] - vw[1]) * (vw[0] - y_seal) / (vw[0] - ww[0])
+    assert z_at < V("ledge_z0")
+    assert min(V("veml_wx"), V("lsw_x")) > V("-bp_x0") and V("lsw_x - lsw_d / 2") > V("-bp_x0")
+
+
 def test_h2_lies_over_the_sen66_so_it_has_no_post():
     """H2 (x 30.15) is over the module (x -24.25 ... 30.95), so a post from the floor cannot stand
     there: the board's H2 screw takes a blind pilot in the zone wall's pad, 0.5 of zone wall under

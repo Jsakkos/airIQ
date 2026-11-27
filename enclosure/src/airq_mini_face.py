@@ -174,15 +174,28 @@ def guide_stop(s: Script) -> None:
               operation="cut", targets=["guide_stop"])
 
 
-LABELS = (("co2", "CO₂", "label_co2_x"), ("pm", "PM2.5", "label_pm_x"))
+def label_params(s: Script) -> None:
+    """The labels' layout. The built-in font's own subscript two is 0.58 of the cap height: at 5 mm its
+    strokes are about 0.40, at the 0.4 nozzle's limit, so the CO2 label's subscript is a plain "2" at
+    label_sub_h (strokes about 0.48), dropped under the baseline. Widths of the built-in font, measured
+    on solidcraft-cli 0.50.0 text outlines: "CO" 2.04 x its cap height, "2" 0.664 x."""
+    p = s.param
+    p("label_sub_h", 3.5, "the CO2 label's subscript 2: its cap height (strokes about 0.136 x this, 0.48 mm, above the 0.4 nozzle)")
+    p("label_sub_drop", 1.0, "the subscript's baseline under the label's baseline")
+    p("label_sub_gap", 0.4, "gap between the label's O and its subscript")
+    p("label_co_w", "2.04 * label_h", "width of 'CO' in the built-in font (measured: 2.04 x the cap height)")
+    p("label_sub_w", "0.664 * label_sub_h", "width of '2' in the built-in font (measured: 0.664 x the cap height)")
+    p("label_co_x", "label_co2_x - (label_sub_gap + label_sub_w) / 2", "'CO' centre x: the label with its subscript centred under the CO2 half")
+    p("label_sub_x", "label_co_x + label_co_w / 2 + label_sub_gap + label_sub_w / 2", "the subscript's centre x")
 
 
 def labels(s: Script) -> None:
-    """`label_debossing`: "CO2" (subscript 2) under the left half and "PM2.5" under the right, debossed
-    label_depth into the face, label_h tall (the Task 2 coupon: >= 5 mm reads at 0.4 deep)."""
+    """`label_debossing`: "CO2" (a subscript 2) under the left half and "PM2.5" under the right,
+    debossed label_depth into the face, label_h tall (the Task 2 coupon: >= 5 mm reads at 0.4 deep)."""
     with s.sketch("Label debossing sketch", F.slope_plane(s), offset=F.toff("0")) as sk:
-        for _, text, x in LABELS:
-            sk.text(text, (x, F.ys("label_f0 - lip")), "label_h")
+        sk.text("CO", ("label_co_x", F.ys("label_f0 - lip")), "label_h")
+        sk.text("2", ("label_sub_x", F.ys("label_f0 - lip - label_sub_drop")), "label_sub_h")
+        sk.text("PM2.5", ("label_pm_x", F.ys("label_f0 - lip")), "label_h")
     s.extrude("Label debossing", "Label debossing sketch", "label_depth", operation="cut", targets=["shell"], direction="negative")
 
 
