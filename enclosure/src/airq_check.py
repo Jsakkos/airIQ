@@ -472,6 +472,24 @@ def ffc_pieces(s) -> list[tuple[str, list[tuple[str, str]], str, float]]:
     return out
 
 
+def ffc_folds(s) -> list[dict]:
+    """The folds of the FFC keep-out, found from its pieces' outlines and depths (not from how many there are):
+    wherever two pieces of the ribbon share an edge in the face's (x, s) plane but lie at different depths, the
+    ribbon turns over on that edge, folded flat (a crease). Returns one {pieces, crease: its two end points (x, s),
+    angle: the crease to x (deg), dt: the depth step} per fold, in route order."""
+    v = s.v
+    pcs = [(k, [(v(x), v(y)) for x, y in pts], v(layer)) for k, pts, layer, _ in ffc_pieces(s)]
+    out = []
+    for i, (ka, pa, ta) in enumerate(pcs):
+        for kb, pb, tb in pcs[i + 1:]:
+            shared = [p for p in pa if any(math.dist(p, q) < 1e-6 for q in pb)]
+            if len(shared) == 2 and abs(ta - tb) > 1e-6:
+                (x0, s0), (x1, s1) = shared
+                ang = math.degrees(math.atan2(abs(s1 - s0), abs(x1 - x0)))
+                out.append({"pieces": (ka, kb), "crease": shared, "angle": ang, "dt": tb - ta})
+    return out
+
+
 def ffc_bend(s) -> tuple[list[list[float]], float]:
     """The bend over to J7 as a closed polygon in (y, z) (the ribbon's section along its centre line,
     thickness ffc_t) and its area."""

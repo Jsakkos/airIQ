@@ -207,7 +207,7 @@ def build() -> Script:
     p("adapter_x", "panel_x0 + fold_end + ad_l / 2", "FPC adapter centre x: its tail ZIF at the folded tail's stiffened end")
     p("adapter_s", "panel_s0 + panel_w / 2 - tail_off", "FPC adapter centre up the slope: on the tail's centre line")
     p("adapter_t", "bezel + panel_t + tail_fold_d + 0.2 + ad_h", "FPC adapter's back face depth (folded tail, 0.2 air, the adapter)")
-    p("ffc_len", 75.0, "FFC length bought: 24-pin 0.5 mm FFC, 75 mm (a stock length of some vendors; 50, 60, 80, 100 are the others to confirm); the seated route (centre line) + 2 x 3.5 inserted fills it (airq_face.ffc_params, 3b-1)")
+    p("ffc_len", 73.0, "FFC length bought: 24-pin 0.5 mm FFC, 73 mm nominal, a custom length (the jog takes 70.8 ... 75.1 at 3.5 inserted, so no common stock length (50, 60, 70, 80, 100) fits; to confirm with the vendor). The fold jig takes it at both ends of its +-1 mm tolerance and of the insertion's +-0.5 (R49): the seated route (centre line) + 2 x 3.5 inserted fills it (airq_face.ffc_params, 3b-1)")
     p("lsw_x", "tongue_x1 - veml_x", "light-sensor window x: the tongue's VEML7700 window (tongue turned 180 deg)")
     p("lsw_z", "tongue_z0 + tongue_t + veml_z", "light-sensor window z: the VEML7700 window centre")
     p("lsw_d", 2.5, "light-sensor window diameter (on the lip, in a gap in the slot rows)")

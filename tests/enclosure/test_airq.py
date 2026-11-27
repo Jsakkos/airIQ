@@ -482,20 +482,40 @@ def test_window_and_pocket_follow_the_panel():
 
 
 def test_ffc_route_length_and_service_lift():
-    """3b-1 feature 2 (R42: at most three 45-degree direction-change folds, made once at assembly over a jig): the
-    FFC is 12.5 x 0.3; the route has at most three folds (flat, no radius, not re-flexed) and one radiused bend
-    into J7 of inner radius >= 1 (the only bend that moves); its centre line plus the two insertions fills the
-    bought 80 mm within the length tolerance (so there is no slack to place and no bow); with both ends plugged
-    in the shell can be lifted the service distance with a margin of 3 mm or more over the straight distance."""
+    """3b-1 feature 2 (R42: at most three 45-degree direction-change folds, made once at assembly over a jig; R49):
+    the FFC is 12.5 x 0.3; the keep-out's pieces show at most three folds (flat, 45 deg, no radius, not re-flexed)
+    and one radiused bend into J7 of inner radius >= 1 (the only bend that moves); its centre line plus the two
+    insertions fills the bought 73 mm; at both ends of the FFC's length tolerance and of the insertion's, the
+    jog (inside its limits) takes the difference, so there is no slack to place and no bow; and with both ends
+    plugged in, the shell can be lifted the service distance with 3 mm or more over the allowance, also for the
+    shortest FFC."""
     g = F.ffc_geometry(V, V("ffc_s_c3"))
     assert (V("ffc_w"), V("ffc_t")) == pytest.approx((12.5, 0.3))
-    assert len(airq_check.ffc_pieces(S)) - 1 == 3                                    # four layers cut by three folds: at most three (R42)
+    folds = airq_check.ffc_folds(S)                                                  # from the pieces' shared edges and depths
+    assert 1 <= len(folds) <= 3 and len(folds) == g["creases"] / V("ffc_crease"), folds     # at most three (R42), as the route counts
+    assert all(f["angle"] == pytest.approx(45.0) and abs(f["dt"]) == pytest.approx(V("ffc_pitch")) for f in folds), folds
     assert V("ffc_r") - V("ffc_t") / 2 >= 1.0 and g["arc1"] > 0 and g["arc2"] > 0     # the J7 bend: inner radius >= 1
-    assert g["centre_len"] + 2 * V("ffc_insert") <= V("ffc_len") + 1e-9                # fits the bought length
     assert 3.0 <= V("ffc_insert") <= 4.0                                              # J7's insertion: about 3.5 (hardware/README.md:167, :176)
+    assert V("ffc_insert") - V("ffc_insert_tol") >= 3.0 - 1e-9 and V("ffc_insert") + V("ffc_insert_tol") <= 4.0 + 1e-9
     spare = V("ffc_len") - 2 * V("ffc_insert") - g["centre_len"]
-    assert 0 <= spare <= V("ffc_tol")                                               # the route is the bought length: the fold jig takes the tolerance
-    assert V("ffc_len") == 75.0                                                     # a stock length of some vendors (to confirm)
+    assert 0 <= spare < 0.01                                                        # the route is the bought length (the jog rounded up)
+    assert V("ffc_len") == 73.0 and V("ffc_len_tol") == 1.0                         # a custom length, +-1 (to confirm)
+    lo, hi = F._jog_limits(V)
+    r_min, r_max = F.ffc_route_range(V)
+    assert lo <= V("ffc_s_c3") <= hi
+    assert hi <= V("ffc_s_b0") - V("ffc_w") / 2 + 1e-9                              # crease 3 ends before layer D's bend starts
+    margins = []
+    for ln in (V("ffc_len") - V("ffc_len_tol"), V("ffc_len") + V("ffc_len_tol")):
+        for ins in (V("ffc_insert") - V("ffc_insert_tol"), V("ffc_insert") + V("ffc_insert_tol")):
+            sp = ln - 2 * ins - g["centre_len"]                                     # over (+) or short (-) at the nominal jog
+            assert r_min - g["centre_len"] < sp < r_max - g["centre_len"], (ln, ins, sp)   # inside the jog's real range
+            sc = F.ffc_fit(V, ln, ins)
+            assert sc is not None and lo < sc < hi, (ln, ins, sc)
+            gt = F.ffc_geometry(V, sc)
+            assert gt["centre_len"] + 2 * ins == pytest.approx(ln, abs=1e-6)
+            sv = F.ffc_service(V, gt, V("ffc_service_dz"), ln, ins)
+            margins.append(sv["chain"] - sv["d_lift"] - V("ffc_service_margin"))
+            assert sv["ok"] and margins[-1] >= 3.0, (ln, ins, sv)                   # service lift: 3 mm over the allowance, shortest FFC too
     # J7: the ribbon enters its mouth between D2 and D3, inside the 15.5 body, flat, 1 mm over the board
     leds = B.MAIN["leds"]["chain"]
     d2, d3 = V("board_x0") + leds[1]["center_x"] + 2.0, V("board_x0") + leds[2]["center_x"] - 2.0

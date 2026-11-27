@@ -820,7 +820,8 @@ they enter (`interface.yaml`): Qwiic 6.0 × 2.95, GH 10.75 × 4.25, to confirm.
       shell is on; the black foam `led_mask` stuck to the panel's back in front of D3 and D4 (also 0.2 mm
       adhesive pad);
   11. the FFC's free end into the adapter's ZIF with the shell held 12 mm over the base (the lift the
-      FFC allows with both ends plugged in, with 4 mm to spare), then the shell lowered along −z;
+      FFC allows with both ends plugged in, with 3.8 mm to spare over the 2 mm allowance, 3.2 for the
+      shortest FFC), then the shell lowered along −z;
   12. feet.
 - **Fastening:** three M2 screws into heat-set inserts in the shell.
   - Two front floor bosses take screws from underneath, the heads under the felt feet. On the way
@@ -862,11 +863,16 @@ positions 3b needs (M6):
 - panel and its pocket: `panel_x0`, `panel_s0`, `bezel`, `window_xc`, `pocket_x0`, `pocket_x1`;
 - LED slot and light guide: `led_f0`, `led_h_slot`, `led_len`, `led_z`, `guide_t`;
 - adapter: `adapter_x`, `adapter_s`, `adapter_t`;
-- FFC: a 75 mm 24-pin 0.5 mm FFC, same-side contacts (Type A), 3.5 mm inserted at each end (about 3.5 mm goes
-  inside J7: `hardware/README.md`, "E-ink FPC fit (airQ)", the reach analysis, lines 167 and 176), into `j7_x0` …
-  `j7_x1`. Its seated route is 68.0 mm of centre line, so route and insertions fill the 75 mm; the fold jig takes
-  the vendor's ±1 mm (the jog's depth moves by about half of it), so there is no slack and no bow. It lets the shell
-  be held 12 mm over the base with both ends plugged in, 4.3 mm over the straight distance. At J7 the contacts are
+- FFC: a 73 mm 24-pin 0.5 mm FFC (a custom length, R49), same-side contacts (Type A), 3.5 mm inserted at each end
+  (about 3.5 mm goes inside J7: `hardware/README.md`, "E-ink FPC fit (airQ)", the reach analysis, lines 167 and 176),
+  into `j7_x0` … `j7_x1`. Its seated route is 66.0 mm of centre line, so route and insertions fill the 73 mm. The fold
+  jig's jog (`ffc_s_c3`, the C run's place up the slope) can go from 9.80 (the run 0.3 over the ledge) to 11.96 (crease
+  3's far corner where layer D's bend to J7 starts), so it takes routes of 63.8 … 68.1 mm, an FFC of 70.8 … 75.1 mm at
+  3.5 inserted: no common stock length (50, 60, 70, 80, 100) fits. At both ends of the vendor's ±1 mm and of an
+  insertion of 3.0 … 4.0 the jog takes the difference (72 mm at 4.0: `ffc_s_c3` 11.87; 74 mm at 3.0: 9.87), so there
+  is no slack and no bow. It lets the shell be held 12 mm over the base with both ends plugged in: the chain is 5.8 mm
+  longer than the straight distance (3.8 over that plus the 2 mm allowance), 3.5 for the shortest FFC (72 mm) and 3.2
+  at 72 mm with 4.0 inserted. At J7 the contacts are
   up and pin 1 is on the right, so pin i is on pin i (the adapter is taken as 1:1, both ZIFs on its panel side). The
   route has three 45° direction-change folds (R42: at most three, made once at assembly over a fold jig, never
   re-flexed);
@@ -999,9 +1005,10 @@ These values are parameters, so a correction is a parameter change and a rebuild
 - The adapter: a 24-pin 0.5 mm FPC adapter with both ZIFs on the panel side, pins 1:1 (straight through) and its
   size (placeholder 12 × 20; the FFC ZIF's slot level, 1.0 above the board). A crossed or opposite-side adapter flips
   the contact-side outcome.
-- The FFC: 24-pin 0.5 mm, 75 mm, Type A (contacts on the same side at both ends), 12.5 wide, 0.3 thick, 3.5 inserted
-  (hardware/README.md:167, :176); stock lengths to confirm with the vendor (50, 60, 75, 80, 100 mm are the usual ones: 60
-  is too short for the route, 80 and 100 leave 5 and 25 mm of slack with no room for a bow, so a 75 mm cut is needed);
+- The FFC: 24-pin 0.5 mm, 73 mm, Type A (contacts on the same side at both ends), 12.5 wide, 0.3 thick, 3.5 inserted
+  (hardware/README.md:167, :176); a custom length: confirm a vendor makes 73 mm at ±1 mm (the jog takes 70.8 … 75.1 mm
+  at 3.5 inserted, 72 … 74 at 3.0 … 4.0, with about 0.1 mm to spare at the extreme corners: 70 and 60 are too short, 80
+  and 100 leave 5 and 25 mm of slack with no room for a bow);
   choose an FFC whose datasheet allows folding (three 45° direction-change folds, made once over a jig), or a
   factory-folded one; and check continuity of all 24 conductors on the prototype after the folds, before power.
 - The light guide (R48): print it and look. The 3-D trace (`airq_check.guide_delivery`, every face bare) gives D1 4.3 %

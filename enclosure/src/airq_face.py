@@ -117,7 +117,9 @@ def ffc_geometry(v, s_c3: float) -> dict:
 def ffc_params(s: Script) -> None:
     """The FFC's parameters and the numbers of its route (see `ffc_geometry`). The jog depth
     `ffc_s_c3` is sized so the route uses the bought length `ffc_len` (a longer jog is a longer
-    route; the standard lengths of 24-pin 0.5 mm FFC are 30, 40, 50, 60, 80, 100 mm ...)."""
+    route). The jog (`_jog_limits`) takes the route from 63.8 to 68.1 mm, so with 3.5 inserted an FFC of
+    70.8 ... 75.1 mm fits; 73 fits at both ends of its +-1 mm and of the insertion's +-0.5 (R49), and no
+    common stock length (50, 60, 70, 80, 100 mm) does."""
     epd, ad = ref_epd.build().v, ref_fpc_adapter.build().v
     p = s.param
     p("ffc_w", epd("tail_w"), "FFC width: the panel tail's narrow part, 24 x 0.5 + the margins (ref_epd tail_w)")
@@ -135,34 +137,54 @@ def ffc_params(s: Script) -> None:
     p("ffc_lh", 1.5, "FFC horizontal run into J7's mouth after the last bend")
     p("ffc_crease", 0.5, "FFC length used by each fold (folded flat over itself)")
     p("ffc_insert", 3.5, "FFC length inserted in each connector: about 3.5 mm goes inside J7 (hardware/README.md, 'E-ink FPC fit (airQ)', the reach analysis, lines 167 and 176; FPC-05FB-24PH20 back-flip); the adapter's ZIF is taken alike")
-    p("ffc_tol", 1.5, "FFC length the seated route may leave over or short: the vendor's length tolerance (typically +-1 mm) and 0.5 of insertion slip. The folds are made once at assembly over a jig, so the jog depth takes it up (R42); no bow is needed")
+    p("ffc_len_tol", 1.0, "FFC length tolerance, +-: the vendor's (typically +-1 mm; to confirm). The folds are made once at assembly over a jig, so the jog depth takes it up (R42, R49); no bow is needed")
+    p("ffc_insert_tol", 0.5, "FFC insertion per connector, +-: the reach analysis' 'about 3.5 mm' taken as 3.0 ... 4.0 (the test's bounds); the jog takes it too")
     v = s.v
-    lo, hi = _jog_limits(v)
-    target = v("ffc_len") - 2 * v("ffc_insert")
-    # bisect s_c3: the route lengthens as the jog deepens (lower s_c3); stay inside [lo, hi]
-    a, b = lo, hi
-    if ffc_geometry(v, hi)["centre_len"] > target:
-        raise ValueError(f"the FFC's shortest route ({ffc_geometry(v, hi)['centre_len']:.1f}) does not fit {target:.1f}")
-    s_c3 = lo if ffc_geometry(v, lo)["centre_len"] < target else None
+    s_c3 = ffc_fit(v, v("ffc_len"), v("ffc_insert"))
     if s_c3 is None:
-        for _ in range(60):
-            m = (a + b) / 2
-            if ffc_geometry(v, m)["centre_len"] > target:
-                a = m
-            else:
-                b = m
-        s_c3 = b
+        lo, hi = ffc_route_range(v)
+        raise ValueError(f"the FFC's route ({v('ffc_len') - 2 * v('ffc_insert'):.1f}) is outside what the jog can take ({lo:.1f} ... {hi:.1f})")
     p("ffc_s_c3", math.ceil(s_c3 * 1000) / 1000, "FFC run C (behind the guide's legs, under the LEDs): its centre line up the slope; sized in airq_face.ffc_params so the route fits ffc_len")
+
+
+def ffc_route_range(v) -> tuple[float, float]:
+    """The shortest and longest seated route (centre line) the fold jog can take: the C run at its highest
+    and at its lowest place (`_jog_limits`)."""
+    lo, hi = _jog_limits(v)
+    return ffc_geometry(v, hi)["centre_len"], ffc_geometry(v, lo)["centre_len"]
+
+
+def ffc_fit(v, length: float, insert: float) -> float | None:
+    """The jog centre `s_c3` that makes the seated route take an FFC of `length` inserted `insert` at each end
+    (the route lengthens 2 mm per mm the jog deepens), or None if no jog inside `_jog_limits` does."""
+    lo, hi = _jog_limits(v)
+    target = length - 2 * insert
+    r_min, r_max = ffc_route_range(v)
+    if not r_min <= target <= r_max:
+        return None
+    a, b = lo, hi                                   # bisect: the route at a is >= target, at b <= target
+    for _ in range(60):
+        m = (a + b) / 2
+        if ffc_geometry(v, m)["centre_len"] > target:
+            a = m
+        else:
+            b = m
+    return b
 
 
 def _jog_limits(v) -> tuple[float, float]:
     """The lowest and highest centre line of the C run (up the slope): its lower edge stays 0.3 mm
-    above the ledge's top (z = lip), its upper edge `ffc_led_clr` under the LED faces' lower edge."""
+    above the ledge's top (z = lip); its upper edge stays 0.3 under the LED faces' lower edge, and
+    crease 3's far corner (s_c3 + ffc_w / 2, on layer D's +x edge) must not pass the line where layer D's
+    bend over to J7 starts (`ffc_s_b0`): past it the fold would lie in the bend (R49; the second bound is
+    the tighter, 11.96 against 17.0)."""
     sn, c, lip = v("sin_t"), v("cos_t"), v("lip")
     t_c = v("ffc_t_a") + 2 * v("ffc_pitch")
+    t_d = v("ffc_t_a") + v("ffc_pitch")
     hw = v("ffc_w") / 2
     led_lo = v("board_y0") * sn + (v("led_z") - 1.0 - lip) * c      # the LED faces' lower edge, up the slope
-    hi = led_lo - 0.3 - hw
+    s_b0 = (v("board_y0") - v("ffc_lh") - v("ffc_r") * (2 - c) - t_d * c) / sn   # as the parameter ffc_s_b0
+    hi = min(led_lo - 0.3 - hw, s_b0 - hw)
     lo = (0.3 + t_c * sn) / c + hw                                   # lower edge's z = lip + 0.3 (t_c deep)
     return lo, hi
 
@@ -173,7 +195,7 @@ def ffc_derived_params(s: Script) -> None:
     p("ffc_t_b", "ffc_t_a + ffc_pitch", "FFC layer B (between crease 1 and 2), depth behind the face")
     p("ffc_t_c", "ffc_t_b + ffc_pitch", "FFC layer C (the run under the LEDs), depth behind the face")
     p("ffc_t_d", "ffc_t_b", "FFC layer D (after crease 3, folded to the front of C), depth behind the face")
-    p("ffc_service_dz", 12.0, "service lift of the shell over its seat while the FFC is plugged in J7 and in the adapter: enough to reach the adapter's ZIF with a finger (judgement, to confirm on the prototype); the floor bosses are still in the zone wall's notches, so the shell stays guided; see airq_face.ffc_service")
+    p("ffc_service_dz", 12.0, "service lift of the shell over its seat while the FFC is plugged in J7 and in the adapter: enough to reach the adapter's ZIF with a finger (judgement, to confirm on the prototype); the shortest FFC (72 mm, 4.0 inserted) keeps 3.2 mm over the allowance (R49); the floor bosses are still in the zone wall's notches, so the shell stays guided; see airq_face.ffc_service")
     p("ffc_service_margin", 2.0, "FFC service lift: the chain must be this much longer than the straight distance (the bends and the fold's thickness)")
     p("ffc_s_b0", "(board_y0 - ffc_lh - ffc_r * (2 - cos_t) - ffc_t_d * cos_t) / sin_t",
       "FFC layer D's straight run ends here (up the slope): where the bend over to J7's mouth starts")
@@ -268,10 +290,13 @@ def ffc_path(v, g: dict, n_arc: int = 8) -> list[tuple[float, float, float]]:
     return pts
 
 
-def ffc_service(v, g: dict, dz: float) -> dict:
+def ffc_service(v, g: dict, dz: float, length: float | None = None, insert: float | None = None) -> dict:
     """The FFC with the shell lifted `dz` along +z while the FFC stays plugged in J7: the straight
     distance from crease 3's centre (which stays near J7) to the adapter's mouth lifted by dz, against
-    the chain's length (S1, the flap, S3, creases 1 and 2) plus the spare the bought length leaves."""
+    the chain's length (S1, the flap, S3, creases 1 and 2) plus the spare the bought length leaves.
+    `length` and `insert` default to ffc_len and ffc_insert (pass a tolerance end, with its jog `g`)."""
+    length = v("ffc_len") if length is None else length
+    insert = v("ffc_insert") if insert is None else insert
     sn, c, lip = v("sin_t"), v("cos_t"), v("lip")
     yz = lambda sv, tv: (sv * sn + tv * c, lip + sv * c - tv * sn)   # noqa: E731
     m0 = yz(v("adapter_s"), g["t"]["a"])
@@ -279,7 +304,7 @@ def ffc_service(v, g: dict, dz: float) -> dict:
     mouth = (v("ffc_x_m"), m0[0], m0[1] + dz)
     crease = (g["x_c3"], c3[0], c3[1])
     d = math.dist(mouth, crease)
-    spare = v("ffc_len") - 2 * v("ffc_insert") - g["centre_len"]
+    spare = length - 2 * insert - g["centre_len"]
     chain = g["s1"] + g["flap"] + g["s3"] + 2 * v("ffc_crease") + spare
     return {"d_lift": d, "chain": chain, "spare": spare, "ok": d + v("ffc_service_margin") <= chain}
 
