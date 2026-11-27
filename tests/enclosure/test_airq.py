@@ -562,15 +562,23 @@ def test_guide_fits_come_from_the_clearances():
 
 
 def test_guide_delivers_light_to_the_exit():
-    """Review I1 / R40, analytic: 2-D ray trace in the guide's section from each entry window, in the LED's cone,
-    with TIR (critical angle 39.6) and escapes. Every foot facet meets the light over the critical angle, rays
-    reach the exit through the foot facet and the bottom facet, and most entry points deliver. It does not
-    prove the line is even along its 30 mm (that needs a rough bottom facet or a print)."""
+    """R48, analytic: a 3-D Monte Carlo ray trace of the guide as built (its four prisms), every face bare (TIR at
+    39.6 deg, else the ray leaves), Fresnel losses at the entry and the exit. D1 and D2 each deliver at least 3 %
+    of their emission to the exit, bare and with the adhesive pad on the bar's front (worst case: all of it). No
+    ray gets there in a straight line: each delivered ray reflects at least twice (the foot facet, then the bottom
+    facet). The lit x-span is reported, not asserted even: the line's ends get no direct light (README, "To
+    confirm"); that, and the 3 % itself, are for the print to confirm."""
     assert 90 - S.params["tilt_deg"].value > airq_check.CRIT_DEG + 10              # the foot facet's incidence (60 deg)
-    d = airq_check.guide_delivery(S)
-    assert d["delivered"] >= 10 and d["fraction"] >= 0.03, d
-    assert d["entry_points_reaching"] >= d["entry_points"] - 1, d
-    assert min(d["bounces"]) >= 2                                                  # foot facet, then the bottom facet
+    x0, x1 = V("led_x0") + V("gd_tg"), V("led_x1") - V("gd_tg")
+    for pad in (False, True):
+        d = airq_check.guide_delivery(S, pad=pad)
+        for led in ("D1", "D2"):
+            assert d["leds"][led]["fraction"] >= 0.03 and d["leds"][led]["delivered"] >= 200, (pad, d)
+        assert d["min_reflections"] >= 2, d
+        assert d["exit_x"] == pytest.approx((x0, x1))
+        lo, hi = d["lit_x"]
+        assert x0 <= lo < d["lit_x90"][0] < d["lit_x90"][1] < hi <= x1, d             # the lit span, inside the exit
+        assert sum(d["bins"]) == sum(q["delivered"] for q in d["leds"].values())
 
 
 def test_guide_light_stays_off_the_crease_the_sensor_and_u4():

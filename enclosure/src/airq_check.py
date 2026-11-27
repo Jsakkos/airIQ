@@ -635,69 +635,151 @@ def guide_surface_points(s, n: int = 12) -> list[tuple[float, float]]:
 
 
 CRIT_DEG = 39.6                  # PETG (n 1.57) against air, the critical angle
+N_PETG = 1.57
+N_PAD = 1.47                     # the acrylic adhesive pad on the bar's front (it frustrates TIR under asin(1.47 / 1.57))
 
 
-def guide_delivery(s, n_pts: int = 9, n_dir: int = 41, cone_deg: float = 50.0, max_hit: int = 8) -> dict:
-    """R40: does light from the entry windows reach the exit face? A 2-D trace in the guide's (s, t)
-    section: rays start across the entry plane, in the LED's cone (+-cone_deg about the LED's axis, -y,
-    in the plane of the section), reflect specularly off each face where the angle of incidence is at
-    least the critical angle (TIR) and leave the guide (lost) where it is less; a ray that reaches the
-    exit face counts as delivered; the entry plane (back toward the LED) and the faces' edges lose it.
-    Returns {fraction of rays delivered, rays traced, delivered, bounces: histogram, entry points reaching}."""
+def guide_prisms(s) -> list[dict]:
+    """The guide's pieces as built (`airq_face.guide_pieces`): {name, poly: (s, t) profile, x: (x0, x1),
+    kinds: {edge index: face name}, sign: the profile's winding}. The profile's edge i runs from point i to
+    point i + 1."""
     v = s.v
-    poly = guide_outline(s)
-    n = len(poly)
-    sn, c = v("sin_t"), v("cos_t")
-    entry = (4, 5)                                                   # the edge from the foot's top to its lower corner is poly[4] -> poly[5]
-    exit_edge = 0
-    total = ok = 0
-    hist: dict[int, int] = {}
-    pts_ok = 0
-    for ip in range(n_pts):
-        f = (ip + 0.5) / n_pts
-        p0, p1 = poly[4], poly[5]
-        pos0 = (p0[0] + (p1[0] - p0[0]) * f, p0[1] + (p1[1] - p0[1]) * f)
-        got = 0
-        for jd in range(n_dir):
-            phi = math.radians(-cone_deg + 2 * cone_deg * jd / (n_dir - 1))      # in the (y, z) plane from -y
-            dy, dz = -math.cos(phi), math.sin(phi)
-            d = [dy * sn + dz * c, dy * c - dz * sn]                             # (s, t) components
-            pos = [pos0[0] + d[0] * 1e-6, pos0[1] + d[1] * 1e-6]
-            total += 1
-            edge_from = 4
-            for hit in range(max_hit + 1):
-                best = None
-                for i in range(n):
-                    if i == edge_from:
-                        continue
-                    (ax, ay), (bx, by) = poly[i], poly[(i + 1) % n]
-                    ex, ey = bx - ax, by - ay
-                    den = d[0] * ey - d[1] * ex
-                    if abs(den) < 1e-12:
-                        continue
-                    t = ((ax - pos[0]) * ey - (ay - pos[1]) * ex) / den
-                    u = ((ax - pos[0]) * d[1] - (ay - pos[1]) * d[0]) / den
-                    if t > 1e-9 and -1e-9 <= u <= 1 + 1e-9 and (best is None or t < best[0]):
-                        best = (t, i, ex, ey)
-                if best is None:
-                    break
-                t, i, ex, ey = best
-                if i == exit_edge:
-                    ok += 1
-                    got += 1
-                    hist[hit] = hist.get(hit, 0) + 1
-                    break
+    pc = F.guide_profile_pts()
+    kinds = {"tongue": {0: "exit"}, "low": {0: "bar_front", 3: "bottom_facet"}, "leg": {1: "foot_facet", 2: "entry"}}
+    names = {"Guide tongue": "tongue", "Guide low": "bar", "Guide leg 1": "D1 foot", "Guide leg 2": "D2 foot"}
+    out = []
+    for n, k, x0, x1 in F.guide_pieces():
+        poly = [(v(a), v(b)) for a, b in pc[k]]
+        area2 = sum(poly[i][0] * poly[(i + 1) % len(poly)][1] - poly[(i + 1) % len(poly)][0] * poly[i][1] for i in range(len(poly)))
+        out.append({"name": names[n], "poly": poly, "x": (v(x0), v(x1)), "kinds": kinds[k], "sign": 1 if area2 > 0 else -1})
+    return out
+
+
+def _in_prisms(prisms, P) -> bool:
+    return any(p["x"][0] <= P[0] <= p["x"][1] and _inside(p["poly"], P[1], P[2]) for p in prisms)
+
+
+def _fresnel_t(cos_i: float, n1: float, n2: float) -> float:
+    """Unpolarised Fresnel transmittance from n1 into n2 at incidence cos_i (0 past the critical angle)."""
+    sin_t = n1 / n2 * math.sqrt(max(0.0, 1 - cos_i * cos_i))
+    if sin_t >= 1:
+        return 0.0
+    cos_t = math.sqrt(1 - sin_t * sin_t)
+    rs = ((n1 * cos_i - n2 * cos_t) / (n1 * cos_i + n2 * cos_t)) ** 2
+    rp = ((n1 * cos_t - n2 * cos_i) / (n1 * cos_t + n2 * cos_i)) ** 2
+    return 1 - (rs + rp) / 2
+
+
+def _next_exit(prisms, P, D):
+    """The nearest point where the ray P + l D (face frame x, s, t) leaves the union of the prisms:
+    (l, outward unit normal, face name), or None."""
+    cands = []
+    for p in prisms:
+        poly, (xa, xb) = p["poly"], p["x"]
+        n = len(poly)
+        for i in range(n):
+            (ax, ay), (bx, by) = poly[i], poly[(i + 1) % n]
+            ex, ey = bx - ax, by - ay
+            den = D[1] * ey - D[2] * ex
+            if abs(den) < 1e-14:
+                continue
+            lam = ((ax - P[1]) * ey - (ay - P[2]) * ex) / den
+            u = ((ax - P[1]) * D[2] - (ay - P[2]) * D[1]) / den
+            if lam > 1e-9 and -1e-9 <= u <= 1 + 1e-9 and xa - 1e-9 <= P[0] + lam * D[0] <= xb + 1e-9:
                 ln = math.hypot(ex, ey)
-                nx, ny = -ey / ln, ex / ln                                     # the edge's normal
-                dot = d[0] * nx + d[1] * ny
-                if math.degrees(math.acos(min(1.0, abs(dot)))) < CRIT_DEG:
-                    break                                                      # escapes: lost
-                pos = [pos[0] + t * d[0], pos[1] + t * d[1]]
-                d = [d[0] - 2 * dot * nx, d[1] - 2 * dot * ny]
-                edge_from = i
-        if got:
-            pts_ok += 1
-    return {"traced": total, "delivered": ok, "fraction": ok / total, "bounces": dict(sorted(hist.items())), "entry_points_reaching": pts_ok, "entry_points": n_pts}
+                cands.append((lam, (0.0, p["sign"] * ey / ln, -p["sign"] * ex / ln), p["kinds"].get(i, p["name"] + " side")))
+        for xe, nx in ((xa, -1.0), (xb, 1.0)):
+            if abs(D[0]) > 1e-14:
+                lam = (xe - P[0]) / D[0]
+                if lam > 1e-9 and _inside(poly, P[1] + lam * D[1], P[2] + lam * D[2]):
+                    cands.append((lam, (nx, 0.0, 0.0), p["name"] + " end"))
+    for lam, nrm, kind in sorted(cands, key=lambda q: q[0]):
+        if not _in_prisms(prisms, [P[k] + (lam + 1e-6) * D[k] for k in range(3)]):
+            return lam, nrm, kind
+    return None
+
+
+def guide_delivery(s, pad: bool = False, n_rays: int = 20000, seed: int = 1, max_bounce: int = 200) -> dict:
+    """R48 (analytic: a 3-D Monte Carlo ray trace in Python, not a print): the light guide as built (the four
+    prisms of `guide_prisms`) with every face bare: PETG (n 1.57) against air, total internal reflection where
+    the incidence is at least the critical angle (39.6 deg), else the ray leaves the guide. Per LED (D1, D2):
+    `n_rays` Lambertian rays from its 4 x 2 light face cross the gd_clr air gap; those that meet its foot's
+    entry face refract in (Snell; the Fresnel transmittance is the ray's weight) and are followed, reflection by
+    reflection, until they leave. A ray leaving through the tongue's front face (the exit) is delivered, times
+    the exit's Fresnel transmittance; one leaving anywhere else is lost (its partial reflection is dropped:
+    conservative). With `pad`, the 0.2 adhesive pad (n 1.47) on the bar's front behind the panel (s >= panel_s0,
+    worst case: the pad over all of it) takes every ray that meets it under asin(1.47 / 1.57).
+    Returns {leds: {D1, D2: {fraction of the LED's emission delivered, rays entered, rays delivered}}, lit_x: the
+    lowest and highest x a delivered ray leaves at, lit_x90: the x span of the middle 90 % of them, bins: delivered
+    rays in 10 equal bins over the exit's length, exit_x: the exit's x range, min_reflections: the fewest
+    reflections of any delivered ray, lost: where the others went}."""
+    import random
+    v = s.v
+    rng = random.Random(seed)
+    sn, c, lip = v("sin_t"), v("cos_t"), v("lip")
+    crit, pad_crit = math.radians(CRIT_DEG), math.asin(N_PAD / N_PETG)
+    prisms = guide_prisms(s)
+    by_name = {p["name"]: p for p in prisms}
+    ye, yf, zc, hh, hw = v("gd_y_e"), v("board_y0"), v("led_z"), v("led_face_h") / 2, v("led_face_w") / 2
+    leg = by_name["D1 foot"]["poly"]
+    win_z = sorted(lip + sv * c - tv * sn for sv, tv in leg[2:4])            # the entry face's z extent (edge 2)
+    x_lo, x_hi = by_name["tongue"]["x"]
+    out_leds, xs, lost, min_ref = {}, [], {}, None
+    for i in (1, 2):
+        cx = v(f"led_d{i}_x")
+        foot = by_name[f"D{i} foot"]
+        w_sum, entered, hits = 0.0, 0, 0
+        for _ in range(n_rays):
+            r1, r2 = rng.random(), rng.random()                             # Lambertian about -y
+            ph, sr = 2 * math.pi * r1, math.sqrt(r2)
+            d = (sr * math.cos(ph), -math.sqrt(1 - r2), sr * math.sin(ph))
+            p0 = (cx + rng.uniform(-hw, hw), yf, zc + rng.uniform(-hh, hh))
+            k = (ye - yf) / d[1]
+            q = (p0[0] + k * d[0], ye, p0[2] + k * d[2])
+            if not (foot["x"][0] <= q[0] <= foot["x"][1] and win_z[0] <= q[2] <= win_z[1]):
+                lost["missed the entry face"] = lost.get("missed the entry face", 0) + 1
+                continue
+            entered += 1
+            w = _fresnel_t(-d[1], 1.0, N_PETG)
+            dx, dz = d[0] / N_PETG, d[2] / N_PETG                            # Snell across the plane y = gd_y_e
+            dw = (dx, -math.sqrt(max(0.0, 1 - dx * dx - dz * dz)), dz)
+            D = [dw[0], dw[1] * sn + dw[2] * c, dw[1] * c - dw[2] * sn]
+            P = [q[0] + 1e-6 * D[0], q[1] * sn + (q[2] - lip) * c + 1e-6 * D[1], q[1] * c - (q[2] - lip) * sn + 1e-6 * D[2]]
+            fate = "max reflections"
+            for nref in range(max_bounce):
+                h = _next_exit(prisms, P, D)
+                if h is None:
+                    fate = "no exit found"
+                    break
+                lam, nrm, kind = h
+                P = [P[k] + lam * D[k] for k in range(3)]
+                cosi = sum(D[k] * nrm[k] for k in range(3))
+                inc = math.acos(max(-1.0, min(1.0, cosi)))
+                if pad and kind == "bar_front" and P[1] >= v("panel_s0") and inc < pad_crit:
+                    fate = "into the adhesive pad"
+                    break
+                if inc < crit:
+                    if kind == "exit":
+                        fate = "delivered"
+                        w_sum += w * _fresnel_t(cosi, N_PETG, 1.0)
+                        hits += 1
+                        xs.append(P[0])
+                        min_ref = nref if min_ref is None else min(min_ref, nref)
+                    else:
+                        fate = "left through " + kind
+                    break
+                D = [D[k] - 2 * cosi * nrm[k] for k in range(3)]
+                P = [P[k] + 1e-7 * D[k] for k in range(3)]
+            if fate != "delivered":
+                lost[fate] = lost.get(fate, 0) + 1
+        out_leds[f"D{i}"] = {"fraction": w_sum / n_rays, "entered": entered, "delivered": hits}
+    bins = [0] * 10
+    for x in xs:
+        bins[min(9, int((x - x_lo) / (x_hi - x_lo) * 10))] += 1
+    xs.sort()
+    span90 = (xs[int(0.05 * (len(xs) - 1))], xs[int(0.95 * (len(xs) - 1))]) if xs else None
+    return {"leds": out_leds, "lit_x": (xs[0], xs[-1]) if xs else None, "lit_x90": span90, "bins": bins, "exit_x": (x_lo, x_hi),
+            "min_reflections": min_ref, "lost": dict(sorted(lost.items())), "pad": pad, "rays_per_led": n_rays}
 
 
 def light_paths(s) -> dict:

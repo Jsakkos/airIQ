@@ -362,22 +362,30 @@ def guide_profile_pts() -> dict:
     }
 
 
+def guide_pieces() -> list[tuple[str, str, str, str]]:
+    """The guide's pieces as built: (feature name, `guide_profile_pts` key, x0, x1), each a prism of its
+    (s, t) profile along x. One source for the build and the checks (`airq_check.guide_delivery`,
+    `airq_check.guide_surface_sight`)."""
+    x0, x1 = "led_x0 + gd_tg", "led_x1 - gd_tg"
+    return [("Guide tongue", "tongue", x0, x1), ("Guide low", "low", x0, x1),
+            ("Guide leg 1", "leg", "gd_l1x0", "gd_la_x1"), ("Guide leg 2", "leg", "gd_lb_x0", "gd_l1x1")]
+
+
 def light_guide(s: Script) -> None:
     """`light_guide`: clear PETG, one part, every fit from clr_align / clr_remove. Light from a LED
     enters a foot's entry plane (gd_clr in front of the LED face, its height) going toward the panel
     and down the slope, meets the foot's front facet at 60 degrees (total internal reflection, PETG's
-    critical angle 39.6) and runs straight down the leg (parallel to its faces), along the bar, and
-    meets the bar's bottom 45 degree facet (TIR) which turns it toward the slot; the tongue, continuous
-    with the bar's bottom, fills the slot (clr_align each side) and shows the line. The legs are the
-    only parts in the FFC's row; the bar sits gd_clr behind the panel (the adhesive pad's gap).
-    No face is coated or clad (R45): every face is bare PETG facing air (the pad on the bar's front is
-    the one contact). D3 and D4 do not feed it: `led_mask` covers them."""
+    critical angle 39.6) and goes down the leg by TIR at its faces, along the bar, to the bar's bottom
+    45 degree facet (TIR) which turns it toward the slot; the tongue, continuous with the bar's bottom,
+    fills the slot (clr_align each side) and shows the line. No straight line runs from an entry face
+    to the exit: delivery needs at least two reflections, and the evidence is the 3-D trace
+    `airq_check.guide_delivery` (R48). The legs are the only parts in the FFC's row; the bar sits gd_clr
+    behind the panel (the adhesive pad's gap). No face is coated or clad (R45): every face is bare PETG
+    facing air (the pad on the bar's front is the one contact). D3 and D4 do not feed it: `led_mask`
+    covers them."""
     pc = guide_profile_pts()
-    x0, x1 = "led_x0 + gd_tg", "led_x1 - gd_tg"
-    _guide_poly(s, "Guide tongue", pc["tongue"], x0, x1, True)
-    _guide_poly(s, "Guide low", pc["low"], x0, x1, False)
-    _guide_poly(s, "Guide leg 1", pc["leg"], "gd_l1x0", "gd_la_x1", False)
-    _guide_poly(s, "Guide leg 2", pc["leg"], "gd_lb_x0", "gd_l1x1", False)
+    for i, (name, key, x0, x1) in enumerate(guide_pieces()):
+        _guide_poly(s, name, pc[key], x0, x1, i == 0)
 
 
 def led_mask(s: Script) -> None:
