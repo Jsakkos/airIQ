@@ -45,12 +45,13 @@ REFS = ("ref_sen66", "ref_epd", "ref_fpc_adapter", "ref_sfa40", "ref_tongue", "r
 SHELL_BORNE = ("ref_epd", "ref_fpc_adapter")     # the panel and the adapter are in the shell and come down with it
 SWEEP_DZ = (1, 2, 4, 8, 16, 32)                  # the shell's raised copies (mm along +z)
 TOUCH_SQUEEZE = 0.05                             # the gaskets overlap their seats by this much when they touch at 0
-TOUCHES = (("gasket_out", "sen66_body"), ("gasket_in", "sen66_body"), ("zone_seal", "base_plate"), ("sen66_pad", "sen66_body"),
+TOUCHES = (("gasket_out", "sen66_body"), ("gasket_in", "sen66_body"), ("gasket_in", "base_plate"), ("zone_seal", "base_plate"),
+           ("sen66_pad", "sen66_body"),
            ("grommet_zone_a", "zone_wall"), ("grommet_zone_b", "zone_wall"), ("grommet_zone_a", "base_plate"),
            ("grommet_zone_b", "base_plate"), ("grommet_j4_a", "base_plate"), ("grommet_j4_b", "base_plate"),
            ("grommet_j4_b", "hcho_lid"), ("grommet_tongue_a", "hcho_lid"), ("grommet_tongue_b", "hcho_lid"))
 # every squeeze and preload: 0 in the check (R9: faces touch), TOUCH_SQUEEZE in the touch run
-SQUEEZES = ("gasket_squeeze", "wiper_squeeze", "pad_squeeze", "ring_preload")
+SQUEEZES = ("gasket_squeeze", "wiper_squeeze", "pad_squeeze", "ring_preload", "root_squeeze")
 
 
 def _rows(rot, t):
@@ -545,18 +546,30 @@ def distances(s=None) -> dict:
 
 
 TPU_E = (26.0, 50.0)        # TPU 95A tensile modulus range, MPa (filament data sheets; the print decides)
+SEAT_E = 1800.0             # the base's plastic (PETG, the softer of PETG/ASA), MPa
+PAD_FORCE_MAX = 15.0        # the most the pad may push (the seat's root stress across layers, the module's housing), N
+PAD_MARGIN = 1.5            # the pad's least force over the least it needs
 
 
 def sen66_hold(s=None) -> dict:
     """I3(b), arithmetic: the SEN66 is held by its port face on the outlet ring's land (its rear
     stop) and by the pad at its front; its depth tolerance goes into the pad.
-    - pad_compression: the pad's compression at 20.8, 21.3 and 21.8 deep (of pad_t);
+    - pad_compression: the pad's compression at 20.8, 21.3 and 21.8 deep (of pad_t), the seat rigid;
     - front_clear_rail / front_clear_slant: a 21.8 module's connector face to the right rail, and
       its plinth's top front edge to the zone wall's slant (the plinth is inset plinth_inset);
     - wiper_force: the inlet blade's push on the port face for TPU_E (cantilever, 3 E I / L^3
       along the blade, over the module's height, the axial part sin^2 of its lean);
-    - pad_force_min: the least pad force that keeps the ring's reaction inside its bore's circle
-      against the blade's moment about the outlet axis (no tipping, no yaw)."""
+    - kern: the ring land's kern radius, (r_o^2 + r_i^2) / (4 r_o): the land stays loaded all round
+      while the ring's reaction acts inside it (review round 3);
+    - pad_force_min: the least pad force that keeps that reaction inside the kern against the
+      blade's moment about the outlet axis; pad_force_spec = PAD_MARGIN x that, the least the pad
+      must give at its least compression;
+    - seat_k: the pad seat's stiffness, a seat_t plate as two cantilevers in parallel, up from the
+      floor and out from the side rail, over pad_w + 2 seat_t (B1); seat_give at pad_force_spec
+      and PAD_FORCE_MAX, and the compression range with that give (the pad's least compression
+      uses the least force, its most the most);
+    - seat_stress: the root bending stress across the layers at PAD_FORCE_MAX (its share up from
+      the floor)."""
     s = s or airq.build()
     v = s.v
     tol, gap, t = v("sen_d_tol"), v("pad_gap"), v("pad_t")
@@ -571,9 +584,23 @@ def sen66_hold(s=None) -> dict:
     inertia = v("wiper_t") ** 3 / 12
     force = [3 * e * inertia / (L ** 3 * math.sin(a) ** 2) * v("sen_up") * v("wiper_squeeze") for e in TPU_E]
     arm = abs((v("wiper_x1") - v("wiper_lean") - v("wiper_w") / 2) - v("outlet_x"))
+    ro, ri = v("ring_od") / 2, v("ring_bore") / 2
+    kern = (ro ** 2 + ri ** 2) / (4 * ro)
+    need = max(force) * (1 + arm / kern)
+    spec = PAD_MARGIN * need
+    b, st = v("pad_w") + 2 * v("seat_t"), v("seat_t")
+    lv, lh = v("outlet_z") - v("floor_t"), v("outlet_x") + v("tub_x")
+    ei3 = 3 * SEAT_E * b * st ** 3 / 12
+    kv, kh = ei3 / lv ** 3, ei3 / lh ** 3
+    k = kv + kh
+    stress = PAD_FORCE_MAX * kv / k * lv / (b * st ** 2 / 6)
+    comp_give = {20.8: 1 - (gap + tol + spec / k) / t, 21.3: 1 - (gap + spec / k) / t, 21.8: 1 - (gap - tol + PAD_FORCE_MAX / k) / t}
     return {"pad_compression": comp, "front_clear_rail": front - rail_r, "front_clear_slant": front - y_slant,
-            "wiper_force": tuple(force), "pad_force_min": max(force) * (1 + arm / (v("ring_bore") / 2)),
-            "pad_pressure_kpa_min": max(force) * (1 + arm / (v("ring_bore") / 2)) / (v("pad_w") * v("pad_h")) * 1000}
+            "wiper_force": tuple(force), "kern": kern, "arm": arm, "pad_force_min": need, "pad_force_spec": spec,
+            "pad_pressure_kpa_spec": spec / (v("pad_w") * v("pad_h")) * 1000,
+            "pad_pressure_kpa_max": PAD_FORCE_MAX / (v("pad_w") * v("pad_h")) * 1000,
+            "seat_k": k, "seat_give": (spec / k, PAD_FORCE_MAX / k), "pad_compression_with_give": comp_give,
+            "seat_stress": stress}
 
 
 def intake_open(s) -> float:

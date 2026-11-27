@@ -334,10 +334,48 @@ def test_sen66_held_over_its_depth_tolerance():
     moment, so the module cannot tip or yaw off the ring."""
     h = airq_check.sen66_hold(S)
     assert V("ring_preload") == 0 and V("pad_y0") + V("pad_gap") == pytest.approx(V("sen_y0"))
-    comp = h["pad_compression"]
-    assert 0.25 <= min(comp.values()) and max(comp.values()) <= 0.70
+    comp, give = h["pad_compression"], h["pad_compression_with_give"]
+    assert 0.25 <= min(comp.values()) and max(comp.values()) <= 0.65
+    assert min(give.values()) >= 0.25 and max(give.values()) <= max(comp.values())     # the seat's give keeps it in range
     assert h["front_clear_rail"] >= V("clr_align") - 1e-9 and h["front_clear_slant"] >= V("clr_align")
-    assert max(h["wiper_force"]) < 2.0 and h["pad_force_min"] < 6.0
+    # round 3: the land stays loaded all round (the reaction inside the land's kern), with margin
+    ro, ri = V("ring_od") / 2, V("ring_bore") / 2
+    assert h["kern"] == pytest.approx((ro ** 2 + ri ** 2) / (4 * ro))
+    assert h["pad_force_min"] == pytest.approx(max(h["wiper_force"]) * (1 + h["arm"] / h["kern"]))
+    assert h["pad_force_spec"] == pytest.approx(airq_check.PAD_MARGIN * h["pad_force_min"])
+    assert h["pad_force_spec"] < airq_check.PAD_FORCE_MAX / 2
+    assert max(h["wiper_force"]) < 1.0
+
+
+def test_pad_seat_is_stiff_and_tied():
+    """Review round 3, B1: the pad's seat is a seat_t plate joined to the left side rail along its
+    height (not a free 1.6 rail), behind the cables' riser and run; its stiffness (two cantilevers,
+    E of PETG) keeps its give under 0.25 at PAD_FORCE_MAX and its root stress across the layers
+    under 8 MPa (creep). B4: its back edge has a 45 deg lead-in that the pad's lower edge meets
+    whatever the module's depth, and its top stays under the drawer's grommet."""
+    h = airq_check.sen66_hold(S)
+    seat = _feature("Pad seat")
+    assert seat["distance"] == "plug_x0 - 1.0 + tub_x + iwall"                    # from the side rail's outer face
+    assert V("seat_t") >= 2.4 and h["seat_k"] >= 50 and h["seat_give"][1] <= 0.25 and h["seat_stress"] <= 8.0
+    assert V("seat_y0") >= V("pt_yh + cable_gh_d / 2") + V("clr_align") - 1e-9       # behind the cables' riser
+    # the lead-in: the pad's front face (free) meets the inclined top for every module depth
+    entry = [V("sen_y1") - d - V("pad_t") for d in (V("sen_d") + V("sen_d_tol"), V("sen_d") - V("sen_d_tol"))]
+    assert V("seat_y0") < min(entry) and max(entry) < V("pad_y0")
+    assert V("seat_y0") < V("seat_apex_y") < V("pad_y0") and V("seat_apex_z") > V("seat_lead_z") > V("outlet_z") + V("pad_h") / 2
+    # its top stays seat_slant_clr under the zone wall's slant (and the drawer grommet's squeezed face)
+    under = V(airq.zt("seat_apex_y", "zw_tf + zone_t")) - V("seat_apex_z")
+    assert under == pytest.approx(V("seat_slant_clr")) and V("seat_slant_clr") > V("gasket_squeeze") / V("sin_t")
+
+
+def test_inlet_seal_root_and_lead_in():
+    """Review round 3, B3: the inlet seal's root is a root_w foot squeezed root_squeeze into its
+    slot's sides and back (no bypass round it, no travel to eat the preload). B4: its tip has a
+    45 deg lead-in at the top, deeper than its preload, so the module's bottom edge pushes it back."""
+    groove = _feature("Inlet seal groove")
+    assert V(groove["length"]) == pytest.approx(V("root_w")) and V(groove["width"]) == pytest.approx(V("seat_d") + 0.5)
+    assert V("root_squeeze") > 0 and V("root_w") > V("wiper_w")
+    assert V("wiper_lead") > V("wiper_squeeze") + 0.2
+    assert ("gasket_in", "base_plate") in airq_check.TOUCHES
     assert V("outlet_z") - V("pad_h") / 2 >= V("floor_t") + V("foam") + ref_sen66.build().v("plinth_inset")   # on the plinth
     # the blade stays out of the inlets' path (R25) and clear of H1
     assert V("wiper_x1") <= V("inlet_x0") - 1.0 + 1e-9
@@ -402,7 +440,7 @@ def test_gaskets_touch_what_they_seal(check):
     vols = airq_check.touch_volumes(check["touch"])
     q = airq_check.TOUCH_SQUEEZE
     ring = math.pi / 4 * (V("ring_od") ** 2 - V("ring_bore") ** 2) * q
-    strip = V("wiper_w") * V("sen_up") * q
+    strip = V("wiper_w") * (V("zw_z0") - V("wiper_lead") - V("floor_t") - V("foam")) * q   # under the tip's lead-in
     lip = 2 * V("bp_x0") * V("ledge_t") * q
     pad = V("pad_w") * V("pad_h") * q
     assert vols[("gasket_out", "sen66_body")] == pytest.approx(ring, rel=0.05)
