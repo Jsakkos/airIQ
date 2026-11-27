@@ -299,6 +299,24 @@ def test_grilles_r18_and_10_mm_rule():
     assert V("exh_z0") > V("zw_z1")
 
 
+def test_openings_are_cut_where_the_parameters_say():
+    """Task 4b: 3 x in_n intake slots, the window, out_n outlet slots, exh_n exhaust slots and the USB-C
+    opening with its chamfer, all cut in base_plate; the exhaust right of the USB-C opening, over the
+    zone wall, under the top wall; the USB-C opening passes the overmold with clr_remove a side."""
+    cuts = [c["params"] for c in S.commands if c["params"].get("operation") == "cut" and c["params"].get("targets") == ["base_plate"]]
+    names = [c["name"] for c in cuts]
+    assert sum(n.startswith("Intake slot ") for n in names) == 3 * V("in_n")
+    assert sum(n.startswith("Outlet slot ") for n in names) == V("out_n")
+    assert sum(n.startswith("Exhaust slot ") for n in names) == V("exh_n")
+    assert {"Light-sensor window", "USB-C opening"} <= set(names)
+    assert "USB-C chamfer" in {c["params"].get("name") for c in S.commands}
+    assert V("exh_gx1") <= V("exh_x1") and V("exh_x0") > V("usb_x + usb_open_w / 2")
+    assert V("exh_z0") > V("zw_z1") and V("exh_z1") < V("H - wall")
+    assert V("usb_open_w - usb_plug_w") == pytest.approx(2 * V("clr_remove"))
+    assert V("usb_z - usb_open_h / 2") >= V("grille_min_z")
+    assert V("row_x0 + in_n * in_len + (in_n - 1) * slot_bar") == pytest.approx(V("row_x1"))
+
+
 def test_feet_cover_the_screw_heads():
     """R10b: the front felt feet cover the shell's screw heads and stand taller than them, and all
     four stay on the bottom face (the airQ's R35 deferred minor: its front feet overhang)."""

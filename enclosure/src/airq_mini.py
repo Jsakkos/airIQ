@@ -203,11 +203,42 @@ def build() -> Script:
 
 
 def openings(s: Script) -> None:
-    """Task 4b: the openings in `base_plate`, cut last (every join is done), at the positions 4a fixed.
+    """Task 4b: the openings in `base_plate`, cut last (every join is done), at the positions 4a fixed;
+    each opening's lower edge is at least grille_min_z (the shell's band slots and the flexure's U slot
+    are higher still).
+    - the intake rows in the lower front lip: three rows of in_n slots, slot_w high, slot_bar bars,
+      from right of the light-sensor window to the right boss pocket, under the zone wall's ledge;
     - the light-sensor window: a round hole in the lip in front of the tongue's VEML7700, low and left
-      of the slot rows, so the sensor's line to it (about 30 deg down, the tongue's handedness puts the
-      VEML7700 high) passes under the zone wall's ledge and the zone seal."""
+      of the rows, so the sensor's line to it (about 30 deg down: the tongue's handedness puts the
+      VEML7700 high) passes under the ledge and the zone seal;
+    - the outlet grille in the lower rear wall, behind the plenum plate (R18: 498 mm2, the study's
+      shortfall against 660.1, over the 296 floor; owner item);
+    - the electronics exhaust in the upper rear wall, over the zone wall's top: into the electronics
+      zone only, apart from the outlet (R26);
+    - the USB-C opening in the rear wall on J1's plug axis, passing the plug's overmold, with a 0.5
+      chamfer on its outer edge; H1's post is its support boss (4a)."""
+    p = s.param
+    for row in (1, 2, 3):
+        for i in range(int(s.v("in_n"))):
+            s.box(f"Intake slot {row}.{i + 1}", [f"row_x0 + {i} * (in_len + slot_bar)", "-wall", f"slot_row{row}_z"], ["in_len", "3 * wall", "slot_w"],
+                  operation="cut", targets=["base_plate"])
     s.cylinder("Light-sensor window", ["lsw_x", "-wall", "lsw_z"], "lsw_d", "3 * wall", axis="Y", operation="cut", targets=["base_plate"])
+    for i in range(int(s.v("out_n"))):
+        s.box(f"Outlet slot {i + 1}", [f"out_gx0 + {i} * out_pitch", "D - 2 * wall", "out_gz0"], ["slot_w", "3 * wall", "out_gz1 - out_gz0"],
+              operation="cut", targets=["base_plate"])
+    p("exh_n", 13, "electronics exhaust slot count: 13 x 2.4 - 1.2 = 30.0 fits exh_x0 ... exh_x1 (31.95); whole number", unit="")
+    p("exh_gx1", "exh_x0 + exh_n * out_pitch - (out_pitch - slot_w)", "derived: the exhaust's last slot's right edge")
+    for i in range(int(s.v("exh_n"))):
+        s.box(f"Exhaust slot {i + 1}", [f"exh_x0 + {i} * out_pitch", "D - 2 * wall", "exh_z0"], ["slot_w", "3 * wall", "exh_z1 - exh_z0"],
+              operation="cut", targets=["base_plate"])
+    p("usb_open_w", "usb_plug_w + 2 * clr_remove", "USB-C opening width: the overmold passes (its tip is in the wall's thickness, usb_well)")
+    p("usb_open_h", "usb_plug_h + 2 * clr_remove", "USB-C opening height")
+    s.box("USB-C opening", ["usb_x - usb_open_w / 2", "D - 2 * wall", "usb_z - usb_open_h / 2"], ["usb_open_w", "3 * wall", "usb_open_h"],
+          operation="cut", targets=["base_plate"])
+    v = s.v
+    d, cx, cz = v("D"), v("usb_x"), v("usb_z")
+    hw, hh = v("usb_open_w") / 2, v("usb_open_h") / 2
+    s.chamfer("USB-C chamfer", [[cx, d, cz - hh], [cx, d, cz + hh], [cx - hw, d, cz], [cx + hw, d, cz]], "usb_chamfer", body="base_plate")
 
 
 def cable_params(s: Script) -> None:
