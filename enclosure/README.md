@@ -339,8 +339,11 @@ the owner. The airQ is built on R22's layout ("airQ enclosure" below).
 - **airQ.** The main board, the SEN66 and the panel do not fit 95 × 55 × 48 mm (±1) when the
   whole front is sloped. The only poses within a few millimetres break the air and heat rules.
   The options are below.
-- **airQ mini.** It fits its hard maximum, 66 × 50 × 42, only with R15's vertical lower lip (15.5
-  mm) and a horizontal board. Two figures fall short and are flagged:
+- **airQ mini.** Superseded by "airQ mini (Task 4)" below: with the airQ's construction as built
+  (SEN66 ports to the rear, the outlet plenum, the board's plugs) the mini is **blocked** at 66 × 50
+  × 42; the smallest rule-keeping envelope found is 69.5 × 50 × 42. The addendum's first finding
+  was that it fits only with R15's vertical lower lip (15.5 mm) and a horizontal board, with two
+  figures short:
   - the antenna is about 5 mm from the SEN66 (R12 asks for 15);
   - the outlet grille has 442 mm² open (R18 asks for 660, with a floor of 296).
 
@@ -548,6 +551,92 @@ case would need to be 6.7 mm deeper than its maximum.
 - **R18, outlet grille.** The whole lower rear, 58.4 × 18.9 mm at 40 % open, gives 441.5 mm².
   That is below 2 × 330.1 = 660.1, and above the floor of 296.
 - **Tongue.** It is 28 mm from U3 and 29 mm from U2 (the rule is ≥ 20).
+
+### airQ mini (Task 4): re-check with the airQ's construction
+
+**Status (2026-11-27, Task 4a): BLOCKED at 66 × 50 × 42, owner decision (spec §10).** The
+addendum above placed the SEN66 ports-forward with the tongue lying in front of it. Since then
+the airQ's construction has settled: the SEN66 faces its ports to the rear (R31, because R25's
+outlet path cannot run along the module's front), the outlet plenum sits behind a plate, and the
+board's standoffs and plugs are modelled. With that construction the mini fails two rules in
+its hard maximum. Neither is a margin question. A case 3.5 mm wider (69.5 × 50 × 42) keeps
+every rule; see "Ways out" below.
+
+`uv run --with pyyaml python enclosure/src/layout_study.py --mini` prints the numbers below
+(`layout_study.mini_recheck`). `tests/enclosure/test_layout_study.py` pins them, with
+independent arithmetic for the key ones.
+
+**Fixed for the re-check** (the airQ's values, `airq.py`):
+- The lip is 15.5 (the smallest that fits 50 is 15.01), and the board is horizontal.
+- The board's bottom is at z 31.0 (the zone rule). Its front edge is at y 12.01, as far back as
+  the antenna strip allows (11.79 … 12.01 is the whole range).
+- The board sits against the right wall (`clr_remove` 0.2), which gives the left-edge plugs the
+  most room.
+- The zone wall's slant hugs the slope (t = wall + `clr_remove`). The mini has no panel in
+  front of it, so the SEN66's front top corner may come forward to y 10.19.
+- The SEN66 stands against the left rail with its ports to the rear and its inlet end against
+  the intake passage. The passage, 3.4 wide (58.8 tub − 0.2 − 55.2), is the only way from the
+  front of the sensor zone to the port gap.
+- The port gap is 3.0 (80.7 mm² ≥ 77.3), the plate 1.6, the ring 24.0 OD.
+- The outlet grille has 1.2 slots at a 2.4 pitch, 2 mm inside the plenum: 23 slots.
+
+**SEN66 pose, decided by the numbers.**
+- **Ports forward is impossible.** The outlet's 330.1 mm² would have to come back past the
+  module to the lower rear. Beside it there is 91.5 mm² (the 3.4 passage), over it 16.6 mm²
+  (the 0.3 gap under the zone wall), and under it nothing.
+- **Ports to the rear (R31) is the only pose.** The plenum must carry the larger branch's share
+  of the grille (13 of 23 slots: 186.6 mm²), so it needs 7.03 deep.
+- **H1 lands in the ring.** H1, the USB-C's support boss, stands at x −20.45, y 39.41. That is
+  inside the outlet ring's x span (−28.4 … −4.4) when the inlet end is right, and in front of the
+  inlets when it is left. So H1 cannot stand in the port gap. Three places remain:
+
+| Place of the SEN66 | Front face y | Plenum (≥ 7.03) | Room in front of the deepest module | Antenna to SEN66 (R12) |
+|---|---|---|---|---|
+| a: H1's post in the plenum, behind the plate | 11.16 | 11.14 | 8.66 | 10.35 |
+| b: H1's pilot boss hung under the zone wall, on the plate's top; the ring passes 0.20 under it | 14.31 | 7.99 | 11.81 | 7.55 |
+| c: as far back as the plenum allows, H1 ignored (for comparison) | 15.27 | 7.03 | 12.77 | 6.75 |
+
+In front of the module go the SEN66's plug and its cable's bend (6.94) and its pad and seat
+(4.2), side by side in x. Every place has room for them.
+
+**Blocker 1: the tongue has no place in the intake air** (global rule: the tongue sits in the
+intake air, at least 20 mm from U3 and U2).
+- **Lying flat in front of the SEN66.** It needs 17.56 from the lip: 0.5 of air, 12.36 to its
+  Qwiic socket's mating face, 4.5 for the plug, and 0.2. The most any place leaves is 12.77, so
+  it is 4.8 to 8.9 mm short.
+- **On edge in the intake passage.** It is 1.6 + 3.0 thick and 22 tall, so it blocks 101 mm² of
+  the passage's 91.5: R25 asks 77.3. At the right end it would also sit 10.5 from U3.
+- **Beside the module:** there is 3.4 mm. **Over or under it:** nothing.
+- **In the slope's space in front of the zone wall:** that space is the electronics zone. To
+  make room there for the tongue lying flat (17.1 behind the slope's inner face), the zone wall's
+  slant would sit 17.4 behind the slope. The SEN66's front would then be at y 27.05 and its port
+  face at 48.35, past the rear wall's inner face (48.2), before the port gap, plate and plenum.
+  This is hand arithmetic, not in `mini_recheck`.
+
+**Blocker 2: the board's sensor plugs have no room.**
+- J2 (the SEN66's cable, JST GH) and J4 (Qwiic, which the tongue would use, because J3 is
+  blocked as in the airQ) come out of the board's left edge.
+- With the board against the right wall, their mating faces are 2.35 and 2.64 from the shell's
+  side wall, less `clr_remove`. With the board centred, 1.35 and 1.64.
+- J3 comes out of the front edge, 1.57 from the slope's inner face.
+- The airQ's plug envelope (plug plus the cable's bend) is 5.0, to confirm with the cables. A
+  side-entry plug stands out of its receptacle, whose body alone is 4.86 deep. So 2.35 does not
+  take one, and the SEN66 cannot be plugged in.
+- Thinning the side wall to the plan's minimum 1.6 adds only 0.2.
+- The conclusion does not hang on the 5.0 envelope. Even a 3.0 plug-and-bend envelope needs W ≥
+  66.65 (`mini_recheck(plug_out=3.0)`).
+
+**Ways out (owner decision; never loosen the air and heat rules, spec §10):**
+
+| Option | Envelope | What changes | Rules |
+|---|---|---|---|
+| **1 (smallest found)** | **69.5 × 50 × 42** (W +3.5) | The board against the right wall: J2 and J4 get 5.85 and 6.14 mm. The SEN66 against the right rail, inlet end left; the intake passage at its left end is 6.9 wide. The tongue stands on edge in the passage, in the intake stream, VEML7700 facing the lip window. H1's post stands in the plenum (place a), its back trimmed below its pilot as in the airQ. | passage 84.4 ≥ 77.3 with the tongue in it; tongue to U3 41.6, to U2 31.6; R25 plenum 11.14 ≥ 7.25, at H1 253.6 ≥ 41.3; room in front 8.66 ≥ 6.94; R12 10.35 and R18 498.2 mm² are shortfalls (owner items, as before) |
+| 2 | 69 × 56 × 42 | The tongue lies flat in front of the SEN66 (D ≥ 55.75). The plugs still need W ≥ 68.65 | larger than option 1 |
+| 3 | 66 × 56 × 42 + a board revision | J2 and J4 move off the left edge (PCB, not this plan); the tongue flat in front | changes the shared board |
+| – | 66 × 50 × 42 | not possible without breaking the tongue rule or R25, or without a way to plug in the SEN66 | – |
+
+Option 1 keeps D and H and the 24° front. The width the owner described as "the same width" as
+the mockup grows by 3.5 mm.
 
 ### What the owner's questions buy
 

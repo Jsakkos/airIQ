@@ -30,6 +30,7 @@ from dataclasses import dataclass, replace
 from functools import lru_cache
 
 import board_sources as B
+import clearances
 from sclib import mechanical
 
 
@@ -508,6 +509,173 @@ def x_layout(m: Model, board_clr: float = 0.5, dot_d: float = 4.0) -> dict:
     return out
 
 
+# --- Task 4a: the airQ mini re-checked with the airQ's construction as built --------------------
+# The addendum above placed the mini's SEN66 ports-forward with the tongue in front of it. Since then
+# the airQ's construction settled (R17, R22, R24, R25, R31): the SEN66 stands with its ports to the
+# rear, blowing through a ring into an outlet plenum behind a plate (the baffle), the inlets drawing
+# from the sealed sensor zone through a port gap fed past the module's inlet end, the board's M2
+# standoffs and plugs modelled. `mini_recheck` redoes the mini's sensor zone with that construction.
+# Every number not read from a reference or interface.yaml is the airQ's (airq.py), named here.
+
+MINI_T4 = replace(MINI, lip=15.5)        # the addendum's lip: min_lip 15.01, rounded up to 0.5
+IWALL = 1.6                 # the base's internal walls (enclosure_common iwall): side rails, plenum plate
+PORT_GAP = 3.0              # port face to the plenum plate (airq port_gap)
+RING_W, RING_CLR = 1.5, 0.25   # outlet ring wall, and its bore over the port (airq)
+OUT_PITCH, OUT_MARGIN = 2.4, 2.0   # outlet grille: 1.2 slots at a 2.4 pitch (50 %), 2 mm inside the plenum (airq, R26)
+SEN_TOL = 0.5               # SEN66 depth tolerance, +- (datasheet Fig. 8; airq sen_d_tol)
+CLR_ALIGN = clearances.CLR_ALIGN   # the shared fit default (clearances.py)
+SEN_PLUG_BEND = 6.94        # the SEN66's plug and its cable's bend in front of its connector face (airq_check ko_sen66_bend)
+PAD_AND_SEAT = 1.8 + 2.4    # the SEN66's pad (compressed) and its seat in front of the connector face (airq pad_gap, seat_t)
+PLUG_OUT = 5.0              # a side-entry plug and its cable's bend out of the receptacle's mating face (airq_check ko_j2_plug,
+                            # ko_j4_plug; to confirm with the cables bought)
+TONGUE_PLUG = 4.5           # the tongue's Qwiic plug out of its mating face (airq_check ko_tongue_plug)
+TONGUE_GAP_MIN = 0.5        # the least air between the lip and the tongue's front edge (the airQ has 4.6, M4: the slots in front stay open)
+BOSS_UNDER_ZONE = 1.6       # an M2 pilot boss hung under the zone wall (with the zone wall and its pad: 3.7 of thread)
+
+
+def _board_y_range(m: Model, z0: float) -> tuple[float, float]:
+    """The horizontal board's front-edge y range at bottom height z0: (front limit, rear limit)."""
+    lo, hi = -math.inf, math.inf
+    for ay, az, b, _ in constraints(m, 0):
+        if ay < 0:
+            lo = max(lo, (b - az * z0) / ay)
+        elif ay > 0:
+            hi = min(hi, (b - az * z0) / ay)
+    return lo, hi
+
+
+def mini_recheck(m: Model = MINI_T4, board_right: bool = True, plug_out: float = PLUG_OUT, inlet_end: str = "right") -> dict:
+    """The mini's sensor zone with the airQ's construction (Task 4a). Returns the numbers behind the
+    README's "airQ mini (Task 4)" study:
+    - pose: the board horizontal at the zone rule's height (SEN66 top + zone wall + gaps), its front
+      edge as far back as the antenna allows; the SEN66 standing (R17), ports to the rear, its
+      inlet end against the intake passage (the only way to the port gap) and its other end against
+      the rail: inlet end right (as the airQ) or left;
+    - ports forward: the most section an outlet duct past the module could have (R25: 330.1);
+    - ports to the rear: the plenum depth R25 needs (the larger branch's share of the outlet), H1
+      against the ring, and the SEN66's places: (a) H1 in the plenum, (b) H1's pilot boss hung under
+      the zone wall over the plate, the ring passing under it; (c) for comparison, as far back as
+      the plenum allows with H1 ignored;
+    - the front room each place leaves in front of the deepest module, against what goes there
+      (the SEN66's plug and bend, its pad and seat, the tongue lying flat with its plug behind it),
+      and the intake passage against the tongue standing on edge in it (`edge`: its free section
+      with the tongue in it, the tongue to U3 and U2, H1 against the inlets, and R25 at H1 with its
+      back trimmed below its pilot as in the airQ);
+    - the plug room at J2, J4 (left edge) and J3 (front edge) against `plug_out`;
+    - R12 (antenna to SEN66, per place) and R18 (outlet grille) for the pose;
+    - the envelope each way out needs."""
+    r = _refs()
+    mb = r["main"]
+    sen_l, sen_d, sen_h = r["sen_l"], r["sen_h"], r["sen_w"]
+    import ref_sen66
+    sv = ref_sen66.build().v
+    tg = mechanical("tongue")
+    top = sen_top(m)
+    zw_z0 = top + m.zone_gap
+    bz0 = zw_z0 + m.zone_wall + m.zone_gap                    # the board's bottom: the zone rule
+    y_lo, y_hi = _board_y_range(m, bz0)
+    by0 = y_hi                                                 # as far back as the antenna allows (room at the front)
+    inner = m.W / 2 - m.wall
+    tub = inner - m.clr - IWALL
+    bw = mb["outline"][0]
+    bx0 = inner - m.clr - bw if board_right else -bw / 2
+    dev = lambda X, Y: (bx0 + X, by0 + mb["outline"][1] - Y)          # noqa: E731  layout -> device
+    # --- the SEN66 in x: its outlet end against a rail, the intake passage at its inlet end
+    right = inlet_end == "right"
+    sx0 = -tub + m.clr if right else tub - m.clr - sen_l
+    sx1 = sx0 + sen_l
+    passage = tub - sx1 if right else sx0 + tub
+    zone_h = zw_z0 - m.floor
+    out_x = sx1 - sv("outlet_x") if right else sx0 + sv("outlet_x")
+    i0 = min(sv("inlet_sq_x0"), sv("inlet_rd_x") - sv("inlet_rd_d") / 2)      # the inlets from the inlet end
+    i1 = max(sv("inlet_sq_x1"), sv("inlet_rd_x") + sv("inlet_rd_d") / 2)
+    inlets = (sx1 - i1, sx1 - i0) if right else (sx0 + i0, sx0 + i1)
+    out_z = top - sv("outlet_y")
+    ring_r = sv("outlet_d") / 2 + RING_CLR + RING_W
+    # --- ports forward: the outlet would have to come back past the module
+    fwd = {"beside": passage * zone_h, "over": m.zone_gap * sen_l, "need": PORT_OUTLET}
+    # --- ports to the rear: R25 in the plenum (the branches either side of the ring carry their grille share)
+    gx0 = -tub + OUT_MARGIN
+    n = math.floor((2 * (tub - OUT_MARGIN) + OUT_PITCH - m.slot_w) / OUT_PITCH)
+    xs = [gx0 + i * OUT_PITCH for i in range(n)]
+    cut_r, cut_l = out_x + ring_r + 0.5, out_x - ring_r - 0.5
+    share = max(sum(1 for x in xs if x >= cut_r), sum(1 for x in xs if x + m.slot_w <= cut_l)) / n
+    branch_need = PORT_OUTLET * share
+    h = zw_z0 - RIB - m.floor
+    p_need = (branch_need + RIB * RIB) / (h + RIB)               # P h + (P - rib) rib >= need
+    rear = m.D - m.wall
+    holes = mb["mounting_holes"]
+    sd = holes["clear_diameter"]
+    h1 = dev(*holes["centers"][0])
+    dx = abs(h1[0] - out_x)
+    ring_top_at_h1 = out_z + math.sqrt(ring_r ** 2 - dx ** 2) if dx < ring_r else -math.inf
+    slant = (m.wall + m.clr + m.zone_wall + (top - m.lip) * m.s) / m.c + m.clr   # the zone wall's slant hugging the slope
+    places = {}
+    # (a) H1's post in the plenum, behind the plate
+    py1 = h1[1] - sd / 2 - CLR_ALIGN
+    places["a: H1 in the plenum"] = {"sen_y0": py1 - IWALL - PORT_GAP - sen_d, "plenum": rear - py1}
+    # (b) H1's pilot boss hung under the zone wall, on the plate's top, the ring passing under it
+    places["b: H1 boss over the plate"] = {"sen_y0": h1[1] - IWALL / 2 - PORT_GAP - sen_d, "plenum": rear - h1[1] - IWALL / 2,
+                                           "boss_clear": zw_z0 - BOSS_UNDER_ZONE - ring_top_at_h1}
+    # (c) for comparison: the SEN66 as far back as the R25 plenum allows, H1 ignored
+    places["c: rear-most, H1 ignored"] = {"sen_y0": rear - p_need - IWALL - PORT_GAP - sen_d, "plenum": p_need}
+    tongue_flat = TONGUE_GAP_MIN + tg["qwiic"]["mating_face_y"] + TONGUE_PLUG + m.clr
+    for pl in places.values():
+        pl["slant_ok"] = pl["sen_y0"] >= slant - 1e-9
+        pl["plenum_ok"] = pl["plenum"] >= p_need
+        pl["front_room"] = pl["sen_y0"] - SEN_TOL - (m.wall + m.clr)
+        pl["tongue_flat_short"] = tongue_flat - pl["front_room"]
+    tongue_t = tg["thickness"] + tg["max_part_height"]
+    edge_w = (INTAKE_MIN / 2 + tongue_t * tg["outline"][0]) / zone_h       # the passage's width with the tongue on edge in it
+    # R25 at H1 (place a), its back trimmed to the plate below its pilot (airq `H1 plenum trim`): the flow past H1 is
+    # the share of the grille beyond it, away from the ring
+    trim = bz0 - 6.0 - 1.0
+    a = places["a: H1 in the plenum"]
+    py1a = rear - a["plenum"]
+    sec_h1 = (rear - py1a - 0.6) * (trim - m.floor) + (rear - (h1[1] + sd / 2)) * (zw_z0 - RIB - trim)
+    beyond = (sum(1 for x in xs if x + m.slot_w <= h1[0] - sd / 2) if h1[0] < out_x
+              else sum(1 for x in xs if x >= h1[0] + sd / 2)) / n
+    # --- plugs: J2 and J4 out of the left edge, J3 out of the front edge
+    side = -inner + m.clr                                       # the shell's side wall's inner face, less clr_remove
+    plugs = {k: bx0 + mb[k]["mating_face_x"] - side for k in ("j_sen66", "j_qwiic_aux")}
+    j3 = mb["j_qwiic_tongue"]
+    j3_top = bz0 + mb["thickness"] + B.connector_h("j_qwiic_tongue")
+    plugs["j_qwiic_tongue"] = dev(0, j3["mating_face_y"])[1] - (front_inner_y(m, j3_top) + m.clr)
+    # --- R12 and R18 for place (b)
+    mod = mb["antenna"]["module_body"]
+    zt = bz0 + mb["thickness"]
+    ant = ((bx0 + mod[0][0], bx0 + mod[1][0]), (dev(0, 0)[1], dev(0, mod[0][1])[1]), (zt, zt + B.module_h()))
+    for pl in places.values():
+        pl["antenna_to_sen66"] = _box_gap(ant, ((sx0, sx1), (pl["sen_y0"], pl["sen_y0"] + sen_d), (m.floor + m.foam, top)))
+    grille = n * m.slot_w * (zw_z0 - RIB - m.grille_min_z)
+    # --- tongue (flat in front, at the left, clear of the SEN66's plug) to U3 and U2
+    u3 = ((bx0 + mod[0][0], bx0 + mod[1][0]), (dev(0, mod[1][1])[1], dev(0, mod[0][1])[1]), (zt, zt + B.module_h()))
+    (ux0, uy0), (ux1, uy1) = B.layout_part("U2")["box"]
+    u2 = ((bx0 + ux0, bx0 + ux1), (dev(0, uy1)[1], dev(0, uy0)[1]), (zt, zt + mb["max_part_height"]))
+    tz0 = m.grille_min_z + 1.25 - tg["veml7700"]["window_center"][2] - tg["thickness"]   # its window's lower edge on the 10 mm line
+    t_flat = ((sx0, sx0 + tg["outline"][0]), (m.wall + TONGUE_GAP_MIN, m.wall + TONGUE_GAP_MIN + tg["outline"][1]), (tz0, tz0 + tongue_t))
+    ex = (tub - tongue_t, tub) if right else (-tub, -tub + tongue_t)        # on edge against the rail in the passage
+    t_edge = (ex, (m.wall + TONGUE_GAP_MIN, m.wall + TONGUE_GAP_MIN + tg["outline"][1]),
+              (m.floor + m.foam, m.floor + m.foam + tg["outline"][0]))
+    # --- the envelopes the ways out need
+    d_tongue = m.D + places["b: H1 boss over the plate"]["tongue_flat_short"]     # the board, H1 and the plate move back with D
+    w_plugs = 2 * m.wall + 2 * m.clr + bw + plug_out - min(mb[k]["mating_face_x"] for k in ("j_sen66", "j_qwiic_aux"))
+    w_edge = 2 * (m.wall + m.clr + IWALL) + 2 * m.clr + sen_l + edge_w
+    return {"board": {"z0": bz0, "y0": by0, "y_range": (y_lo, y_hi), "x0": bx0, "antenna_end": dev(0, mod[0][1])[1]},
+            "sen66_x": (sx0, sx1), "passage": passage, "zone_h": zone_h, "ports_forward": fwd,
+            "port_gap_section": PORT_GAP * zone_h, "ring": (out_x, out_z, ring_r), "h1": h1, "h1_in_ring_x": dx < ring_r,
+            "ring_top_at_h1": ring_top_at_h1, "slant_limit": slant, "grille": {"n": n, "open": grille, "branch_share": share},
+            "plenum_need": p_need, "branch_need": branch_need, "places": places, "tongue_flat_need": tongue_flat,
+            "sen_front_need": max(SEN_PLUG_BEND, PAD_AND_SEAT), "edge_passage_need": edge_w,
+            "edge": {"passage_free": passage * zone_h - tongue_t * tg["outline"][0], "need": INTAKE_MIN / 2,
+                     "to_u3": _box_gap(t_edge, u3), "to_u2": _box_gap(t_edge, u2), "inlets": inlets,
+                     "h1_meets_inlets": inlets[0] - sd / 2 < h1[0] < inlets[1] + sd / 2,
+                     "h1_section": sec_h1, "h1_need": PORT_OUTLET * beyond},
+            "plugs": plugs, "plug_out": plug_out,
+            "tongue_flat_to_u3": _box_gap(t_flat, u3), "tongue_flat_to_u2": _box_gap(t_flat, u2),
+            "envelopes": {"D_for_tongue_flat": d_tongue, "W_for_plugs": w_plugs, "W_for_tongue_on_edge": w_edge}}
+
+
 ALPHAS = (0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60)
 
 
@@ -612,7 +780,38 @@ def answers(m: Model, depth: float) -> list[dict]:
     return out
 
 
+MINI_WAY_OUT = replace(MINI_T4, W=69.5)   # the smallest rule-keeping mini found (Task 4a): W +3.5, the tongue on edge
+
+
+def mini_summary() -> list[str]:
+    """The Task 4a re-check, as lines (README "airQ mini (Task 4)")."""
+    out = []
+    for name, m, kw in (("66 x 50 x 42, inlet end right", MINI_T4, {}), ("66 x 50 x 42, inlet end left", MINI_T4, {"inlet_end": "left"}),
+                        ("69.5 x 50 x 42, inlet end left", MINI_WAY_OUT, {"inlet_end": "left"})):
+        r = mini_recheck(m, **kw)
+        e = r["edge"]
+        out.append(f"{name}: board z {r['board']['z0']:.2f} y {r['board']['y0']:.2f} x0 {r['board']['x0']:.2f}; SEN66 x {r['sen66_x'][0]:.2f}..{r['sen66_x'][1]:.2f},"
+                   f" passage {r['passage']:.2f}; ring x {r['ring'][0]:.2f}; H1 {r['h1'][0]:.2f}, {r['h1'][1]:.2f}; slant limit {r['slant_limit']:.2f};"
+                   f" plenum needs {r['plenum_need']:.2f} ({r['branch_need']:.1f} mm2); grille {r['grille']['n']} slots {r['grille']['open']:.1f} mm2")
+        for k, pl in r["places"].items():
+            out.append(f"   {k}: SEN66 y0 {pl['sen_y0']:.2f} (slant {'ok' if pl['slant_ok'] else 'NO'}), plenum {pl['plenum']:.2f} ({'ok' if pl['plenum_ok'] else 'NO'}),"
+                       f" front room {pl['front_room']:.2f} (tongue flat needs {r['tongue_flat_need']:.2f}: short {pl['tongue_flat_short']:.2f}),"
+                       f" antenna-SEN66 {pl['antenna_to_sen66']:.2f}" + (f", boss over the ring {pl['boss_clear']:.2f}" if "boss_clear" in pl else ""))
+        out.append(f"   tongue on edge in the passage: free {e['passage_free']:.1f} (needs {e['need']:.1f}), to U3 {e['to_u3']:.1f}, U2 {e['to_u2']:.1f};"
+                   f" H1 meets the inlets {e['h1_meets_inlets']}; R25 at H1 {e['h1_section']:.1f} / {e['h1_need']:.1f}")
+        out.append(f"   plugs (room / {r['plug_out']}): " + ", ".join(f"{k} {v:.2f}" for k, v in r["plugs"].items())
+                   + f"; ports forward: beside {r['ports_forward']['beside']:.1f}, over {r['ports_forward']['over']:.1f} (need {PORT_OUTLET})")
+    env = mini_recheck()["envelopes"]
+    out.append("envelopes: " + ", ".join(f"{k} {v:.2f}" for k, v in env.items()))
+    return out
+
+
 if __name__ == "__main__":
+    import sys
+    if "--mini" in sys.argv:
+        for line in mini_summary():
+            print(line)
+        raise SystemExit
     for m, depth in ((AIRQ, 55.0), (MINI, 50.0)):
         print(f"######## {m.name}: {m.W} x {m.D} x {m.H}, tilt {m.tilt_deg}; face needs H >= {min_face_height(m):.2f}")
         for r in study(m):

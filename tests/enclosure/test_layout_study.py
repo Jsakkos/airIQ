@@ -219,3 +219,73 @@ def test_hcho_alternatives_by_slot_count():
     built = rows[0]
     assert built["open_40"] == pytest.approx(18 * 1.2 * 18.9) and built["open_40"] < L.OUTLET_MIN
     assert all(not r["meets"] for r in rows[:-1]) and rows[-1]["meets"]
+
+
+# --- Task 4a: the mini re-checked with the airQ's construction (README "airQ mini (Task 4)") ----------
+
+def test_mini_task4_board_pose_and_sensor_zone():
+    r = L.mini_recheck()
+    lo, hi = r["board"]["y_range"]
+    # the zone rule: SEN66 top 2.0 + 1.0 + 25.6, gaps 0.3, zone wall 1.8
+    assert r["board"]["z0"] == pytest.approx(2.0 + 1.0 + 25.6 + 0.3 + 1.8 + 0.3)
+    assert lo <= r["board"]["y0"] == pytest.approx(hi)
+    assert r["board"]["antenna_end"] == pytest.approx(50 - 1.8 - 0.2, abs=0.02)      # the antenna strip binds at the rear wall
+    # the tub: 66 - 2 x (1.8 + 0.2 + 1.6) = 58.8 wide; the SEN66 (55.2) leaves a 3.4 passage at its inlet end
+    assert r["passage"] == pytest.approx(58.8 - 0.2 - 55.2)
+    assert r["port_gap_section"] == pytest.approx(3.0 * 26.9) and r["port_gap_section"] >= 77.3
+
+
+def test_mini_task4_ports_forward_cannot_take_the_outlet_back():
+    """R25: with the ports forward the outlet (330.1) would have to pass the module to the rear: beside
+    it (the 3.4 passage) or over it (the 0.3 gap under the zone wall)."""
+    f = L.mini_recheck()["ports_forward"]
+    assert f["beside"] == pytest.approx(3.4 * 26.9) and f["over"] == pytest.approx(0.3 * 55.2)
+    assert max(f["beside"], f["over"]) < 330.1
+
+
+def test_mini_task4_tongue_has_no_place_at_66_x_50():
+    """The tongue (22 x 13, its Qwiic plug 4.5 out of its rear edge's mating face at 12.36) lying flat in
+    front of the SEN66 needs 17.56 from the lip; the most any place of the SEN66 leaves is 12.77, with H1
+    ignored. On edge in the intake passage it blocks 4.6 x 22 of a 3.4 x 26.9 section."""
+    r = L.mini_recheck()
+    tg = interface()["mechanical"]["tongue"]
+    assert r["tongue_flat_need"] == pytest.approx(0.5 + tg["qwiic"]["mating_face_y"] + 4.5 + 0.2)
+    # place b by hand: H1 at the board's front edge 12.01 + 30 - 2.6; the plate centred on it
+    h1_y = 12.01 + 30 - 2.6
+    assert r["places"]["b: H1 boss over the plate"]["front_room"] == pytest.approx(h1_y - 0.8 - 3.0 - 21.3 - 0.5 - 2.0, abs=0.01)
+    assert all(pl["tongue_flat_short"] > 4.5 for pl in r["places"].values())
+    for end in ("right", "left"):
+        e = L.mini_recheck(inlet_end=end)["edge"]
+        assert e["passage_free"] == pytest.approx(3.4 * 26.9 - 4.6 * 22) and e["passage_free"] < e["need"]
+    assert L.mini_recheck()["edge"]["to_u3"] < 20                    # and at the right end it would sit under U3
+
+
+def test_mini_task4_left_edge_plugs_have_no_room_at_66():
+    """J2 (the SEN66's cable) and J4 come out of the board's left edge; with the board against the right
+    wall (clr_remove 0.2) J2's mating face is 66 / 2 - 1.8 - 0.2 - 60 + 0.35 from the centre, 2.35 from
+    the shell's side wall less clr_remove. J3 (front edge) faces the slope at 1.57."""
+    m = interface()["mechanical"]["main"]
+    p = L.mini_recheck()["plugs"]
+    x0 = 66 / 2 - 1.8 - 0.2 - 60
+    assert p["j_sen66"] == pytest.approx(x0 + m["j_sen66"]["mating_face_x"] - (-(66 / 2 - 1.8) + 0.2))
+    assert max(p.values()) < 3.0 < L.PLUG_OUT
+    assert L.mini_recheck(board_right=False)["plugs"]["j_sen66"] == pytest.approx(p["j_sen66"] - 1.0)
+    # not a margin question: even a 3.0 plug-and-bend envelope needs a case wider than 66
+    assert L.mini_recheck(plug_out=3.0)["envelopes"]["W_for_plugs"] > 66.5
+
+
+def test_mini_task4_envelopes_and_the_way_out():
+    env = L.mini_recheck()["envelopes"]
+    assert env["D_for_tongue_flat"] == pytest.approx(50 + 5.75, abs=0.02)
+    assert env["W_for_plugs"] == pytest.approx(2 * 1.8 + 2 * 0.2 + 60 + 5.0 - 0.35)
+    assert env["W_for_tongue_on_edge"] == pytest.approx(2 * 3.6 + 0.4 + 55.2 + (77.25 + 4.6 * 22) / 26.9)
+    # 69.5 x 50 x 42, the SEN66's inlet end left, H1 in the plenum, the tongue on edge in the passage
+    r = L.mini_recheck(L.MINI_WAY_OUT, inlet_end="left")
+    a = r["places"]["a: H1 in the plenum"]
+    assert a["slant_ok"] and a["plenum_ok"] and a["front_room"] >= r["sen_front_need"]
+    e = r["edge"]
+    assert e["passage_free"] >= e["need"] and min(e["to_u3"], e["to_u2"]) >= 20 and e["h1_section"] >= e["h1_need"]
+    assert e["h1_meets_inlets"]                                        # so H1 must stand in the plenum (place a)
+    assert min(r["plugs"]["j_sen66"], r["plugs"]["j_qwiic_aux"]) >= L.PLUG_OUT and r["plugs"]["j_qwiic_tongue"] < 3.0
+    assert L.OUTLET_FLOOR <= r["grille"]["open"] < L.OUTLET_MIN        # R18 shortfall: owner item
+    assert a["antenna_to_sen66"] < 15                                   # R12: owner item
