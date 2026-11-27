@@ -66,8 +66,9 @@ BED_CONTACT = {
     "light_guide_pm": (30, 36),
     "gasket_out": (90, 1),
     "gasket_in": (25, 1),            # lying on its side: nothing hangs
-    "grommet_zone_a": (20, 4),       # the 0.5 ribs' undersides
-    "grommet_zone_b": (13, 1),
+    "grommet_zone_a": (9, 3),        # the 0.5 rib's underside (round 2: three pieces split across y)
+    "grommet_zone_b": (13, 1),       # between the cables: nothing hangs
+    "grommet_zone_c": (9, 3),        # the 0.5 rib's underside
     "tongue_mount": (2.5, 15),       # 2.8 mm2 on the spigot's end; the collar's underside ring hangs 1.0 up: brim
 }
 
@@ -98,7 +99,8 @@ HANGING = {
     "light_guide_pm": {((0.0, 0.0, -1.0, 1.6), 34.6): "flange fronts over and under the slot"},
     # the collar's underside ring round the spigot it stands on (1.0 up)
     "tongue_mount": {((0.0, 0.0, -1.0, 1.0), 13.8): "collar underside ring"},
-    "grommet_zone_a": {((0.0, 0.0, -1.0, 0.7), 3.2): "ribs' undersides"},
+    "grommet_zone_a": {((0.0, 0.0, -1.0, 0.7), 2.6): "rib's underside"},
+    "grommet_zone_c": {((0.0, 0.0, -1.0, 0.7), 2.6): "rib's underside"},
 }
 
 

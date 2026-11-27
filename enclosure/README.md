@@ -1178,8 +1178,9 @@ Build it with `uv run --with pyyaml python enclosure/build.py airq-mini`, and ch
   - A vertical riser across the passage would take 3 × 26.9 mm² of it. So the drawer sits at the
     passage's rear, behind the tongue's plug, and nothing rises beside the tongue.
 - **The drawer is a notch in the zone wall's flat part, open to its left end.** The split grommet
-  is cut on the cables' line, x −29.5. The inner half goes in first, then the cables with their
-  plugs on, then the outer half, which rests on the left rail and is held by the shell's side wall.
+  (round 2: three pieces split across y through the two cables' axes, as the airQ's) is squeezed by the
+  notch's front and rear faces; the cables go in first with their plugs on, then the pieces, which rest on
+  the left rail.
 - **The cradle.**
   - The pad's seat lies right of the plug (x 5.75 … 27.75), joined to the right boss pocket's
     inner wall. It does not reach the rail, where it met the shell's right boss: the check design
@@ -1271,7 +1272,7 @@ the hard stop (no printed stop gap). Face down, the rod stands 24° off the vert
   a 0.9 chamfer there (1.63 of wall left across it) and `intake_throat` (per-z gap to the SEN66's front-left,
   less the cable over its height): **97.5** mm² nominal, **87.1** at the tolerance corner (module on its left
   stop, 21.8 deep), against 77.3. At wall 2.4 it is 57.4: owner item with the intake rows.
-- **The drawer grommet's split is pressed shut (M2).** The outer half reaches the shell's side wall with
+- **The drawer grommet's split is pressed shut (M2; superseded in round 2, below).** The outer half reaches the shell's side wall with
   `drawer_squeeze` (a 0.4 lead-in on its top outer edge for the wall coming down past it), so the wall presses
   it onto the inner half and the inner half onto the notch's closed end: the cables' push in the bores cannot
   open the split.
@@ -1555,8 +1556,8 @@ walls and infill are the owner's choice: the design does not depend on them. Siz
 | `light_guide_co2`, `light_guide_pm` | 1 each | **clear or natural PETG**, bare: no paint, coat or cladding on any face (R40, R48) | **exit face down on a smooth plate** (turn x +114; 20.2 × 4.1 × 4.4 mm). The exit face is the first layer: 34.3 mm² on the bed. Every TIR face is a vertical wall or a wall leaning up | **Supports only under the two flange fronts** (34.6 mm² in all: 22.5 over the slot and 12.1 under it, parallel to the exit face and 1.6 above it; 0.6 … 1.1 mm wide ledges that may print without any). They carry **none of the light**: of the 5,081 rays each half delivers, 0 touch them (`test_supports_touch_none_of_the_light`). No support touches the exit, an entry face or a TIR face. The faces that do carry light are printed as layer steps, not supported: the entry faces (all 5,081 delivered rays cross them; they face up at 24° from the bed, so they print as shallow steps: the roughest optical faces, a look item), the tongue's lower side (16 %), the feet's bottoms (13 % and 11 %), the feet's ends (3 % each) and the tongue's upper side (1 %). No brim needed (34 mm² contact); a brim of 3 lines helps if the 4 mm tall part lifts. First-print item: the best orientation is decided at the first print (section 6) |
 | `gasket_out` | 1 | TPU 95A, opaque (black) | on its seat end (the end that goes into the plate): 24 × 24 × 4 | none |
 | `gasket_in` | 1 | TPU 95A, opaque | **on its side** (turn y −90): 27.9 × 4.55 × 6.44, 29.3 mm² on the bed, the 55° wiper lying flat | none (nothing hangs). The airQ's identical part stands on 7.1 mm²; this is easier |
-| `grommet_zone_a` | 1 | TPU 95A, opaque | flat as designed: 3.5 × 8.8 × 1.8, the bores vertical, 22.7 mm² on the bed | none (the 0.5 ribs' undersides, 3.2 mm²) |
-| `grommet_zone_b` | 1 | TPU 95A, opaque | on its closed end (turn y +90), the split face and its half-channels up: 1.8 × 8.8 × 2.35, 14.7 mm² | none |
+| `grommet_zone_a`, `grommet_zone_c` | 1 each | TPU 95A, opaque | flat as designed: 5.6 × 2.8 / 2.5 × 1.8, the half-bores vertical, 10.1 / 9.6 mm² on the bed | none (each rib's underside, 2.5 mm², 0.7 up) |
+| `grommet_zone_b` | 1 | TPU 95A, opaque | flat as designed: 5.6 × 3.5 × 1.8, a half-bore on each face, 14.6 mm² on the bed | none (nothing hangs) |
 | `tongue_mount` | 1 (print 3: the pin is 7.7 tall) | shell material | standing on the spigot's end (turn y −90): 4.6 × 4.6 × 7.7, **2.8 mm² on the bed** | none, but **brim or mouse ears**: the collar's underside ring (13.8 mm², 1.4 wide, 1.0 above the bed) hangs round the spigot |
 
 TPU: dry the filament and print slowly. The TPU parts are sized with their own squeeze already in (the check design
@@ -1610,8 +1611,10 @@ Keep the base and the shell separate until step 9.
    the ring, past the seat's and the wiper's lead-ins. Lay both cables toward the drawer (the SEN66 cable over the
    tongue).
 6. **Zone wall.** With `zone_seal` stuck on its ledge's front face, onto the standoff's spigot and the key. Lay the
-   two cables into the drawer from its open end, close `grommet_zone_a/_b` round them (the split on the cables' line)
-   and slide the pair in together. The outer half meets the shell's side wall later and presses the split shut.
+   two cables into the drawer from its open end (the SEN66 cable in front), then slide the three grommet pieces in
+   from the open end over the left rail, holding each cable back as its piece passes it: `grommet_zone_a` in front
+   of the SEN66 cable, `_b` between the cables, `_c` behind the Qwiic. Their ribs (on a and c) run in the notch's
+   grooves; the notch's front and rear faces squeeze the stack, so both splits close round the cables.
 7. **Main board.** Then the cables into J2 and J4, and the screws: **H1 an M2 × 6** (which also clamps the zone
    wall), **H2 an M2 × 3**.
 8. **Shell, face down on the bench.**

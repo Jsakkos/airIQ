@@ -117,7 +117,7 @@ def test_every_body_is_named(name):
         "airq": ["shell", "base_plate", "zone_wall", "sen66_top_seal", "zone_seal", "sen66_foam", "gasket_out", "gasket_in", "sen66_pad", "hcho_lid",
                  "grommet_zone_a", "grommet_zone_b", "grommet_j4_a", "grommet_j4_b", "grommet_tongue_a", "grommet_tongue_b", "light_guide", "crease_seal", "led_mask", "gap_stop", "orange_dot"],
         "airq-mini": ["shell", "base_plate", "zone_wall", "zone_seal", "sen66_foam", "gasket_out", "gasket_in", "sen66_pad", "sen66_top_seal",
-                      "tongue_mount", "grommet_zone_a", "grommet_zone_b", "light_guide_co2", "light_guide_pm", "guide_stop", "orange_dot"],
+                      "tongue_mount", "grommet_zone_a", "grommet_zone_b", "grommet_zone_c", "light_guide_co2", "light_guide_pm", "guide_stop", "orange_dot"],
     }[name]
     assert SCRIPTS[name].bodies == expected
 

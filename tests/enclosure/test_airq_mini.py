@@ -22,7 +22,7 @@ from sclib import evaluate
 S = airq_mini.build()
 V = S.v
 BODIES = ["shell", "base_plate", "zone_wall", "zone_seal", "sen66_foam", "gasket_out", "gasket_in", "sen66_pad", "sen66_top_seal",
-          "tongue_mount", "grommet_zone_a", "grommet_zone_b", "light_guide_co2", "light_guide_pm", "guide_stop", "orange_dot"]
+          "tongue_mount", "grommet_zone_a", "grommet_zone_b", "grommet_zone_c", "light_guide_co2", "light_guide_pm", "guide_stop", "orange_dot"]
 STUDY = L.mini_recheck(L.MINI_WAY_OUT, inlet_end="left")
 # positions Task 4b needs (task-4-scope "Split light band", "Rules and checks"), fixed here as parameters
 FACE_4B = ["d1_x", "d2_x", "d3_x", "d4_x", "div_x0", "div_x1", "led_z", "led_f", "band_half", "band_h", "band_co2_x0", "band_co2_x1",
@@ -198,16 +198,25 @@ def test_hold_pads_stand_on_the_zone_wall():
 
 
 def test_drawer_grommet_split_is_pressed_shut():
-    """Review M2: the drawer grommet splits across x at the cables' line; the outer half reaches the shell's
-    side wall (drawer_squeeze into it, a lead-in at its top), the inner half the notch's closed end
-    (drawer_squeeze), so the split is squeezed shut between them; the outer half's bottom is at contact."""
-    a = next(c["params"] for c in S.commands if c["params"].get("name") == "Zone grommet a")
-    b = next(c["params"] for c in S.commands if c["params"].get("name") == "Zone grommet b")
-    assert V(a["corner"][0]) == pytest.approx(V("-inner_x - drawer_squeeze"))
-    assert V(f"{a['corner'][0]} + {a['length']}") == pytest.approx(V("cab_x")) == pytest.approx(V(b["corner"][0]))
-    assert V(f"{b['corner'][0]} + {b['length']}") == pytest.approx(V("dr_x1 + drawer_squeeze"))
-    assert V(a["corner"][2]) == pytest.approx(V("zw_z0")) and V("drawer_floor_squeeze") == 0
-    assert "Zone grommet a lead-in" in {c["params"].get("name") for c in S.commands}
+    """Review round 2, M2: the drawer grommet is three pieces split across y through the two cables' axes (as the
+    airQ's), so the notch's front and rear faces squeeze both splits (drawer_squeeze each): the press acts between
+    two faces of the zone wall, and the shell's x float (+-0.2, screws in screw_d holes) and the zone wall's (+-0.15,
+    H1's spigot in its seat) do not enter it at any corner. Every piece reaches the notch's closed end, stands on the
+    rail at contact and keeps clr_remove from the shell's side wall."""
+    import airq_mini
+    boxes = {piece: next(c["params"] for c in S.commands if c["params"].get("name") == f"Zone grommet {piece}") for piece in "abc"}
+    y = {k: (V(b["corner"][1]), V(f"{b['corner'][1]} + {b['width']}")) for k, b in boxes.items()}
+    assert y["a"][1] == pytest.approx(V("gh_y")) == pytest.approx(y["b"][0])
+    assert y["b"][1] == pytest.approx(V("qw_y")) == pytest.approx(y["c"][0])
+    assert y["c"][1] - y["a"][0] == pytest.approx(V("dr_y1 - dr_y0 + 2 * drawer_squeeze"))      # the notch squeezes the stack
+    for b in boxes.values():
+        assert V(b["corner"][0]) == pytest.approx(V("-inner_x + clr_remove"))
+        assert V(f"{b['corner'][0]} + {b['length']}") == pytest.approx(V("dr_x1 + drawer_squeeze"))
+        assert V(b["corner"][2]) == pytest.approx(V("zw_z0"))
+    # the floats: the shell's and the zone wall's x play, both larger than the press, are outside the press's path
+    assert V("(screw_d - 2) / 2") > V("drawer_squeeze") and V("clr_align") > V("drawer_squeeze")
+    assert [p for p, *_ in airq_mini.GROMMET_PIECES] == ["a", "b", "c"]
+    assert V("drawer_floor_squeeze") == 0
 
 
 def test_labels_and_light_sensor_window():

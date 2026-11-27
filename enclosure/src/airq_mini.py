@@ -29,7 +29,8 @@ through its mounting hole; the module's end keeps it on the pin. J3 is blocked b
 
 Cables: J2 (the SEN66) and J4 (the tongue) leave the board's left edge; both cables pass the zone
 wall in one drawer (a notch open to its left end) over the passage's rear, sealed by a split
-grommet (`grommet_zone_a` outer, `grommet_zone_b` inner) laid round them with the plugs on.
+grommet in three pieces (`grommet_zone_a` front, `_b` between the cables, `_c` rear, split through the cables'
+axes so the notch's faces squeeze the splits) laid round them with the plugs on.
 
 Bodies:
 - printed: shell (with the band's slots and ribs, the labels, the flexure); orange_dot (an AMS colour
@@ -37,7 +38,7 @@ Bodies:
   H1's standoff and its web to the plate, the plenum plate, the pad's seat, the module's left
   stop); zone_wall (clamped by the board's screw at H1, the board's H2 screw in a blind pilot in
   it: H2 lies over the module, so it has no post); tongue_mount (the tongue's pin);
-- TPU 95A: gasket_out, gasket_in, grommet_zone_a/_b;
+- TPU 95A: gasket_out, gasket_in, grommet_zone_a/_b/_c;
 - foam: sen66_foam, sen66_pad, zone_seal, sen66_top_seal, guide_stop (black, behind the guides).
 Felt feet are bought (positions here).
 
@@ -84,8 +85,9 @@ PRINT_PARTS = {
     "light_guide_pm": {"turns": [("x", 114)]},
     "gasket_out": {"turns": [("x", -90)]},                 # on its seat end (the rear end, into the plenum plate)
     "gasket_in": {"turns": [("y", -90)]},                  # on its side: the wiper lies flat, nothing hangs
-    "grommet_zone_a": {"turns": []},                       # flat, as designed (bores vertical)
-    "grommet_zone_b": {"turns": [("y", 90)]},              # on its closed end, the split face up
+    "grommet_zone_a": {"turns": []},                       # flat, as designed (bores vertical): only its rib's underside hangs
+    "grommet_zone_b": {"turns": []},                       # flat: nothing hangs
+    "grommet_zone_c": {"turns": []},                       # flat: only its rib's underside hangs
     "tongue_mount": {"turns": [("y", -90)]},               # standing on the spigot end, shank up
 }
 EXPORTS = [f"export/airq-mini-{part}.{ext}" for part in PRINT_PARTS for ext in ("3mf", "step")]
@@ -177,8 +179,7 @@ def build() -> Script:
     p("groove_d", 0.6, "drawer grooves' depth into the notch's faces (along y)")
     p("groove_w", 0.8, "drawer grooves' height, centred in the zone wall's thickness")
     p("drawer_squeeze", 0.05, "TPU squeeze of the drawer grommet's faces (the airQ's B6 value; R9: the check sets 0)")
-    p("drawer_floor_squeeze", 0, "the outer grommet's bottom on the left rail's top: at contact (review I1: a squeeze there would push the zone wall up beside the drawer, outside its holds; R9: the touch run sets 0.05)")
-    p("grommet_lead", 0.4, "lead-in on the outer drawer grommet's top outer edge: the shell's side wall slides down past it (review M2)")
+    p("drawer_floor_squeeze", 0, "the drawer grommet's bottom on the left rail's top: at contact (review I1: a squeeze there would push the zone wall up beside the drawer, outside its holds; R9: the touch run sets 0.05)")
     p("bore_squeeze", 0.2, "grommet bores under the cable's diameter (they hug the cable; R9: the check sets 0)")
     cable_params(s)
 
@@ -409,8 +410,8 @@ def zone_drawer(s: Script) -> None:
     """The cable pass-through in the zone wall's flat part over the passage's rear (J2 and J4): a
     notch open to the zone wall's left end, so both cables are laid in from the side with their
     plugs on (no plug passes it). Its front and rear faces carry grooves along x for the split
-    grommet's ribs; the grommet's halves slide in from the left over the left rail, the shell's
-    side wall stops them (clr_remove)."""
+    grommet's ribs and squeeze its three pieces (round 2, M2); the pieces slide in from the left over
+    the left rail, and the shell's side wall stands clr_remove outside their outer ends."""
     x0 = "-inner_x + clr_remove - 1"
     s.box("Drawer notch", [x0, "dr_y0", "zw_z0 - 1"], [f"dr_x1 - ({x0})", "dr_y1 - dr_y0", "zone_t + 2"],
           operation="cut", targets=["zone_wall"])
@@ -419,34 +420,35 @@ def zone_drawer(s: Script) -> None:
         s.box(f"Drawer groove {name}", [x0, ya, zm0], [f"dr_x1 - ({x0})", "groove_d", "groove_w"], operation="cut", targets=["zone_wall"])
 
 
+GROMMET_PIECES = (("a", "dr_y0 - drawer_squeeze", "gh_y", "front"), ("b", "gh_y", "qw_y", None), ("c", "qw_y", "dr_y1 + drawer_squeeze", "rear"))
+
+
 def grommets(s: Script) -> None:
-    """`grommet_zone_a` (outer) and `grommet_zone_b` (inner), TPU 95A, split along the cables'
-    line (x = cab_x) so they go round both cables with the plugs on. Each fills the notch between
-    its faces with drawer_squeeze on the front and rear faces (and on the closed end for the inner
-    half); ribs in the notch's grooves hold them in z. The outer half stands on the left rail's top
-    at contact (review I1) and reaches the shell's side wall with drawer_squeeze (review M2): the wall
-    presses the split shut against the inner half and the notch's closed end, so the cables' push in
-    the bores (bore_squeeze) cannot open it."""
+    """The drawer's split grommet, TPU 95A, in three pieces split across y through the two cables' axes, as the
+    airQ's (review round 2, M2): `grommet_zone_a` (front, to the SEN66 cable's axis gh_y), `grommet_zone_b`
+    (between the cables' axes) and `grommet_zone_c` (rear, from the Qwiic cable's axis qw_y). Each runs from the
+    zone wall's open end to the notch's closed end (drawer_squeeze into it). The notch's front and rear faces
+    squeeze the stack (drawer_squeeze each), so both splits are pressed shut by two faces of the one zone wall:
+    the shell's and the zone wall's floats in x do not enter, and the cables' push in their bores (bore_squeeze)
+    is taken by those faces. Ribs on a and c in the notch's grooves hold the stack in z; every piece stands on the
+    left rail's top at contact (drawer_floor_squeeze, review I1). Laid in from the open end after the cables (each
+    cable held back as its piece slides past it), with the plugs on."""
     sq, c = "drawer_squeeze", "clr_align"
     zm0, zm1 = f"zw_z0 + zone_t / 2 - groove_w / 2 + {c}", f"zw_z0 + zone_t / 2 + groove_w / 2 - {c}"
     rib = f"groove_d - {c}"
-    for half, xa, xb, z0 in (("a", "-inner_x - drawer_squeeze", "cab_x", "zw_z0 - drawer_floor_squeeze"), ("b", "cab_x", f"dr_x1 + {sq}", "zw_z0")):
-        body = f"grommet_zone_{half}"
-        s.box(f"Zone grommet {half}", [xa, f"dr_y0 - {sq}", z0], [f"{xb} - ({xa})", f"dr_y1 - dr_y0 + 2 * {sq}", f"zw_z1 - ({z0})"], body=body)
-        s.box(f"Zone grommet {half} rib front", [xa, f"dr_y0 - {sq} - ({rib})", zm0], [f"{xb} - ({xa})", f"{rib} + 0.5", f"{zm1} - ({zm0})"],
-              operation="join", targets=[body])
-        s.box(f"Zone grommet {half} rib rear", [xa, f"dr_y1 + {sq} - 0.5", zm0], [f"{xb} - ({xa})", f"{rib} + 0.5", f"{zm1} - ({zm0})"],
-              operation="join", targets=[body])
-    # review M2: the outer half reaches the shell's side wall (drawer_squeeze into it): the wall presses the split shut,
-    # so the cables' push in the bores cannot open it; a lead-in at its top outer edge for the wall coming down past it
-    with s.sketch("Zone grommet a lead-in outline", "XZ", offset="dr_y0 - drawer_squeeze - 1") as sk:
-        sk.polyline([("-inner_x - drawer_squeeze - 0.1", "-(zw_z1 + 0.1)"), ("-inner_x - drawer_squeeze + grommet_lead", "-(zw_z1 + 0.1)"),
-                     ("-inner_x - drawer_squeeze - 0.1", "-(zw_z1 - grommet_lead - 0.1)")])
-    s.extrude("Zone grommet a lead-in", "Zone grommet a lead-in outline", "dr_y1 - dr_y0 + 2 * drawer_squeeze + 2", operation="cut",
-              targets=["grommet_zone_a"])
-    for name, y, d in (("GH", "gh_y", "cable_gh_d"), ("Qwiic", "qw_y", "cable_qw_d")):
+    xa, xb, z0 = "-inner_x + clr_remove", f"dr_x1 + {sq}", "zw_z0 - drawer_floor_squeeze"
+    for piece, ya, yb, side in GROMMET_PIECES:
+        body = f"grommet_zone_{piece}"
+        s.box(f"Zone grommet {piece}", [xa, ya, z0], [f"{xb} - ({xa})", f"{yb} - ({ya})", f"zw_z1 - ({z0})"], body=body)
+        if side == "front":
+            s.box(f"Zone grommet {piece} rib", [xa, f"dr_y0 - {sq} - ({rib})", zm0], [f"{xb} - ({xa})", f"{rib} + 0.5", f"{zm1} - ({zm0})"],
+                  operation="join", targets=[body])
+        elif side == "rear":
+            s.box(f"Zone grommet {piece} rib", [xa, f"dr_y1 + {sq} - 0.5", zm0], [f"{xb} - ({xa})", f"{rib} + 0.5", f"{zm1} - ({zm0})"],
+                  operation="join", targets=[body])
+    for name, y, d, pieces in (("GH", "gh_y", "cable_gh_d", ("a", "b")), ("Qwiic", "qw_y", "cable_qw_d", ("b", "c"))):
         s.cylinder(f"Zone grommet hole {name}", ["cab_x", y, "zw_z0 - 1"], f"{d} - bore_squeeze", "zone_t + 2", operation="cut",
-                   targets=["grommet_zone_a", "grommet_zone_b"])
+                   targets=[f"grommet_zone_{q}" for q in pieces])
 
 
 def tongue_mount(s: Script) -> None:
