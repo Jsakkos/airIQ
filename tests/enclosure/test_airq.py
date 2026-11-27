@@ -32,7 +32,7 @@ S = airq.build()
 V = S.v
 GROMMETS = ["grommet_zone_a", "grommet_zone_b", "grommet_j4_a", "grommet_j4_b", "grommet_tongue_a", "grommet_tongue_b"]
 BODIES = ["shell", "base_plate", "zone_wall", "sen66_top_seal", "zone_seal", "sen66_foam", "gasket_out", "gasket_in", "sen66_pad", "hcho_lid",
-          *GROMMETS]
+          *GROMMETS, "light_guide", "crease_seal"]
 TPU = ["gasket_out", "gasket_in", *GROMMETS]
 # positions Task 3b needs (task-3-scope, M6), fixed here as parameters
 FACE = ["panel_x0", "panel_s0", "bezel", "window_xc", "pocket_x0", "pocket_x1", "led_f0", "led_h_slot", "led_len", "led_z",
@@ -42,7 +42,8 @@ FACE = ["panel_x0", "panel_s0", "bezel", "window_xc", "pocket_x0", "pocket_x1", 
         "usb_x", "usb_z", "usb_well", "usb_chamfer",
         "win_x0", "win_x1", "win_s0", "win_s1", "win_chamfer",
         "ffc_w", "ffc_t", "ffc_r", "ffc_s_c3", "ffc_s_b0", "ffc_t_a", "ffc_x_m", "ffc_xc", "ffc_x_c1", "ffc_insert", "ffc_service_dz",
-        "hold_s0", "hold_s1", "hold_t0", "hold_t1", "hold_x0", "hold_x1"]
+        "hold_s0", "hold_s1", "hold_t0", "hold_t1", "hold_x0", "hold_x1",
+        "led_x0", "led_x1", "led_s0", "led_s1", "gd_t0", "gd_t1", "gd_s0", "gd_y_e", "gd_l1x0", "gd_l1x1", "gd_l2x0", "gd_l2x1", "crease_y0", "crease_squeeze"]
 
 
 def test_bodies_and_plan_parameters():
@@ -521,6 +522,44 @@ def test_adapter_holder_flanks_the_board():
     assert V("hold_s0") * V("cos_t") + V("lip") - V("hold_t1") * V("sin_t") > V("zw_z1") + 2.6      # z above the strip's top
 
 
+def test_led_slot_and_light_guide_follow_the_leds():
+    """3b-1 feature 3: a 30 mm slot centred under the window; a clear guide whose entry faces are gd_clr in
+    front of the four LED faces (at their real positions, 4.0 x 2.0 centred 1.0 above the board), whose
+    legs end at the faces' top edge, and which keeps out of the FFC's strip into J7 and behind the panel."""
+    leds = B.MAIN["leds"]["chain"]
+    assert V("led_x1") - V("led_x0") == pytest.approx(30.0) and (V("led_x0") + V("led_x1")) / 2 == pytest.approx(V("window_xc"))
+    for i, led in enumerate(leds, 1):
+        assert V(f"led_d{i}_x") - V("board_x0") == pytest.approx(led["center_x"])
+    assert (V("led_face_w"), V("led_face_h")) == pytest.approx((4.0, 2.0))
+    assert V("led_z") - V("board_z0") - V("board_t") == pytest.approx(1.0)                  # the face's centre, 1.0 above the board
+    assert V("gd_y_e") == pytest.approx(V("board_y0") - V("gd_clr"))
+    assert V("gd_t0") >= V("bezel") + V("panel_t") + V("clr_remove") - 1e-9               # behind the panel's back face
+    assert V("gd_t1") - V("gd_t0") == pytest.approx(V("guide_t"))
+    assert V("gd_l1x0") < V("led_d1_x") - 2.0 and V("led_d2_x") + 2.0 < V("gd_l1x1")        # the legs flank the LED faces
+    assert V("gd_l2x0") < V("led_d3_x") - 2.0 and V("led_d4_x") + 2.0 < V("gd_l2x1")
+    assert V("gd_l1x1") < V("ffc_xc") - V("ffc_w") / 2 and V("ffc_xc") + V("ffc_w") / 2 < V("gd_l2x0")   # the FFC's strip is clear
+    assert V("gd_l1x1") - V("gd_l1x0") < 10.0 and V("gd_l2x1") <= V("board_x0") + V("board_w")
+    zmin = V("lip") + V("gd_s0") * V("cos_t") - V("gd_t1") * V("sin_t")
+    assert zmin >= V("lip") + V("clr_remove") + 0.2 - 1e-9                                  # no part of the guide lower than 0.4 over the lip's top
+    assert V("gd_top_z") == pytest.approx(V("led_z") + V("led_face_h") / 2)                 # no surface sees over the LEDs
+    assert V("panel_s0") - V("clr_remove") - V("led_s1") >= 1.2 - 1e-9                   # a bar of 1.2 between slot and pocket
+
+
+def test_guide_light_stays_off_the_crease_the_sensor_and_u4():
+    """3b-1 feature 3: from every non-exit surface of the guide, every straight line to the light
+    sensor, to the lip's window and to the crease (the 0.2 parting line's front, which the foam tape
+    plugs) crosses at least 1.2 mm of opaque material; no line from an LED face or a guide window
+    reaches the MS5611 (R13)."""
+    paths = airq_check.light_paths(S)
+    for name, (length, _) in paths.items():
+        assert length >= 1.2 - 1e-6, (name, length)
+    sight = airq_check.ms5611_sight(S)
+    assert sight["unblocked"] == {"led_faces": 0, "entry_windows": 0}, sight
+    assert sight["samples"]["entry_windows"] > 100
+    # the crease seal: the lip's top to the shell's lowest plane, over 1.2 of foam
+    assert V("wall") - V("crease_y0") >= 1.2                                                 # foam tape: 1.2 or more along the line
+
+
 # --- SolidCraft --------------------------------------------------------------------------
 
 def test_build_and_bounding_box(cli):
@@ -682,3 +721,21 @@ def test_ffc_keepout_is_the_route_and_the_holder_flanks_the_adapter(check):
     assert check["interference"]["count"] == 0
     vol = airq_check.face_volumes(check["face"])
     assert vol[("fp_hold", "shell")] == pytest.approx(0.05 * V("ad_l") * (V("hold_t1") - V("hold_t0")), rel=0.02)
+
+
+def test_light_guide_and_crease_seal_on_the_geometry(check):
+    """3b-1 feature 3 on the geometry: the light guide is one clear part from the slot's exit tongue to the
+    LED faces' top edge, gd_clr in front of the LEDs, and clear of the FFC, the panel and the shell
+    (interference 0 in the main run, including its raised copies along the shell's way down); the
+    crease seal's foam presses the shell's lower edge by exactly its squeeze at TOUCH_SQUEEZE."""
+    bodies = {b["name"]: b for b in check["measure"]["bodies"]}
+    lo, hi = bodies["light_guide"]["bbox"]["min"], bodies["light_guide"]["bbox"]["max"]
+    assert hi[2] == pytest.approx(V("gd_top_z"), abs=0.01) and hi[1] == pytest.approx(V("gd_y_e"), abs=0.01)
+    assert lo[0] == pytest.approx(V("led_x0") + V("gd_tg"), abs=0.01) and hi[0] == pytest.approx(V("gd_l2x1"), abs=0.01)
+    assert lo[2] >= V("lip") + V("clr_remove") + 0.0 - 1e-6                                      # off the parting line
+    assert check["interference"]["count"] == 0
+    names = {b["name"] for b in check["measure"]["bodies"]}
+    assert {"guide_up_1", "guide_up_32", "ref_ffc", "crease_seal"} <= names
+    vols = airq_check.touch_volumes(check["touch"])
+    expect = V("W") * (V("wall") - V("crease_y0")) * airq_check.TOUCH_SQUEEZE
+    assert vols[("crease_seal", "shell")] == pytest.approx(expect, rel=0.08)

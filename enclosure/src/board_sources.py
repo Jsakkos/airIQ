@@ -47,6 +47,14 @@ def led_body_h() -> float:       # leds.face_y: "body 4.0 x 1.6 x 2.0 high"
     return comment_number(r"body [\d.]+ x [\d.]+ x ([\d.]+) high")
 
 
+def led_body_w() -> float:       # leds.face_y: "body 4.0 x 1.6 x 2.0 high": the light face's width
+    return comment_number(r"body ([\d.]+) x [\d.]+ x [\d.]+ high")
+
+
+def led_body_d() -> float:       # leds.face_y: "body 4.0 x 1.6 x 2.0 high": the LED's depth behind its face
+    return comment_number(r"body [\d.]+ x ([\d.]+) x [\d.]+ high")
+
+
 def module_h() -> float:         # antenna.module_body: "18 x 25.5, 3.1 high"
     return comment_number(r"module_body: .*# [\d.]+ x [\d.]+, ([\d.]+) high")
 

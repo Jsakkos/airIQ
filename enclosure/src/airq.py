@@ -51,7 +51,8 @@ OUTPUT = "airq.sc"
 
 # R22: the study's lip layout, rounded: lip 15 fits D 55 (needs 54.62); the face needs H 50.1 in
 # the study plus about 1 mm for the zone wall's ledge between the slots and the LED slot -> H 51
-MODEL = replace(L.AIRQ, lip=15.0, H=51.0, D=55.0)
+# 3b-1: the LED slot is 0.9 high and 0.3 higher (its lower edge): the wall under it must be >= 1.2 of opaque path to the crease
+MODEL = replace(L.AIRQ, lip=15.0, H=51.0, D=55.0, led_slot_h=0.9)
 
 
 def build() -> Script:
@@ -78,7 +79,7 @@ def build() -> Script:
     p("slot_bar", 1.2, "bar between the two intake slot rows on the lip, and between slots in a row")
     p("slot_row1_z", "grille_min_z", "intake slots, lower row bottom: the 10 mm line (on the lip)")
     p("slot_row2_z", "slot_row1_z + slot_w + slot_bar", "intake slots, upper row bottom (its top under the zone wall's ledge)")
-    p("led_f0", 16.2, "LED slot lower edge, along the front (f): its inner edge above the ledge")
+    p("led_f0", 16.5, "LED slot lower edge, along the front (f): its inner edge above the ledge; 16.5 (3a: 16.2) leaves 1.2 of face wall between the slot and the crease (3b-1, light_paths)")
     p("led_h_slot", m.led_slot_h, "LED slot height on the face")
     p("led_len", 30.0, "LED line length (plan)")
     p("panel_s0", "led_f0 + led_h_slot + 1.4 - lip", "panel's lower edge, up the slope from the crease (1.2 face + 0.2 pocket)")
@@ -219,6 +220,7 @@ def build() -> Script:
     F.ffc_params(s)
     F.ffc_derived_params(s)
     F.adapter_holder_params(s)
+    F.guide_params(s)
     cable_params(s)
     drawer_params(s)
     # --- bodies ------------------------------------------------------------------------------
@@ -226,6 +228,7 @@ def build() -> Script:
     C.panel_pocket(s)
     F.window(s)
     F.adapter_holder(s)
+    F.led_slot(s)
     hcho_window(s)
     C.base_plate(s)
     C.rails(s)
@@ -248,6 +251,8 @@ def build() -> Script:
     gaskets(s)
     hcho_lid(s)
     grommets(s)
+    F.light_guide(s)
+    F.crease_seal(s)
     # outlet grille in the lower rear wall (M6, R18, R26): 1.2 slots at a 2.4 pitch from the left
     p("out_pitch", 2.4, "outlet grille slot pitch (1.2 slots, 1.2 bars: R26 higher open fraction)")
     p("out_n", 32, "outlet grille slot count: 32 x 1.2 x 17.3 = 664 mm2 >= 660.1 (R18). Whole number", unit="")

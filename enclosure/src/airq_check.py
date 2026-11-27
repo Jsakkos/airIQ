@@ -51,10 +51,11 @@ TOUCHES = (("gasket_out", "sen66_body"), ("gasket_in", "sen66_body"), ("gasket_i
            ("sen66_pad", "sen66_body"),
            ("grommet_zone_a", "zone_wall"), ("grommet_zone_b", "zone_wall"), ("grommet_zone_a", "base_plate"),
            ("grommet_zone_b", "base_plate"), ("grommet_j4_a", "base_plate"), ("grommet_j4_b", "base_plate"),
-           ("grommet_tongue_a", "hcho_lid"), ("grommet_tongue_b", "hcho_lid"), ("sen66_top_seal", "zone_wall"))
+           ("grommet_tongue_a", "hcho_lid"), ("grommet_tongue_b", "hcho_lid"), ("sen66_top_seal", "zone_wall"),
+           ("crease_seal", "shell"))
 # every squeeze and preload: 0 in the check (R9: faces touch), TOUCH_SQUEEZE in the touch run
 SQUEEZES = ("gasket_squeeze", "wiper_squeeze", "pad_squeeze", "ring_preload", "root_squeeze", "grommet_squeeze",
-            "drawer_squeeze", "bore_squeeze", "seal_squeeze", "top_seal_squeeze")
+            "drawer_squeeze", "bore_squeeze", "seal_squeeze", "top_seal_squeeze", "crease_squeeze")
 
 
 def _rows(rot, t):
@@ -241,6 +242,9 @@ def sweeps(s) -> list[dict]:
     for dz in SWEEP_DZ:
         b.append({"command": "solid.move", "params": {"name": f"shell_up_{dz}", "bodies": ["shell"], "translate": [0, 0, dz],
                                                       "copy": True, "body_name": f"shell_up_{dz}"}})
+        # 3b-1: the light guide rides in the shell: its raised copies must clear the base and the cables too
+        b.append({"command": "solid.move", "params": {"name": f"guide_up_{dz}", "bodies": ["light_guide"], "translate": [0, 0, dz],
+                                                      "copy": True, "body_name": f"guide_up_{dz}"}})
     return b
 
 
@@ -401,6 +405,173 @@ def face_volumes(face: dict) -> dict:
     return out
 
 
+# --- light paths (3b-1 feature 3): the guide's light against the crease, the light sensor and U4 -------
+def _clip_len(p, q, poly) -> float:
+    """Length of the segment p->q inside the simple polygon `poly` (list of (y, z))."""
+    ts = [0.0, 1.0]
+    (py, pz), (qy, qz) = p, q
+    dy, dz = qy - py, qz - pz
+    n = len(poly)
+    for i in range(n):
+        (ay, az), (by, bz) = poly[i], poly[(i + 1) % n]
+        ey, ez = by - ay, bz - az
+        den = dy * ez - dz * ey
+        if abs(den) < 1e-12:
+            continue
+        t = ((ay - py) * ez - (az - pz) * ey) / den
+        u = ((ay - py) * dz - (az - pz) * dy) / den
+        if 0 <= t <= 1 and 0 <= u <= 1:
+            ts.append(t)
+    ts = sorted(set(ts))
+
+    def inside(y, z):
+        c = False
+        for i in range(n):
+            (ay, az), (by, bz) = poly[i], poly[(i + 1) % n]
+            if (az > z) != (bz > z) and y < ay + (z - az) * (by - ay) / (bz - az):
+                c = not c
+        return c
+    total = 0.0
+    for a, b in zip(ts, ts[1:]):
+        m = (a + b) / 2
+        if inside(py + dy * m, pz + dz * m):
+            total += (b - a) * math.hypot(dy, dz)
+    return total
+
+
+def _opaque_len(p, q, polys) -> float:
+    """Length of p->q inside any of the (non-overlapping) opaque polygons."""
+    return sum(_clip_len(p, q, poly) for poly in polys)
+
+
+def section_polys(s) -> dict:
+    """The opaque parts in the section at the light sensor's x (the sensor is under the line's
+    right end), as (y, z) polygons: what a ray from the guide to the sensor, to the lip's window or
+    to the crease's open end must cross."""
+    v = s.v
+    sn, c, lip = v("sin_t"), v("cos_t"), v("lip")
+    yz = lambda sv, tv: (sv * sn + tv * c, lip + sv * c - tv * sn)   # noqa: E731
+    box = lambda y0, y1, z0, z1: [(y0, z0), (y1, z0), (y1, z1), (y0, z1)]   # noqa: E731
+    w, hz, dz = v("wall"), v("lsw_z"), v("lsw_d") / 2
+    zw = [(v("wall + seal_t"), v("ledge_z0")), (v(C.yb("ledge_z0")), v("ledge_z0")), (v(C.yb("zw_z0")), v("zw_z0")),
+          (v("D - wall - clr_remove"), v("zw_z0")), (v("D - wall - clr_remove"), v("zw_z1")), (v(C.yf("zw_z1")), v("zw_z1")),
+          (v(C.yf("ledge_z1")), v("ledge_z1")), (v("wall + seal_t"), v("ledge_z1"))]
+    z_bot = lip + v("clr_remove")                                      # the shell's lowest plane
+    s_slot0, s_slot1 = v("led_s0"), v("led_s1")
+    y_out = (z_bot - lip) / c * sn                                     # the outer face at z_bot
+    low_out = yz(s_slot0, 0.0)
+    t_cut = (low_out[1] - z_bot) / sn                                  # along the slot's lower face down to z_bot
+    return {
+        "lip_low": box(0, w, 0, hz - dz), "lip_high": box(0, w, hz + dz, lip),
+        "zone_seal": box(w, v("wall + seal_t"), v("ledge_z0"), v("ledge_z1")),
+        "crease_seal": box(v("crease_y0"), w, lip, z_bot),
+        "zone_wall": zw,
+        "face_below_slot": [(y_out, z_bot), low_out, yz(s_slot0, t_cut)],
+        "face_bar": [yz(s_slot1, 0.0), yz(v("panel_s0 - clr_remove"), 0.0), yz(v("panel_s0 - clr_remove"), w), yz(s_slot1, w)],
+    }
+
+
+def guide_surface_points(s, n: int = 12) -> list[tuple[float, float]]:
+    """Sample points (y, z) on the light guide's surfaces in the section, except the exit face (the
+    light is meant to leave there, outside): the tongue, the neck and the bar outlines."""
+    v = s.v
+    sn, c, lip = v("sin_t"), v("cos_t"), v("lip")
+    yz = lambda sv, tv: (sv * sn + tv * c, lip + sv * c - tv * sn)   # noqa: E731
+    g = v("gd_tg")
+    boxes = [(v("led_s0") + g, v("led_s1") - g, 0.3, v("wall")),                              # tongue
+             (v("led_s0") + g + 0.5, v("gd_s0") + 0.1, v("wall"), v("wall") + v("gd_nk_t")),  # neck
+             (v("gd_s0"), v("gd_s0") + v("gd_bar"), v("gd_t0"), v("gd_t1"))]                  # bar
+    pts = []
+    for k, (s0, s1, t0, t1) in enumerate(boxes):
+        corners = [(s0, t0), (s1, t0), (s1, t1), (s0, t1)]
+        for i in range(4):
+            (a0, b0), (a1, b1) = corners[i], corners[(i + 1) % 4]
+            for j in range(n + 1):
+                f = j / n
+                sv, tv = a0 + (a1 - a0) * f, b0 + (b1 - b0) * f
+                if k == 0 and abs(tv - 0.3) < 1e-9:                                           # the exit face
+                    continue
+                pts.append(yz(sv, tv))
+    return pts
+
+
+def light_paths(s) -> dict:
+    """The least opaque length (mm) along any straight line from the guide's surfaces (not its exit
+    face) to: the light sensor (the VEML7700's window, behind the lip), the lip's window hole
+    (outside) and the crease's open end (the parting line's front, plugged by the crease seal). In the section at the sensor's x; lines at other x are longer.
+    Returns {target: (length, (source, target point))}."""
+    v = s.v
+    polys = list(section_polys(s).values())
+    src = guide_surface_points(s)
+    hz, dz = v("lsw_z"), v("lsw_d") / 2
+    lip, cr = v("lip"), v("clr_remove")
+    targets = {
+        "sensor": [(v("tongue_y0") + 0.25, hz)],
+        "lip_window": [(0.0, hz + dz * k / 4) for k in range(-4, 5)],
+        "crease_front": [(v("crease_y0") + 0.005, lip + z) for z in (0.01, cr / 2, cr - 0.01)],
+    }
+    out = {}
+    for name, ts in targets.items():
+        best = (1e9, None)
+        for p in src:
+            for q in ts:
+                ln = _opaque_len(p, q, polys)
+                if ln < best[0]:
+                    best = (ln, (p, q))
+        out[name] = best
+    return out
+
+
+def ms5611_sight(s) -> dict:
+    """R13: the straight lines from the LED faces and the guide's uncoated faces to the MS5611's port
+    (U4): `unblocked` counts those that no opaque part stops (0 is the pass). The light guide's
+    surfaces other than the four entry windows and the exit face are coated (opaque), so those are
+    the only guide faces that emit. Sources: samples on each LED face and on each entry window (the
+    LED face inset by gd_win_*, gd_clr in front of it); the exit face emits outward, so U4,
+    which is behind it, is not in its hemisphere. Obstacles: the LED bodies (depth from the
+    interface.yaml comment) and the board."""
+    v = s.v
+    u4 = B.layout_part("U4")["center"]
+    ms_h = 1.0                                                      # MS5611 package height (datasheet; its port is in the lid)
+    tx = v("board_x0") + u4[0]
+    ty = v("board_y0") + v("board_d") - u4[1]
+    tz = v("board_z0") + v("board_t") + ms_h
+    w, hh, dep = v("led_face_w"), v("led_face_h"), B.led_body_d()
+    yf, zc = v("board_y0"), v("led_z")
+    boxes = [((v(f"led_d{i}_x") - w / 2, yf, zc - hh / 2), (v(f"led_d{i}_x") + w / 2, yf + dep, zc + hh / 2)) for i in range(1, 5)]
+    boxes.append(((v("board_x0"), yf, v("board_z0")), (v("board_x0") + v("board_w"), yf + v("board_d"), v("board_z0") + v("board_t"))))
+
+    def hits(p, q) -> bool:
+        for lo, hi in boxes:
+            t0, t1 = 0.0, 1.0
+            for k in range(3):
+                d = q[k] - p[k]
+                if abs(d) < 1e-12:
+                    if p[k] < lo[k] - 1e-9 or p[k] > hi[k] + 1e-9:
+                        t0, t1 = 2, 1
+                    continue
+                a, b = (lo[k] - p[k]) / d, (hi[k] - p[k]) / d
+                t0, t1 = max(t0, min(a, b)), min(t1, max(a, b))
+            if t0 <= t1 + 1e-9:
+                return True
+        return False
+    n = 6
+    count = {"led_faces": 0, "entry_windows": 0}
+    un = {"led_faces": 0, "entry_windows": 0}
+    for i in range(1, 5):
+        cx = v(f"led_d{i}_x")
+        for a in range(n + 1):
+            for b in range(n + 1):
+                for kind, y, (im, ip, iz) in (("led_faces", yf, (0.0, 0.0, 0.0)),
+                                              ("entry_windows", v("gd_y_e"), (v("gd_win_xm"), v("gd_win_xp"), v("gd_win_z")))):
+                    x0, x1 = cx - w / 2 + im, cx + w / 2 - ip
+                    p = (x0 + (x1 - x0) * a / n, y, zc - hh / 2 + iz + (hh - 2 * iz) * b / n)
+                    count[kind] += 1
+                    if not hits(p, (tx, ty, tz)):
+                        un[kind] += 1
+    return {"target": (tx, ty, tz), "samples": count, "unblocked": un}
+
+
 EXTREME_PARTS = ("base_plate", "zone_wall", "sen66_pad", "gasket_out", "gasket_in")
 
 
@@ -450,9 +621,9 @@ def exclusions(names: list[str]) -> list[list[str]]:
     out = [[f"{n}:1", f"{n}:1"] for n in REFS]
     ko = [n for n in names if n.startswith("ko_")]
     out += [[a, b] for i, a in enumerate(ko) for b in ko[i + 1:]]
-    sw = [n for n in names if n.startswith(("sweep_", "shell_up_"))]
+    sw = [n for n in names if n.startswith(("sweep_", "shell_up_", "guide_up_"))]
     out += [[a, b] for i, a in enumerate(sw) for b in sw[i + 1:]]
-    out += [[a, "shell"] for a in sw]
+    out += [[a, "shell"] for a in sw] + [[a, "light_guide"] for a in sw]
     out += [[a, f"{r}:1"] for a in sw for r in SHELL_BORNE]
     return out
 

@@ -281,3 +281,90 @@ def ffc_service(v, g: dict, dz: float) -> dict:
     spare = v("ffc_len") - 2 * v("ffc_insert") - g["centre_len"]
     chain = g["s1"] + g["flap"] + g["s3"] + 2 * v("ffc_crease") + spare
     return {"d_lift": d, "chain": chain, "spare": spare, "ok": d + v("ffc_service_margin") <= chain}
+
+
+# --- LED slot, light guide, crease seal (feature 3) --------------------------------------------
+
+def yz(sv: str, tv: str) -> tuple[str, str]:
+    """World (y, z) of the face point (s, t), as expressions."""
+    return f"({sv}) * sin_t + ({tv}) * cos_t", f"lip + ({sv}) * cos_t - ({tv}) * sin_t"
+
+
+def guide_params(s: Script) -> None:
+    """The LED line's slot, the clear light guide behind it and the foam strip that plugs the crease's
+    parting line (the shell lands at z = lip + clr_remove over the lip's top at z = lip)."""
+    leds = MAIN["leds"]["chain"]
+    p = s.param
+    p("led_x0", "window_xc - led_len / 2", "LED slot: tail-side end, x (the 30 mm line centred on the window)")
+    p("led_x1", "window_xc + led_len / 2", "LED slot: far end, x")
+    p("led_s0", "led_f0 - lip", "LED slot: lower edge, up the slope from the crease")
+    p("led_s1", "led_s0 + led_h_slot", "LED slot: upper edge")
+    p("led_face_w", B.led_body_w(), "LED light face width (interface.yaml leds comment, board_sources)")
+    p("led_face_h", B.led_body_h(), "LED light face height (interface.yaml leds comment: the LED's body height)")
+    for i, led in enumerate(leds, 1):
+        p(f"led_d{i}_x", f"board_x0 + {led['center_x']}", f"D{i} light face centre, x (interface.yaml leds chain)")
+    p("gd_clr", 0.2, "light guide: air between its entry faces and the LED faces, and to the panel and the slot's edges (clr_remove)")
+    p("gd_t0", "bezel + panel_t + clr_remove", "light guide: front face, behind the panel's back face")
+    p("gd_t1", "gd_t0 + guide_t", "light guide: back face (guide_t thick, the coupon's 2 mm bar)")
+    p("gd_s0", "(0.4 + gd_t1 * sin_t) / cos_t", "light guide: lower edge up the slope: its lowest point is 0.4 above the lip's top over the crease seal")
+    p("gd_top_z", "led_z + led_face_h / 2", "light guide: its top, at the LED faces' top edge (no surface above it sees over the LEDs)")
+    p("gd_bar", 4.0, "light guide: the bar behind the slot, up the slope")
+    p("gd_y_e", "board_y0 - gd_clr", "light guide: entry faces' plane, gd_clr in front of the LED faces")
+    p("gd_tb", "(gd_y_e - (gd_top_z - lip) * sin_t / cos_t) * cos_t", "light guide foot: depth of the entry plane at the faces' top edge")
+    p("gd_sb", "(gd_top_z - lip + gd_tb * sin_t) / cos_t", "light guide foot: slope position there")
+    p("gd_sa", "(gd_top_z - lip + gd_t0 * sin_t) / cos_t", "light guide leg: slope position where its front meets the top plane")
+    p("gd_tc", "(gd_y_e - (led_z - led_face_h / 2 - lip) * sin_t / cos_t) * cos_t", "light guide foot: depth of the entry plane at the faces' lower edge")
+    p("gd_sc", "(led_z - led_face_h / 2 - lip + gd_tc * sin_t) / cos_t", "light guide foot: slope position there")
+    p("gd_l1x0", "led_d1_x - led_face_w / 2 - gd_clr", "light guide: D1/D2 leg, tail-side face")
+    p("gd_l1x1", "led_d2_x + led_face_w / 2 + gd_clr", "light guide: D1/D2 leg, far face")
+    p("gd_l2x0", "led_d3_x - led_face_w / 2 - gd_clr", "light guide: D3/D4 leg, tail-side face")
+    p("gd_l2x1", "led_d4_x + led_face_w / 2 + gd_clr", "light guide: D3/D4 leg, far face")
+    p("gd_win_xm", 0.4, "light guide: the uncoated entry window starts this far inside the LED face's tail-side (-x) edge (a line to U4, at -x, drifts that way over the 0.2 gap and the LED's depth)")
+    p("gd_win_xp", 0.2, "light guide: the uncoated entry window stops this far inside the LED face's far (+x) edge")
+    p("gd_win_z", 0.2, "light guide: the uncoated entry window is this far inside the LED face's top and lower edges")
+    p("gd_tg", 0.05, "light guide: the tongue's clearance to the slot on each side")
+    p("gd_nk_t", 0.9, "light guide: neck thickness behind the face wall")
+    p("crease_y0", 0.12, "crease seal: front edge, flush with the shell's outer face at its lower edge (the foam plugs the parting line over the lip's top from the outside: 1.7 of foam)")
+    p("crease_squeeze", 0.1, "crease seal: foam tape clr_remove + this thick before it is pressed (R9: the check sets 0)")
+
+
+def led_slot(s: Script) -> None:
+    """The LED slot through the face wall: the 30 mm line under the screen."""
+    with s.sketch("LED slot outline", slope_plane(s), offset=toff("-1")) as sk:
+        sk.rect("led_x0", ys("led_s0"), "led_x1", ys("led_s1"))
+    s.extrude("LED slot", "LED slot outline", "wall + 1 + 0.2", operation="cut", targets=["shell"], direction="negative")
+
+
+def _slope_piece(s: Script, name: str, x0: str, x1: str, s0: str, s1: str, t0: str, t1: str, first: bool) -> None:
+    with s.sketch(f"{name} outline", slope_plane(s), offset=toff(t0)) as sk:
+        sk.rect(x0, ys(s0), x1, ys(s1))
+    if first:
+        s.extrude(name, f"{name} outline", f"({t1}) - ({t0})", body="light_guide", direction="negative")
+    else:
+        s.extrude(name, f"{name} outline", f"({t1}) - ({t0})", operation="join", targets=["light_guide"], direction="negative")
+
+
+def light_guide(s: Script) -> None:
+    """`light_guide`: clear PETG, one part. Its exit tongue sits in the LED slot (recessed 0.3, gd_clr
+    round it, its back face before the wall's inner face so it stays off the crease), a neck behind the
+    wall, a bar behind the panel (guide_t thick, the coupon bar) that spreads the light along the line,
+    and two legs up behind the panel to feet in front of the LED faces: D1/D2 and D3/D4. Each foot is a
+    wedge whose entry face is the plane gd_clr in front of the LED faces and covers exactly their
+    height; the legs end at the faces' top edge. The strip between the legs is free for the FFC."""
+    g = "gd_tg"
+    x0, x1 = f"led_x0 + {g}", f"led_x1 - {g}"
+    _slope_piece(s, "Guide tongue", x0, x1, f"led_s0 + {g}", f"led_s1 - {g}", "0.3", "wall", True)
+    _slope_piece(s, "Guide neck", x0, x1, f"led_s0 + {g} + 0.5", "gd_s0 + 0.1", "wall", "wall + gd_nk_t", False)
+    _slope_piece(s, "Guide bar", x0, "gd_l2x1", "gd_s0", "gd_s0 + gd_bar", "gd_t0", "gd_t1", False)
+    for k, (lx0, lx1) in enumerate((("gd_l1x0", "gd_l1x1"), ("gd_l2x0", "gd_l2x1")), 1):
+        pts = [("gd_s0", "gd_t0"), ("gd_sa", "gd_t0"), ("gd_sb", "gd_tb"), ("gd_sc", "gd_tc"), ("gd_sc", "gd_t1"), ("gd_s0", "gd_t1")]
+        with s.sketch(f"Guide leg {k} profile", "YZ", offset=lx0) as sk:
+            sk.polyline([yz(sv, tv) for sv, tv in pts])
+        s.extrude(f"Guide leg {k}", f"Guide leg {k} profile", f"{lx1} - {lx0}", operation="join", targets=["light_guide"])
+
+
+def crease_seal(s: Script) -> None:
+    """`crease_seal`: black closed-cell foam tape on the lip's top, full width, that fills the 0.2 parting
+    line between the shell's lower edge and the lip from crease_y0 to the lip's inner face (1.4 of
+    foam): the light guide's light cannot run out along the crease."""
+    s.box("Crease seal", ["-W / 2", "crease_y0", "lip"], ["W", "wall - crease_y0", "clr_remove + crease_squeeze"], body="crease_seal")
