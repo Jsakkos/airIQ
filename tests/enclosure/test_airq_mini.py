@@ -168,6 +168,9 @@ def test_guide_fits_come_from_the_clearances():
     assert bar[3][0] > V("lg_s1") + 0.5 and bar[6][0] < V("lg_s0") - 0.5
     for x0, x1, z0, z1 in MF.stop_windows():
         assert V(f"({x1}) - ({x0})") > 0 and V(z0) > V("rib_z0") and V(z1) < V("stop_z1")
+        # review M3: die-cuttable webs over and under the windows, the stop under the slope's inner face
+        assert V(f"stop_z1 - ({z1})") >= 1.6 - 1e-9 and V(f"({z0}) - rib_z0") >= 1.5
+    assert V("stop_z1") < V("lip + (lg_ysf * cos_t - wall) / sin_t") - 0.5
     # the feet inside their LED faces (R13: a line from a foot toward U4 enters the LED body)
     for i in (1, 2, 3, 4):
         assert V(f"lg_f{i}_x0") > V(f"d{i}_x - led_face_w / 2") and V(f"lg_f{i}_x1") < V(f"d{i}_x + led_face_w / 2")

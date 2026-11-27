@@ -50,7 +50,7 @@ def guide_params(s: Script) -> None:
     p("stop_y1", "board_y0 - clr_remove", "guide_stop: back face, clr_remove in front of the board's edge, the LEDs and J7")
     p("lg_ein", 0.1, "light guide: the feet's entry faces this far in front of the stop's back face (so no line between the two guides' feet runs in the stop's back plane, behind the divider)")
     p("lg_ye", "stop_y1 - lg_ein", "light guide: the feet's entry faces (vertical), clr_remove + lg_ein in front of the LED faces")
-    p("stop_t", 1.2, "guide_stop: foam thickness along y (>= 1.2 opaque)")
+    p("stop_t", 1.2, "guide_stop: foam thickness along y (>= 1.2 opaque), INCLUDING its adhesive: 1.2 at most (+0 / -0.2), as its back face is only clr_remove from the board's edge and the LEDs (review M3)")
     p("lg_ysf", "stop_y1 - stop_t", "guide_stop: front face (on the ribs' back faces)")
     p("lg_yb", "lg_ysf - clr_align", "light guide: the bar's back face, clr_align in front of the stop")
     p("lg_z1", "min(led_z + led_face_h / 2, lip + ((lg_yb - 0.1) * cos_t - lg_tf) / sin_t)",
@@ -67,7 +67,8 @@ def guide_params(s: Script) -> None:
     p("end_rib_t", 1.2, "band end ribs: thickness (>= 1.2 opaque), beyond each half's outer end")
     p("rib_z0", "max(lg_z0 - 0.4, zw_z1 + clr_remove)", "band ribs and guide_stop: bottom, under the guides' bottom, clr_remove over the zone wall's top")
     p("rib_tin", "wall - 0.5", "band ribs: their front edge runs 0.5 inside the face wall (joined)")
-    p("stop_z1", "max(lg_z1, lg_fz1 + clr_align) + 0.4", "guide_stop: top, over the guides' top and its windows")
+    p("stop_web", 1.6, "guide_stop: the foam web over its windows (die-cuttable, as the webs between them; review M3)")
+    p("stop_z1", "max(lg_z1 + 0.4, lg_fz1 + clr_align + stop_web)", "guide_stop: top, over the guides' top and stop_web over its windows; under the slope's inner face (z 37.4 at the stop's front)")
     p("stop_x0", "band_co2_x0 - end_rib_t", "guide_stop: left end (the left end rib's outer face)")
     p("stop_x1", "band_pm_x1 + end_rib_t", "guide_stop: right end (the right end rib's outer face)")
 
