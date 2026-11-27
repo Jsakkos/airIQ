@@ -4,6 +4,7 @@ print orientation on the bed (z = 0).
 Fast tests read the committed 3MF as plain XML. SolidCraft tests (skipped where solidcraft-cli is
 missing, as in CI) reopen every file and compare it with the design's body.
 """
+import math
 import xml.etree.ElementTree as ET
 import zipfile
 
@@ -37,15 +38,69 @@ def test_exports_are_registered_per_part():
                    for e in encbuild.exports_of("airq"))
 
 
+def mesh_areas(path, tol=0.05, steep=-0.72):
+    """(down-facing flat area on the bed, down-facing area above the bed steeper than 45 deg), mm2, from
+    the 3MF's triangles: a flat face counts as on the bed when it lies within `tol` of the lowest z."""
+    with zipfile.ZipFile(path) as z:
+        root = ET.fromstring(z.read("3D/3dmodel.model"))
+    ns = {"m": root.tag[root.tag.index("{") + 1:root.tag.index("}")]}
+    v = [(float(e.get("x")), float(e.get("y")), float(e.get("z"))) for e in root.findall(".//m:vertex", ns)]
+    zmin = min(p[2] for p in v)
+    bed = over = 0.0
+    for t in root.findall(".//m:triangle", ns):
+        a, b, c = (v[int(t.get(k))] for k in ("v1", "v2", "v3"))
+        u = [b[i] - a[i] for i in range(3)]
+        w = [c[i] - a[i] for i in range(3)]
+        n = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]]
+        length = math.sqrt(sum(x * x for x in n))
+        if not length:
+            continue
+        nz = n[2] / length
+        if nz < -0.999 and max(a[2], b[2], c[2]) - zmin < tol:
+            bed += length / 2
+        elif nz < steep:
+            over += length / 2
+    return zmin, bed, over
+
+
+# Per part: the least flat area (mm2) that must rest on the bed, and the most down-facing area above
+# it steeper than 45 deg (what the slicer must bridge or support). Measured on the committed meshes;
+# the second number carries the documented exceptions (README "Print and assembly guide", section 2).
+BED_CONTACT = {
+    "shell": (1500, 400),            # one support (the adapter arm, 62); chamfer, top-wall strip, wall strips accepted
+    "orange_dot": (10, 1),
+    "base_plate": (4500, 700),       # bridges: slots, grilles, the USB-C ceiling (12.9 mm)
+    "zone_wall": (80, 25),           # one small support at the boss notch's ledge
+    "hcho_lid": (600, 300),          # the tongue pocket's 13.3 mm bridge
+    "light_guide": (9, 70),          # on its +x end; supports only under the feet's two +x side faces
+    "gasket_out": (90, 1),
+    "gasket_in": (6, 1),             # 7.1 mm2 of contact on a 27.9 tall post: brim
+    "grommet_zone_a": (28, 40),
+    "grommet_zone_b": (28, 48),
+    "grommet_j4_a": (7, 8),
+    "grommet_j4_b": (7, 8),
+    "grommet_tongue_a": (3, 8),      # 3.3 mm2: brim
+    "grommet_tongue_b": (3, 8),
+}
+
+
+def test_every_printed_part_has_a_bed_contact_budget():
+    assert set(BED_CONTACT) == set(PRINTED)
+
+
 @pytest.mark.parametrize("part", PRINTED)
-def test_committed_files_are_small_and_hold_one_part_on_the_bed(part):
+def test_committed_files_are_small_and_rest_on_the_bed(part):
     for ext in ("3mf", "step"):
         f = EXPORT / f"airq-{part}.{ext}"
         assert f.exists(), f
         assert f.stat().st_size <= LIMIT, f"{f.name} over the R8 limit"
     n, lo, _ = mesh_box(EXPORT / f"airq-{part}.3mf")
     assert n == 1
-    assert abs(lo[2]) < TOL, f"{part} does not sit on the bed (min z {lo[2]})"
+    zmin, bed, over = mesh_areas(EXPORT / f"airq-{part}.3mf")
+    assert abs(zmin) < TOL
+    least, most = BED_CONTACT[part]
+    assert bed >= least, f"{part} rests on only {bed:.1f} mm2 of flat bed contact (needs {least})"
+    assert over <= most, f"{part} hangs {over:.1f} mm2 of steep overhang over the bed (budget {most})"
 
 
 @pytest.fixture(scope="module")
@@ -96,3 +151,9 @@ def test_build_writes_the_committed_exports(cli):
     for e in r["exports"]:
         if e["parts"] is not None:
             assert len(e["parts"]) == 1
+
+
+def test_file_prefix_comes_from_the_design():
+    import airq_mini
+    assert encbuild.part_of(airq, "export/airq-shell.3mf") == "shell"
+    assert encbuild.part_of(airq_mini, "export/airq-mini-shell.3mf") == "shell"

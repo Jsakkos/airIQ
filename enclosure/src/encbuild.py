@@ -147,6 +147,13 @@ def eval_bodies(path: Path, cli: str, json_out: Path) -> dict:
     return {b["name"]: b["bbox"] for b in json.loads(json_out.read_text(encoding="utf-8"))["bodies"]}
 
 
+def part_of(mod, path) -> str:
+    """The printed body a PRINT_PARTS export file holds: its name without the module's FILE_PREFIX
+    (default `<DESIGN>-`, so `airq-shell` is `shell` and the mini's `airq-mini-shell` is `shell`)."""
+    prefix = getattr(mod, "FILE_PREFIX", f"{mod.DESIGN}-")
+    return Path(path).stem.removeprefix(prefix)
+
+
 def print_turns(mod) -> list[dict]:
     """The solid.move steps that put every printed part in its print orientation."""
     steps = []
@@ -190,7 +197,7 @@ def print_exports(name: str, design: Path, cli: str) -> dict:
         commands.append({"command": "solid.move", "params": {"bodies": [part], "translate": [0, 0, f"{lift:.9f}"],
                                                              "name": f"print_bed_{part}"}})
     for rel in mod.EXPORTS:
-        part = Path(rel).stem.removeprefix("airq-")
+        part = part_of(mod, rel)
         target = (BUILD_DIR / rel).resolve()
         target.parent.mkdir(parents=True, exist_ok=True)
         target.unlink(missing_ok=True)
@@ -254,6 +261,6 @@ def build(name: str, cli: str | None = None, commit: bool = True) -> dict:
             shutil.copyfile(built_export, target_export)
         done.append({"file": target_export if keep else built_export, "bytes": built_export.stat().st_size,
                      "committed": keep, "parts": parts,
-                     "expected": expected[Path(built_export).stem.removeprefix("airq-")] if per_part else None})
+                     "expected": expected[part_of(mod, built_export)] if per_part else None})
     return {"design": mod.DESIGN, "file": target if committed else built, "bytes": size,
             "committed": committed, "bodies": bodies, "warnings": warnings, "exports": done}

@@ -62,7 +62,10 @@ PRINT_PARTS = {
     "base_plate": {"turns": []},                           # floor down, as designed
     "zone_wall": {"turns": [("y", 90)]},                   # standing on its right end
     "hcho_lid": {"turns": [("x", 180)]},                   # top face down, posts up
-    "light_guide": {"turns": [("x", -60)]},                # on the back face (first-print item)
+    # standing on its +x end face (9.4 mm2). No plane rests it better: the back face floats 1.0 over the bed
+    # (the tongue dips below it), and the tongue's end face (65.6 mm2) puts the bottom TIR facet on
+    # support. On its end every optical face is a vertical wall; only the two feet's +x side faces hang
+    "light_guide": {"turns": [("y", 90)]},
     "gasket_out": {"turns": [("x", -90)]},                 # on its seat end (the rear end)
     "gasket_in": {"turns": []},                            # standing on its floor end
     "grommet_zone_a": {"turns": [("x", -60)]},             # on the large slanted end face

@@ -880,7 +880,9 @@ they enter (`interface.yaml`): Qwiic 6.0 × 2.95, GH 10.75 × 4.25, to confirm.
     drawer and the J4 notch are open from the cable's place out past their edges
     (`test_plugs_pass_their_openings`).
 
-**Print split (R24), orientation (fix round 2, N6) and materials (N3).**
+**Print split (R24), orientation (fix round 2, N6) and materials (N3).** The orientations and the supports to use are the
+table in "Print and assembly guide (airQ)", section 2, which the exports follow; this table gives the reasons and is not
+kept in step with it.
 
 | Part | Material | Prints | Supports |
 |---|---|---|---|
@@ -891,7 +893,7 @@ they enter (`interface.yaml`): Qwiic 6.0 × 2.95, GH 10.75 × 4.25, to confirm.
 | `gasket_out` | TPU 95A, opaque (black) | on its seat end | none |
 | `gasket_in` | TPU 95A, opaque | standing on its floor end: the root foot and the 55° wiper are a vertical prism; the tip's lead-in faces up | none |
 | `zone_seal`, `sen66_top_seal` | closed-cell foam, **black**, adhesive-backed (bought, cut) | – | – |
-| `grommet_zone_a/_b` | TPU 95A, opaque | on an end face: the rib profile on the bed | none |
+| `grommet_zone_a/_b` | TPU 95A, opaque | see the guide, section 2 | none |
 | `grommet_j4_a/_b`, `grommet_tongue_a/_b` | TPU 95A, opaque | on the split face, the half-channel on the bed | none; the tongue halves' 0.4 barbs overhang 0.5 |
 | `sen66_foam`, `sen66_pad` | PU foam, cut (bought) | – | – |
 
@@ -1280,22 +1282,23 @@ AMS colour region, flush with the shell's face.
 ### 2. Printed parts
 
 Material: **ASA if the printer is enclosed, PETG otherwise** ("shell material"). No part needs a
-brim or a raft. Layer height, walls and infill are the owner's choice: the design does not depend
+raft; the light guide, `gasket_in` and the tongue grommets want a brim or mouse ears (small
+contact, see the table). Layer height, walls and infill are the owner's choice: the design does not depend
 on them.
 
 | Part (file) | Qty | Material | Print orientation | Supports |
 |---|---|---|---|---|
-| `shell` | 1 | shell material, warm white | **face down** on textured PEI: the 30° face on the bed (95 × 69 × 52.6 mm as printed) | none. Two small overhangs of about 60° are accepted (the rear boss's front disc, the HCHO window's rear edge). The adapter holder's arm hangs free and needs a support, reached from the open bottom |
+| `shell` | 1 | shell material, warm white | **face down** on textured PEI: the 30° face on the bed (95 × 69 × 52.6 mm as printed) | **one support, under the adapter holder's arm** (a 62 mm² flat underside at z 5.4, reached from the open bottom). The rest is accepted without support: the face's 0.8 chamfer along the bed edge (132 mm², z 0 … 0.7), a strip under the top wall's inner edge (108 mm², about 30° off horizontal, 95 wide, z 1.6 … 26), the two rear-boss and HCHO-window overhangs of about 60°, and thin symmetric wall strips of 54–60° at the sides (each 24–33 mm²: x ±45.7 … 47.5 at y −14 … −3 and at y −35 … −19). Check them in the slicer preview |
 | `orange_dot` | 1 | orange, an AMS colour region of the shell job | as the shell: it prints first, on the bed, flush with the face (a 0.6 deep recess in the flexure's tip) | none |
-| `base_plate` | 1 | shell material | floor down, as designed (95 × 55 × 49) | none |
+| `base_plate` | 1 | shell material | floor down, as designed (95 × 55 × 49) | none, but it bridges (649 mm² of flat ceilings above the bed, z 0.4 … 48.9): the intake slots' ceilings (up to 9.4 mm long, in the 1.8 lip), the outlet grille's and the exhaust's slots (1.2 wide, in the rear wall), the USB-C opening's ceiling (12.9 mm wide, z 37.9: the longest bridge, 12.8 measured) and the counterbores. Use bridge settings; the 12.9 mm one is a first-print item |
 | `zone_wall` | 1 | an **opaque** filament (black or dark: it is a light barrier) | standing on its right end: the bent profile on the bed, the drawer at the top (18 × 50 × 91 as printed) | one small support under the right boss notch's ledge (a 5 × 2 cantilever) |
 | `hcho_lid` | 1 | an opaque filament | top face down, posts up | none (the tongue pocket's floor bridges 13.3 mm) |
-| `light_guide` | 1 | **clear or natural PETG**, bare: no paint, coat or cladding on any face (R45) | proposed: on its back face, the large flat that the feet's tops lie in (29.7 × 23.5 × 5.1 as printed). The feet's entry faces, the two facets and the exit stay off the bed. **A first-print item** | none expected |
+| `light_guide` | 1 | **clear or natural PETG**, bare: no paint, coat or cladding on any face (R45) | **standing on its +x end face** (19.3 × 15.3 × 29.7 as printed). No plane rests it better: the back face would float 1.0 mm over the bed (the tongue dips 1.0 below it), and resting on the tongue's end face (65.6 mm²) puts the bottom 45° TIR facet on support. On its end every optical face (exit, entry faces, both facets) is a vertical wall or a facet at 45° or better | **Supports only under the two feet's +x side faces** (33.7 mm² each, 10 mm out), nowhere else: the exit, the entry faces and the facets must stay free of support and bare. Contact is 9.4 mm² and the part is 29.7 tall: use a **brim** (or mouse ears) and slow, cool printing. A first-print item: if it fails, print it on a 1 mm raft only if the back face may be rough, and say so in the result |
 | `gasket_out` | 1 | TPU 95A, opaque (black) | on its seat end (the end that goes into the plate): 24 × 24 × 4 | none |
-| `gasket_in` | 1 | TPU 95A, opaque | standing on its floor end: the root foot and the 55° wiper are a vertical prism, the tip's lead-in faces up (27.9 tall) | none |
-| `grommet_zone_a`, `_b` | 1 each | TPU 95A, opaque | on the large slanted end face (8.95 × 7.9 × 1.85 as printed) | none |
+| `gasket_in` | 1 | TPU 95A, opaque | standing on its floor end: the root foot and the 55° wiper are a vertical prism, the tip's lead-in faces up (27.9 tall) | none. **Brim or mouse ears:** only 7.1 mm² touches the bed |
+| `grommet_zone_a`, `_b` | 1 each | TPU 95A, opaque | on the large slanted end face (8.95 × 7.9 × 1.85 as printed); the half-bores lean 30° | none |
 | `grommet_j4_a`, `_b` | 1 each | TPU 95A, opaque | split face on the bed, the half-channel down | none |
-| `grommet_tongue_a`, `_b` | 1 each | TPU 95A, opaque | split face on the bed | none (the 0.4 barbs overhang 0.5) |
+| `grommet_tongue_a`, `_b` | 1 each | TPU 95A, opaque | split face on the bed (4 tall, 3.3 mm² of contact) | none (the 0.4 barbs overhang 0.5). **Brim or mouse ears** |
 
 TPU: dry the filament and print slowly. The TPU parts are sized with their own squeeze already in
 (`gasket_squeeze` and the others; the check design sets them to 0).
