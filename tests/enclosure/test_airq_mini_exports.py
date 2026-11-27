@@ -224,6 +224,19 @@ def test_supports_touch_none_of_the_light(half):
     assert traced_shares(0, n_rays=4000)[half]["hung"] > 0
 
 
+def test_guide_names_every_printed_and_bought_part():
+    """The README's guide lists each printed part (section 2) and each bought body (section 3), and keeps the
+    owner's items visible."""
+    readme = (ENCLOSURE / "README.md").read_text(encoding="utf-8")
+    start = readme.index("## Print and assembly guide (airQ mini)")
+    guide = readme[start:readme.index("## Sources", start)]
+    for part in PRINTED + BOUGHT:
+        assert f"`{part}`" in guide, part
+    for item in ("69.5 × 50 × 42", "18.0 mm lip", "10.35 mm", "498 mm²", "153.7", "57.4", "M2 × **3**", "30 kPa",
+                 "Check table (airQ mini)", "several days", "feeler", "dark ends", "4.0 mm"):
+        assert item in guide, item
+
+
 # --- SolidCraft: the files reopen as the design's bodies ---------------------------------------------
 
 @pytest.fixture(scope="module")

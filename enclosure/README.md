@@ -20,12 +20,13 @@ Contents:
 - [airQ enclosure](#airq-enclosure)
 - [airQ mini enclosure](#airq-mini-enclosure)
 - [Print and assembly guide (airQ)](#print-and-assembly-guide-airq)
+- [Print and assembly guide (airQ mini)](#print-and-assembly-guide-airq-mini)
 - [Sources](#sources)
 - [To confirm](#to-confirm)
 
-The print and assembly guide for the airQ (Task 5) is under "Print and assembly guide (airQ)". The
-airQ mini (69.5 × 50 × 42, owner decision R51) is under "airQ mini enclosure"; its guide follows
-with Task 5b. The print-test coupons (Task 2) are below.
+The print and assembly guides (Task 5) are under "Print and assembly guide (airQ)" and "Print and
+assembly guide (airQ mini)". The airQ mini (69.5 × 50 × 42, owner decision R51) is described under
+"airQ mini enclosure". The print-test coupons (Task 2) are below.
 
 ## Files
 
@@ -47,7 +48,7 @@ with Task 5b. The print-test coupons (Task 2) are below.
 | `airq-mini.sc` | The airQ mini enclosure design (committed) |
 | `src/layout_study.py` | The layout studies' section arithmetic for both models (pure Python; `tests/enclosure/test_layout_study.py`) |
 | `coupons.sc` | The coupons design, built from `src/coupons.py` (committed) |
-| `export/` | Printable exports, written by `build.py` (committed): `coupons.3mf` / `.step`, and `airq-<part>.3mf` / `.step` for each printed airQ part, in its print orientation |
+| `export/` | Printable exports, written by `build.py` (committed): `coupons.3mf` / `.step`, `airq-<part>.3mf` / `.step` for each printed airQ part and `airq-mini-<part>.3mf` / `.step` for each printed airQ mini part, in its print orientation |
 | `reference/*.sc` | The reference designs, built from the generators (committed) |
 | `.build/` | Generated scripts, run results and anything not committed (gitignored) |
 
@@ -79,11 +80,12 @@ uv run --with pytest --with pyyaml pytest tests/enclosure   # the checks
    input gives the same bytes. Task 5 reuses this for every printed part: list its files in
    `EXPORTS` (for example `["export/airq-shell.3mf", "export/airq-shell.step"]`).
 
-A design with a `PRINT_PARTS` table (the airQ) exports one file pair per printed part instead
+A design with a `PRINT_PARTS` table (the airQ and the airQ mini) exports one file pair per printed part instead
 (`encbuild.print_exports`): after the design is saved, each part is turned into its print orientation
 and set on the bed, and written alone, so the saved design is not touched. The build fails unless each
-3MF reopens with exactly one part. `tests/enclosure/test_airq_exports.py` also checks every file's box
-and volume against the design's body.
+3MF reopens with exactly one part. `tests/enclosure/test_airq_exports.py` (and `test_airq_mini_exports.py`) also
+check every file's box and volume against the design's body. The file prefix comes from the module
+(`airq-` or `airq-mini-`).
 
 **Toolchain.** The committed designs were built with SolidCraft 0.50.0 (save format `solidcraft/69`)
 and the tests that compare a fresh build with the committed files assume that toolchain: a different
@@ -1105,7 +1107,7 @@ and the sealed sensor tub), the zone wall, the board above the standing SEN66 an
 sensor zone is the airQ's mirrored: `enclosure_common` builds it with `hand` +1. Task 4a built the
 body and internals. Task 4b added the split light band, the labels, the light-sensor window, the dot
 and flexure, the openings and the rest of the check table, on the positions 4a named ("Face and
-openings (Task 4b)" below). Nothing is exported yet (Task 5b).
+openings (Task 4b)" below). Task 5b exports every printed part: see "Print and assembly guide (airQ mini)".
 
 Build it with `uv run --with pyyaml python enclosure/build.py airq-mini`, and check it with
 `uv run --with pyyaml python enclosure/src/airq_mini_check.py --run`.
@@ -1362,7 +1364,7 @@ design, `airq_mini_check --run`), **analytic** (a model of the physics in Python
 
 ## Print and assembly guide (airQ)
 
-For one airQ (95 × 55 × 51 mm). The airQ mini (69.5 × 50 × 42, R51) gets its own section with its exports (Task 5b).
+For one airQ (95 × 55 × 51 mm). The airQ mini (69.5 × 50 × 42, R51) has its own guide, "Print and assembly guide (airQ mini)", below; where the two differ on purpose (foam, feet, the zone wall's and `gasket_in`'s orientation) the mini's guide says so.
 Everything below comes from the design and its checks. **Nothing has been printed yet**: the owner's
 test print (section 6) is the next step.
 
@@ -1402,6 +1404,8 @@ on them.
 TPU: dry the filament and print slowly. The TPU parts are sized with their own squeeze already in
 (`gasket_squeeze` and the others; the check design sets them to 0).
 
+(`gasket_in` is the same part as the mini's `gasket_in`, 6.44 × 4.55 × 27.9. The mini prints it on its side, 29.3 mm² of bed and nothing hanging, instead of standing on 7.1 mm²: worth trying here too.)
+
 **Bought, not printed:** `sen66_foam`, `sen66_pad`, `zone_seal`, `sen66_top_seal`, `crease_seal`,
 `led_mask`, `gap_stop`. They are cut and stuck on as the assembly says (sizes in "Bodies" above).
 Not exported either: the references, the FFC and cable keep-outs and the air probes, which exist only
@@ -1430,7 +1434,7 @@ closing the case to be high.
 | SEN66 cable, JST GH 6-pin | 1 | Modelled ⌀ 3.0; the connector's place on the module is to confirm |
 | PU foam, adhesive: `sen66_foam` 55.2 × 21.3 × 1 | 1 | Under the SEN66 |
 | PU foam, adhesive: `sen66_pad` 10 × 10 × 3.2 | 1 | **Spec:** at least 4.7 N at 26 % compression, at most 15 N at 60 % (47–150 kPa); medium microcellular |
-| Closed-cell foam, black, adhesive: `zone_seal` 77.8 × 1.6 × 1.2 and `sen66_top_seal` 3.4 × 21.3 × 0.6 | 1 + 1 | 30–100 kPa at 25 % |
+| Closed-cell foam, black, adhesive: `zone_seal` 77.8 × 1.6 × 1.2 and `sen66_top_seal` 3.4 × 21.3 × 0.6 | 1 + 1 | 30–100 kPa at 25 %. (The airQ mini's top seal is softer, at most 30 kPa: do not mix the two stocks) |
 | Foam tape, black closed-cell, 0.3 thick: `crease_seal` 95 × 1.7 | 1 | On the lip's top |
 | Black closed-cell foam: `led_mask` 9.5 × 2.9 × 4.1 and `gap_stop` 1.3 × 5.0 × 5.6 | 1 + 1 | Stuck to the panel's back on 0.2 mm adhesive pad |
 | Adhesive pad, 0.2 mm | 3 | Light guide to panel (the only contact), `led_mask`, `gap_stop` |
@@ -1504,6 +1508,167 @@ What to look for:
   the SEN66 connector and cable, the adapter, the FFC vendor.
 - **Air.** Wait several days before judging VOC readings, and check the Wi-Fi RSSI (R12).
 
+## Print and assembly guide (airQ mini)
+
+For one airQ mini (69.5 × 50 × 42 mm, R51): the screenless wedge with the split CO₂ / PM2.5 light band. Everything
+below comes from the design and its checks (Task 5b). **Nothing has been printed yet**: the owner's test print
+(section 6) is the next step. The airQ's guide ("Print and assembly guide (airQ)") is the model; where the mini
+differs on purpose, this guide says so.
+
+**Owner items that stay open** (all are parameters or look items, none is hidden by the exports):
+
+- **Envelope 69.5 × 50 × 42** (R51), with the **18.0 mm lip** (the study's 15.5 leaves too little for three intake rows).
+- **R12:** the antenna is **10.35 mm** from the SEN66 (the rule asks 15). Check the Wi-Fi RSSI on the prototype.
+- **R18:** the outlet grille opens **498 mm²** (the rule 660.1, the floor 296). Confirm against Sensirion's guide.
+- **Wall 2.4:** at `wall` 2.4 the intake falls to 153.7 mm² (rule 154.5), the intake throat to 57.4 mm² (rule 77.3) and
+  J2's room to 4.65 mm. The exports are at the default wall (1.8): do not thicken it without a rebuild.
+
+### 1. Files
+
+`export/airq-mini-<part>.3mf` and `export/airq-mini-<part>.step`, one file per printed part (11 parts, 22 files),
+written by `uv run --with pyyaml python enclosure/build.py airq-mini` (the `PRINT_PARTS` table in `src/airq_mini.py`
+sets each part's orientation). Each part is already in its **print orientation, sitting on the bed (z = 0)**, so a
+3MF drops straight into Bambu Studio. A part is turned about the world origin and moved in z only, so its x and y
+are still the assembly's. Every file is under 5 MB (R8); the largest is `airq-mini-base_plate.step`, 0.7 MB. Print
+the 3MF. The STEP is for other CAD.
+
+`shell` and `orange_dot` are one print job: import both and keep their relative place. The dot is an AMS colour
+region, flush with the shell's face. Everything else prints alone.
+
+The bodies of `airq-mini.sc` are 16: 11 printed (the files above) and 5 bought (`zone_seal`, `sen66_foam`,
+`sen66_pad`, `sen66_top_seal`, `guide_stop`). `tests/enclosure/test_airq_mini_exports.py` fails if a body is in
+neither list.
+
+### 2. Printed parts
+
+Material: **ASA if the printer is enclosed, PETG otherwise** ("shell material"). No part needs a raft. Layer height,
+walls and infill are the owner's choice: the design does not depend on them. Sizes are as printed (x × y × z).
+"Hangs" means a face steeper than 45° from the bed over the bed; the numbers are measured on each committed 3MF
+(`tests/enclosure/test_airq_mini_exports.py`).
+
+| Part (file `airq-mini-…`) | Qty | Material | Print orientation | Supports |
+|---|---|---|---|---|
+| `shell` | 1 | shell material, warm white | **face down** on textured PEI: the 24° face on the bed (turn x +114; 69.5 × 56.2 × 50.5 mm). 1,590 mm² on the bed | **None planned; 314 mm² hangs and is accepted. Check it in the slicer preview.** It is: the face's 0.8 chamfer along the bed edge (93 mm², z 0 … 0.7); the debossed labels' and the dot's recess ceilings (53 and 12.5 mm², 0.4 and 0.6 up: they bridge, by design); the side walls' lower front ends (2 × 29 mm², x ±33 … ±34.8, z 1.7 … 8.3) and the front boss notches (2 × 27 and 2 × 8 mm², z 5.4 … 12.4), all ceilings 24° above horizontal on a 1.8 mm wall edge; the rear boss's face (26 mm², z 29 … 32). If the side walls' ends droop, add a support under each |
+| `orange_dot` | 1 | orange, an AMS colour region of the shell job | as the shell: it prints first, on the bed, flush with the face (a 0.6 deep recess in the flexure's tip). 4.0 × 4.0 × 0.6 | none |
+| `base_plate` | 1 | shell material | floor down, as designed (69.5 × 50 × 40). 3,445 mm² on the bed | none, but it bridges (517 mm² of flat or shallow ceilings above the bed): the intake rows' slots (3 rows × 4 slots, 10.98 mm wide, 1.8 deep in the lip: 237 mm²), the outlet grille's 24 slots (151 mm², 1.2 wide, in the rear wall at z 27.3), the exhaust's 13 slots (28 mm², z 39.0), the USB-C opening's ceiling (12.9 mm wide at z 37.9, 17 mm²: the longest bridge), the two screw counterbores (2 × 10.6 mm², 0.4 up), a 7.4 × 6.0 flat ceiling in the plenum (22 mm², z 27.7, x −22.4 … −15) and the outlet ring seat's lead-in (about 29 mm², 43° from the vertical, z 23 … 28). Use bridge settings; the 12.9 mm one is a first-print item |
+| `zone_wall` | 1 | an **opaque** filament (black or dark: it is a light barrier, review M5) | **on its slanted face** (the face that hugs the shell's; turn x +114; 65.5 × 31.0 × 37.4). 772 mm² on the bed. Not the airQ's end-standing (73 mm² under a 65 mm wall) and not flat top down (that floats 2,555 mm² 0.3 over its 31.0 rises) | none. 125 mm² hangs, all shallow ceilings 24° above horizontal and within 1.8 of the bed: the ledge tip (67 mm², the seat of `zone_seal`), the boss notches' ledges (2 × 20 mm²), plus the drawer notch's three groove faces (10 mm², z 23 … 24) and slivers. The flat top (the pads' face) and the underside (the top seal's face) print as steps on walls 24° off the vertical: check their flatness with the feeler at the first print |
+| `light_guide_co2`, `light_guide_pm` | 1 each | **clear or natural PETG**, bare: no paint, coat or cladding on any face (R40, R48) | **exit face down on a smooth plate** (turn x +114; 20.2 × 4.1 × 4.4 mm). The exit face is the first layer: 34.3 mm² on the bed. Every TIR face is a vertical wall or a wall leaning up | **Supports only under the two flange fronts** (34.6 mm² in all: 22.5 over the slot and 12.1 under it, parallel to the exit face and 1.6 above it; 0.6 … 1.1 mm wide ledges that may print without any). They carry **none of the light**: of the 5,081 rays each half delivers, 0 touch them (`test_supports_touch_none_of_the_light`). No support touches the exit, an entry face or a TIR face. The faces that do carry light are printed as layer steps, not supported: the entry faces (all 5,081 delivered rays cross them; they face up at 24° from the bed, so they print as shallow steps: the roughest optical faces, a look item), the tongue's lower side (16 %), the feet's bottoms (13 % and 11 %), the feet's ends (3 % each) and the tongue's upper side (1 %). No brim needed (34 mm² contact); a brim of 3 lines helps if the 4 mm tall part lifts. First-print item: the best orientation is decided at the first print (section 6) |
+| `gasket_out` | 1 | TPU 95A, opaque (black) | on its seat end (the end that goes into the plate): 24 × 24 × 4 | none |
+| `gasket_in` | 1 | TPU 95A, opaque | **on its side** (turn y −90): 27.9 × 4.55 × 6.44, 29.3 mm² on the bed, the 55° wiper lying flat | none (nothing hangs). The airQ's identical part stands on 7.1 mm²; this is easier |
+| `grommet_zone_a` | 1 | TPU 95A, opaque | flat as designed: 3.5 × 8.8 × 1.8, the bores vertical, 22.7 mm² on the bed | none (the 0.5 ribs' undersides, 3.2 mm²) |
+| `grommet_zone_b` | 1 | TPU 95A, opaque | on its closed end (turn y +90), the split face and its half-channels up: 1.8 × 8.8 × 2.35, 14.7 mm² | none |
+| `tongue_mount` | 1 (print 3: the pin is 7.7 tall) | shell material | standing on the spigot's end (turn y −90): 4.6 × 4.6 × 7.7, **2.8 mm² on the bed** | none, but **brim or mouse ears**: the collar's underside ring (13.8 mm², 1.4 wide, 1.0 above the bed) hangs round the spigot |
+
+TPU: dry the filament and print slowly. The TPU parts are sized with their own squeeze already in (the check design
+sets every squeeze to 0).
+
+**Bought, not printed** (all in "Bodies" above): `zone_seal`, `sen66_foam`, `sen66_pad`, `sen66_top_seal` and
+`guide_stop` (die-cut foam). Not exported either: the references, the cable keep-outs and the air probes, which
+exist only in the check design.
+
+**Airing.** A new print gives off VOCs, which the SEN66 would read as air quality. Air the finished shell, base
+and zone wall for **several days**, in a ventilated room and out of the sun, before you trust any VOC reading.
+Expect the first days of readings after closing the case to be high.
+
+### 3. Bought parts, one airQ mini
+
+| Part | Qty | Notes |
+|---|---|---|
+| M2 heat-set inserts, 4.0 deep | 3 | In the shell's bosses: two at the front, one at the rear (hole `insert_d` 3.2; the insert coupon decides it) |
+| M2 screws, pan head, head ⌀ ≤ 4.4 | 3 | Shell to base: two from under the floor (front bosses), one through the rear wall (R29). **M2 × 5**, as the airQ's identical bosses (the front hole takes at most 5.6, the rear one 5.0). To confirm |
+| M2 × 6 self-tapping screw, pan head | 1 | **H1**: the board, the zone wall and its pad into the standoff's 6.0 deep pilot (board 1.6 + pad 0.3 + wall 1.8, so 2.3 of thread in the post). It also clamps the zone wall |
+| M2 × **3** screw, pan head, self-tapping | 1 | **H2**: into a blind pilot, 1.6 deep, in the pad and the zone wall (0.5 of wall left under it). **M2 × 3 only, 1.4 of thread.** An M2 × 4, or the airQ's M2 × 6, goes through the 0.5 skin and the 0.3 gap into the SEN66's housing (review M6) |
+| Felt feet, ⌀ 7.5, at least 2.0 thick | 4 | Two at the front cover the screws' heads, two at the rear corners (the airQ's are ⌀ 10) |
+| SEN66 module | 1 | 55.2 × 25.6 × 21.3 ± 0.5, standing, ports to the rear, inlet end left |
+| Boards: main and tongue | 1 each | From `hardware/` |
+| SEN66 cable, JST GH 6-pin | 1 | Modelled ⌀ 3.0. Its route is about 85 mm (plug, along the floor in front of the module, up the passage's front, over the tongue, up the drawer to J2): choose the length to fit, with no slack in the passage or the throat (review M9) |
+| Qwiic cable, JST SH 4-pin | 1 | Tongue to **J4** directly (the mini has no SFA40 breakout). Modelled ⌀ 2.4; the grommets' bores are 0.2 under it |
+| PU foam, adhesive: `sen66_foam` 55.2 × 21.3 × 1 | 1 | Under the SEN66 |
+| PU foam, adhesive: `sen66_pad` 10 × 10 × 3.2 | 1 | **Spec:** at least 4.7 N at 26 % compression, at most 15 N at 60 % (47–150 kPa); medium microcellular. On the SEN66's connector face on the outlet's axis |
+| Closed-cell foam, black, adhesive: `zone_seal` 52.3 × 1.6 × 1.2 | 1 | 30–100 kPa at 25 %. On the zone wall's ledge front face |
+| Closed-cell foam, black, adhesive, **soft**: `sen66_top_seal` 3.4 × 21.3 × 0.6 | 1 | **At most 30 kPa at 25 %** (the mini's spec, review I1): the zone wall is held down by only H1's clamp and four pads, so the seal pushes up 4.3 N at most (firm foam would push 14.5 N). **The airQ's top seal is 30–100 kPa: do not mix the two stocks.** To confirm with the foam bought |
+| Closed-cell foam, black, **die-cut**, adhesive: `guide_stop` | 1 | **1.2 mm thick including the adhesive (+0 / −0.2)**: its back face is only 0.2 from the board's edge, the LEDs and J7, so a thicker stop touches them. Outline 50.2 × 5.07 (x −23.55 … 26.65, z 31.08 … 36.15 as modelled), **four windows 3.5 × 1.9** (x −16.2 … −12.7, −11.1 … −7.6, 11.1 … 14.6, 16.2 … 19.7; z 32.65 … 34.55), webs 1.6 over and between them (`airq_mini_face.stop_windows`). Stuck on the three ribs' back faces |
+| USB-C cable | 1 | To J1 through the rear wall's opening (12.9 × 7.4); overmold size to confirm |
+
+None of the airQ's panel parts is used: no e-paper, FFC, adapter, SFA40, lid, `crease_seal`, `led_mask`,
+`gap_stop` or adhesive pad (every light-guide face stays bare).
+
+### 4. Assembly order
+
+Keep the base and the shell separate until step 9.
+
+1. **Inserts.** Heat the three M2 inserts into the shell's bosses (4.0 deep).
+2. **Base.** Check the printed base: the intake and outlet slots, the pockets, the standoff's pilot and the tongue
+   pin's blind hole in the left rail are clean. Press `tongue_mount`'s spigot into that hole (1.0 deep; it can slide
+   out at most 0.8, and the SEN66's end holds it once the module is in).
+3. **Gaskets.** `gasket_in` down its slot, root first. `gasket_out` into its seat in the plenum plate.
+4. **Tongue, before the SEN66.** The pin is 7.7 long and the passage between the rail and the module is 6.9, so the
+   tongue cannot go on after the module. Slide it on the pin by its mounting hole (parts toward where the module's
+   end will be, the VEML7700 forward), with its Qwiic cable plugged in.
+5. **SEN66.** Stick `sen66_foam` under it, `sen66_pad` on its connector face on the outlet's axis and
+   `sen66_top_seal` across its top at the wiper's tip. Plug the GH cable into it, then lower it, pressed back against
+   the ring, past the seat's and the wiper's lead-ins. Lay both cables toward the drawer (the SEN66 cable over the
+   tongue).
+6. **Zone wall.** With `zone_seal` stuck on its ledge's front face, onto the standoff's spigot and the key. Lay the
+   two cables into the drawer from its open end, close `grommet_zone_a/_b` round them (the split on the cables' line)
+   and slide the pair in together. The outer half meets the shell's side wall later and presses the split shut.
+7. **Main board.** Then the cables into J2 and J4, and the screws: **H1 an M2 × 6** (which also clamps the zone
+   wall), **H2 an M2 × 3**.
+8. **Shell, face down on the bench.**
+    - Drop each bare clear light guide into its slot from inside, tongue first (`light_guide_co2` left,
+      `light_guide_pm` right; they are the same shape).
+    - Press `guide_stop` onto the three ribs' back faces over the four feet (windows 0.15 clear of each).
+    - Check that the dot and its flexure move freely.
+9. **Close.** Lower the shell along −z onto the base: it stands on the floor, the guides' entry faces stop 0.3 in front
+   of the LEDs, and the four pads touch the zone wall's top. Drive the three M2 screws. Check the pads with a feeler
+   (0.05 mm: they must bear, and the zone wall's laps must stay shut).
+10. **Feet.** Stick the four felt feet on, the front two over the screw heads.
+
+**Before power.** The SEN66 must not move when you press its connector face toward the front. Check that J2 and J4
+are seated and that the GH cable is not pinched in the passage.
+
+### 5. Check table
+
+The check table is under "airQ mini enclosure" → "Check table (airQ mini)" above. Each row gives the rule, the
+value, how it was measured (on the geometry, analytic, or arithmetic) and the result. Re-run the checks with
+`uv run --with pyyaml python enclosure/src/airq_mini_check.py --run` and
+`uv run --with pytest --with pyyaml pytest tests/enclosure`.
+
+### 6. The owner's test print (next step, not done)
+
+Plan 3 Task 5 Step 2 (ruling R7) needs a printer and the prototype boards, so it has not happened. Print one airQ
+mini from the 3MF files, assemble it with the prototype boards and report. Fix any fit by **changing parameters
+only**, then rebuild (`build.py airq-mini`) and re-export. Print the coupons first if their results (`clr_*`) are
+still pending.
+
+What to look for:
+
+- **Fits.** The shell on the base (the 0.2 parting line, the way on), the inserts, the screws' lengths, the zone
+  wall's laps and its drawer, the SEN66 in its cradle, the tongue on its pin, every grommet.
+- **Zone-wall pads (review I1).** With a 0.05 feeler: each of the four pads bears on the zone wall's top, the rail
+  fronts', the boss pockets' and the plenum plate's laps stay shut, and the top seal and `zone_seal` keep their
+  compression. Also the zone wall's flat top and underside, which print as steps on a leaning wall.
+- **Seal.** The outlet ring (smoke at the grille with the SEN66 running: nothing leaks into the space beside the
+  ring), the wiper, the pad's force, the soft top seal.
+- **Light band.** Both halves' brightness and evenness: the model gives about 10.5 % delivery per LED and light only
+  at x −18.4 … −5.5 (CO₂, the middle 90 % at −16.3 … −7.5 of the visible −22.35 … −1.85) and 9.1 … 21.8 (PM2.5, 10.9 …
+  19.9 of 4.95 … 25.45), so each half's last 4 mm get no direct light and **the dark ends** will look dim. The gap
+  between the halves must stay dark (6.8 mm; at warm-white 1.2 its middle is 4.4, at the coupon's 2.0 only 2.8) and no
+  light should show across it. Print both guides and report how the exit faces look (smooth plate: clear; textured:
+  diffuse). **Best orientation:** the export is exit face down; also try **entry faces down** (10.2 mm² on the bed,
+  supports under the back face, 63 mm², which carries none of the light) and **on an end** (12.2 mm², no support at
+  all), and report which is brightest.
+- **Labels.** "CO₂" and "PM2.5" read at 5 mm, and the **CO₂ subscript (a 4.0 mm "2", strokes about 0.54)**, which is
+  under the coupon's 5 mm finding (review M7).
+- **Sensor window.** The VEML7700 sees the desk through the ⌀2.0 window, about 30° off its axis (review M8): the lux
+  reading, with the LEDs on and off.
+- **Button.** SW1 through the flexure and the dot: the push is crisp and the beam does not hold the switch closed (the
+  stop is the switch body, 0.04 past its travel). The face-down flexure at 24° has no coupon, so this print is its test.
+- **H2.** The M2 × 3 holds in its 1.4 mm of thread, and does not reach the SEN66.
+- **Parts list.** Confirm every row of section 3: screw lengths, the insert hole size, the foam (the top seal's
+  softness above all), the SEN66 connector and cable, the USB-C overmold.
+- **Air.** Wait several days before judging VOC readings, and check the Wi-Fi RSSI (R12, 10.35 mm).
+
 ## Sources
 
 Every dimension comes from these documents; none of them is committed (R5).
@@ -1554,7 +1719,10 @@ print ("Print and assembly guide (airQ)", section 6) is what settles most of the
     band partly lights (review M8): calibrate with the LEDs on and off, and consider blanking the LEDs during
     the sensor's integration (a firmware option).
   - The H2 screw takes 1.4 mm of thread in the zone wall: **M2 × 3 only** (an M2 × 4 or the airQ's M2 × 6 reaches
-    the SEN66's housing, review M6); check the hold on the print. Put the length in the guide and the BOM (5b).
+    the SEN66's housing, review M6); check the hold on the print. It is in the guide's list (section 3).
+  - The first print's orientations (Task 5b, "Print and assembly guide (airQ mini)" section 6): the light guides
+    exit face down (also try entry face down and on the end), the zone wall on its slanted face, `gasket_in` on
+    its side, the shell's shallow ceilings (side-wall ends, boss notches) without support.
   - The tongue's Qwiic and SEN66 cable sizes: see "airQ mini enclosure".
   - The SEN66 cable's route is about 85 mm (its plug, along the floor in front of the module, up the passage's
     front, over the tongue, up the drawer to J2): its slack has no recorded place and must stay out of the
