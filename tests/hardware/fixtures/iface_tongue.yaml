@@ -1,0 +1,7 @@
+# Interface for the sense-tongue board: only the connector group applies.
+checks: [connectors]
+signals:
+  I2C_SDA: GPIO6
+  I2C_SCL: GPIO7
+connectors:
+  J_QWIIC_TONGUE: [GND, +3V3, I2C_SDA, I2C_SCL]

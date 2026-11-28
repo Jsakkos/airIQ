@@ -1,0 +1,7 @@
+(version 1)
+# Spec 6.2 / global constraint "Sense tongue": no copper within 1.5 mm of the SHT45 except its
+# own pads and traces. The rule area SHT45_ISOLATION (board file) covers the island, the slot
+# and the neck; it bans vias and pours there. This rule bans every other part's pads there.
+(rule "SHT45 isolation: only the SHT45's own pads"
+  (constraint disallow pad)
+  (condition "A.intersectsArea('SHT45_ISOLATION') && !A.memberOfFootprint('U1')"))

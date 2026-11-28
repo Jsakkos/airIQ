@@ -8,7 +8,7 @@ light:
     internal: true
     pin: ${pin_led_data}
     num_leds: ${led_count}
-    chipset: WS2812
+    chipset: SK6812  # SK6812SIDE-A side-view LEDs (WS2812 protocol, GRB)
     channel_colors: GRB
 
 switch:

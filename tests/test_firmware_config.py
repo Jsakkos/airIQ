@@ -124,6 +124,8 @@ def test_low_heat_cpu(board):
 def test_esp_idf_c6(board):
     assert board["esp32"]["variant"] == "esp32c6"
     assert board["esp32"]["framework"]["type"] == "esp-idf"
+    # ESP32-C6-WROOM-1-N8 on the main board (hardware/bom/parts.csv): 8 MB, not ESPHome's 4 MB default.
+    assert board["esp32"]["flash_size"] == "8MB"
 
 
 def test_logger_off_uart0(board):
@@ -152,11 +154,22 @@ def test_index_keys(sensors):
 def test_pressure_in_hpa_for_sen6x(sensors):
     sen6x = next(s for s in sensors["sensor"] if s["platform"] == "sen6x")
     src = sen6x["co2"]["ambient_pressure_compensation_source"]
-    bmp = next(s for s in sensors["sensor"] if s["platform"] == "bmp581_i2c")
-    p = bmp["pressure"]
+    ms = next(s for s in sensors["sensor"] if s["platform"] == "ms5611")
+    # TE MS5611-01BA03, CSB tied low on the board -> 0x77 (from the substitution).
+    assert ms["address"] == "${addr_ms5611}"
+    p = ms["pressure"]
     assert p["id"] == src
+    assert p["name"] == "Pressure"
+    # esphome's ms5611 already reports hPa (calculate_values_ divides by 100): no scaling filter.
     assert p["unit_of_measurement"] == "hPa"
-    assert {"multiply": 0.01} in p["filters"]
+    assert not any("multiply" in f for f in p["filters"])
+    assert {"timeout": "120s"} in p["filters"]
+
+
+def test_led_chipset_sk6812():
+    light = load_yaml(PKG / "light-common.yaml")
+    strip = next(l for l in light["light"] if l["id"] == "led_strip")
+    assert strip["chipset"] == "SK6812"
 
 
 def test_lux_smoothed(sensors):

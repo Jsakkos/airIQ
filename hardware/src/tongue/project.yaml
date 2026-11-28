@@ -1,0 +1,32 @@
+# airQ v3 sense tongue: project settings for the generator (tools/hw/build.py tongue).
+# A small board cabled to the main board's J_QWIIC_TONGUE socket by a Qwiic (JST SH 4-pin) lead,
+# so the reference SHT45 sits in the intake air, away from the main board's heat (spec 6.2, 6.8).
+# The KiCad files in hardware/kicad/tongue/ are generated from this folder: edit here, then rebuild.
+# Format: hardware/README.md, "Design source".
+
+project: airq-tongue               # KiCad project name: <output>/airq-tongue.kicad_pro
+title: airQ v3 sense tongue
+company: airQ open hardware (CC BY-SA 4.0)
+rev: 3.0-dev
+output: ../../kicad/tongue         # KiCad project folder, relative to this file
+fab: ../../fab/tongue              # JLC upload files (Gerber zip, bom.csv, cpl.csv), rewritten by every build
+step: ../../step/airq-tongue.step  # 3-D model for the enclosure: build.py --step
+
+# The interface contract: J1 (Role J_QWIIC_TONGUE) takes its pinout from it (gen_sch.py).
+interface: ../../interface.yaml
+
+# Schematic sheets, in page order; each one is <name>.yaml in this folder.
+sheets: [sense]
+
+# Nets drawn with a KiCad power symbol instead of a label.
+power_symbols:
+  GND: power:GND
+  +3V3: power:+3V3                 # from the main board, through the Qwiic lead
+
+# Project libraries (paths relative to this file). Other library names (Device, power,
+# Mechanical, ...) are KiCad 10's stock libraries.
+libraries:
+  symbols:
+    airq: ../../kicad/lib/airq.kicad_sym
+  footprints:
+    airq: ../../kicad/lib/airq.pretty

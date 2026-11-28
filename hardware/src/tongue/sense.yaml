@@ -1,0 +1,69 @@
+# Sense tongue sheet: SHT45 reference T/RH sensor, VEML7700 ambient-light sensor, Qwiic socket.
+# Each part: `at` is the symbol anchor on the A4 page in mm (Y down, on the 1.27 mm grid);
+# `pins` maps every symbol pin number to a net name (NC = no connection), see hardware/README.md.
+# J1's pins 1-4 come from connectors.J_QWIIC_TONGUE in hardware/interface.yaml through its Role
+# field (Qwiic leads are pin 1 to pin 1, so it matches the main board's socket); check_netlist
+# checks the result against hardware/src/tongue/interface.yaml.
+# I2C addresses (hardware/interface.yaml i2c_addresses): SHT45-AD1B 0x44, VEML7700 0x10, both fixed.
+
+title: "Sense tongue: SHT45, VEML7700, Qwiic socket"
+paper: A4
+
+notes:
+  - {text: "Qwiic socket J_QWIIC_TONGUE\n(pin order: hardware/interface.yaml)\nNo I2C pull-ups here: the 4.7 k\npull-ups are on the main board", at: [40.64, 63.5], size: 1.8}
+  - {text: "SHT45-AD1B, I2C 0x44\nOn the slotted island: milled slot on 3 sides,\nno copper within 1.5 mm except its own pads and traces", at: [114.3, 63.5], size: 1.8}
+  - {text: "VEML7700-TR (side view), I2C 0x10\nWindow faces out of the front edge,\nat the end opposite the SHT45", at: [114.3, 111.76], size: 1.8}
+  - {text: "M2 mounting hole", at: [40.64, 132.08], size: 1.8}
+  - {text: "ERC power flags (supply arrives through J1)", at: [40.64, 160.02], size: 1.8}
+
+parts:
+  # -- Qwiic socket, JST SH 4-pin side entry. Pins 5 and 6 are the fitting nails (mechanical).
+  J1:
+    symbol: airq:SM04B-SRSS-TB
+    at: [63.5, 96.52]
+    rot: 270                    # pins on the right, 1..4 from the top
+    fields: {Role: J_QWIIC_TONGUE}    # pins 1-4: hardware/interface.yaml
+    pins: {"5": NC, "6": NC}
+
+  # -- Reference temperature and humidity: Sensirion SHT45-AD1B-R2
+  U1:
+    symbol: airq:SHT45-AD1B-R2
+    at: [127.0, 81.28]
+    pins: {"1": I2C_SDA, "2": I2C_SCL, "3": +3V3, "4": GND}
+  C1:                   # SHT45 decoupling, at the island's neck (>= 1.5 mm from the sensor)
+    symbol: Device:C
+    at: [154.94, 81.28]
+    value: 100nF
+    footprint: Capacitor_SMD:C_0402_1005Metric
+    lcsc: C1525
+    pins: [+3V3, GND]
+
+  # -- Ambient light: Vishay VEML7700-TR (side-view package)
+  U2:
+    symbol: airq:VEML7700-TR
+    at: [132.08, 129.54]
+    pins: {"1": I2C_SCL, "2": +3V3, "3": GND, "4": I2C_SDA}
+  C2:                   # VEML7700 decoupling, next to its VDD/GND pins
+    symbol: Device:C
+    at: [154.94, 129.54]
+    value: 100nF
+    footprint: Capacitor_SMD:C_0402_1005Metric
+    lcsc: C1525
+    pins: [+3V3, GND]
+
+  # -- M2 mounting hole (non-plated, no BOM line, not placed by JLC)
+  H1:
+    symbol: Mechanical:MountingHole
+    at: [63.5, 142.24]
+    footprint: MountingHole:MountingHole_2.2mm_M2
+
+  # -- ERC: +3V3 and GND reach this board only through the connector's passive pins
+  "#FLG01":
+    symbol: power:PWR_FLAG
+    at: [53.34, 175.26]
+    rot: 180
+    pins: [+3V3]
+  "#FLG02":
+    symbol: power:PWR_FLAG
+    at: [68.58, 170.18]
+    pins: [GND]

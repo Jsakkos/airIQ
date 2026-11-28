@@ -1,6 +1,6 @@
 # airQ v3 interface contract: single source of truth for GPIOs, I2C addresses
 # and connector pinouts. Consumed by the firmware and the PCB checkers.
-# GPIOs verified against ESP32-C6-MINI-1 datasheet v1.5, Table 3-1.
+# GPIOs verified against the ESP32-C6-WROOM-1 datasheet, Table "Pin Definitions".
 
 signals:
   I2C_SDA: GPIO6
@@ -19,27 +19,186 @@ signals:
 i2c_addresses:
   sen6x: 0x6B
   sht45: 0x44
-  bmp585: 0x46
+  ms5611: 0x77  # TE MS5611-01BA03, CSB low -> 0x77 (the board ties CSB to GND)
   veml7700: 0x10
   sfa40: 0x5D  # verified: ESPHome sfa40 component default (i2c_device_schema(0x5D)), esphome 2026.11.1
 
 # Net name on each pin, in pin order. NC = not connected.
 connectors:
   # Sensirion SEN6x, JST GH 6-pin. Supply is 3.3 V (SEN66 runs on 3.15-3.45 V, spec section 3).
-  # TODO verify pin order against SEN6x datasheet (could not fetch the PDF).
-  J_SEN66: [+3V3, GND, I2C_SDA, I2C_SCL, GND, NC]
+  # Pin order: Sensirion "SEN6x Datasheet" Version 0.5 (October 2024), section 4 Hardware
+  # Interface Description, Table 16 "SEN6x pin assignment": 1 VDD, 2 GND, 3 SDA, 4 SCL,
+  # 5 "GND or NC", 6 "VDD or NC" (5 is internally tied to 2, 6 to 1). Pins 5 and 6 are left NC.
+  J_SEN66: [+3V3, GND, I2C_SDA, I2C_SCL, NC, NC]
   J_QWIIC_TONGUE: [GND, +3V3, I2C_SDA, I2C_SCL]
   J_QWIIC_AUX: [GND, +3V3, I2C_SDA, I2C_SCL]
   J_LED_EXT: [+5V, LED_DOUT_5V, GND]
-  J_AUX_UART: [GND, +3V3, AUX_UART_TX, AUX_UART_RX]
-  # GoodDisplay GDEY029T94, 24-pin 0.5 mm FPC.
-  # TODO verify against the GDEY029T94 specification (could not fetch the PDF);
-  # pins 8-14 follow the BS1/BUSY/RES/DC/CS/SCK/SDI order seen in a third-party listing.
-  J_EPD: [NC, EPD_GDR, EPD_RESE, EPD_VSH2, NC, NC, NC, GND, EPD_BUSY, EPD_RST, EPD_DC, EPD_CS, EPD_CLK, EPD_MOSI, +3V3, +3V3, GND, EPD_VDD, EPD_VPP, EPD_VSH1, EPD_VGH, EPD_VSL, EPD_VGL, EPD_VCOM]
+  # EN = ESP32-C6 chip-enable net, BUTTON = GPIO9/BOOT: with pins 1-4 they give ROM-UART
+  # recovery (hold BUTTON low, pulse EN) and take a future mmWave sensor.
+  J_AUX_UART: [GND, +3V3, AUX_UART_TX, AUX_UART_RX, EN, BUTTON]
+  # GoodDisplay GDEY029T94, 24-pin 0.5 mm FPC. Pin order: GoodDisplay "GDEY029T94 Product
+  # Specifications" Rev 1.0 (2021/03/15; download "GDEY029T94_Specification(24.10.22)"), section 5
+  # "Input/Output Pin Assignment" and the section 4 drawing's pin strip; identical to the
+  # Waveshare "2.9inch e-Paper V2" Specification Rev 2.1 (2020/02/10), section 1.5. Pins 1 and 4
+  # are NC, 5 = VSH2, 6/7 = TSCL/TSDA (unused, NC), 8 = BS1 (low = 4-wire SPI, hence GND),
+  # 15 VDDIO and 16 VCI both +3V3, 17 VSS. NOT compatible with the older Waveshare 2.9" V1
+  # (2017, IL3820-class) panel, whose pins 4/5 are VGL/VGH.
+  # FPC contacts: on the front (viewing) face, stiffener on the back, per the GoodDisplay side
+  # view "CONTACT SIDE"/"STIFFENER" labels (Waveshare V2 drawing: "CONNECT SIDE" on FRONT).
+  # The datasheets have no assembly drawing, so the board connector contact type is chosen in
+  # Task 3 (dual-contact recommended).
+  J_EPD: [NC, EPD_GDR, EPD_RESE, NC, EPD_VSH2, NC, NC, GND, EPD_BUSY, EPD_RST, EPD_DC, EPD_CS, EPD_CLK, EPD_MOSI, +3V3, +3V3, GND, EPD_VDD, EPD_VPP, EPD_VSH1, EPD_VGH, EPD_VSL, EPD_VGL, EPD_VCOM]
 
-mechanical: {}  # filled by the PCB plan (board outlines, mounting holes)
+# Board mechanics for the enclosure (PCB plan). Lengths in mm.
+mechanical:
+  # Sense tongue (hardware/src/tongue/layout.yaml, hardware/kicad/tongue/). Frame: origin at the
+  # board's top-left corner (KiCad grid origin, as in layout.yaml), +X right, +Y down (toward the
+  # Qwiic edge), +Z up from the top (component) surface. All parts are on top; the bottom is flat
+  # (ground pour under the body only, no parts).
+  tongue:
+    front_edge: -Y                 # the long top edge faces the device front, behind the intake lip
+    outline: [22.0, 13.0]          # W x H rectangle, square corners
+    thickness: 1.6
+    max_part_height: 3.0           # VEML7700 (J1 is 2.95); bottom side 0
+    step:                          # hardware/step/airq-tongue.step (build.py tongue --step: --grid-origin)
+      x: X                         # STEP x = X
+      y: -Y                        # STEP y = -Y (KiCad's 3-D frame has Y up)
+      z: Z + 1.6                   # parts sit on the top face at STEP z = 1.6; board bottom at z = 0
+      # KiCad's board body is the dielectric only (no copper, mask): z 0 .. 1.51; checked in
+      # SolidCraft 2026-11-25: board x 0..22, y -13..0; U2 (VEML7700) x 14.95..21.75, y -2.6..-0.25, top 4.596
+    mounting_hole:
+      center: [4.5, 10.4]          # below the SHT45 island
+      diameter: 2.2                # non-plated, M2
+      clear_diameter: 5.0          # flat, copper- and part-free circle round it (screw head, boss)
+    sht45:                         # reference T/RH sensor, keep it in the intake air
+      center: [4.5, 4.5]           # left end, 4.5 mm behind the front edge
+      body: [1.5, 1.5, 0.55]       # L x W x H, sensing opening on top (+Z)
+      island: [[2.5, 2.5], [7.5, 6.5]]   # board island it sits on; joins the board only via the neck
+      neck: [[7.5, 3.3], [8.5, 5.7]]
+      slot_width: 1.0              # milled slot round the island on 3 sides (top, left, bottom); = JLC's minimum
+      slot: [[1.5, 1.5], [8.5, 1.5], [8.5, 3.3], [7.5, 3.3], [7.5, 2.5], [2.5, 2.5], [2.5, 6.5],
+             [7.5, 6.5], [7.5, 5.7], [8.5, 5.7], [8.5, 7.5], [1.5, 7.5]]   # cutout polygon
+    veml7700:                      # ambient light, side-view package, at the end opposite the SHT45
+      faces: -Y                    # its window looks out of the front edge
+      window_center: [18.35, 0.25, 1.95]  # sensitive-area centre on the window face (Z above board)
+      body: [[14.95, 0.25], [21.75, 2.6]]  # 6.8 x 2.35 footprint, 3.0 high; window face 0.25 inside the edge
+      half_sensitivity_angle: 55   # degrees (Vishay app note 84323): size the front window from this
+    qwiic:                         # J1, JST SH 4-pin side entry (SM04B-SRSS-TB), J_QWIIC_TONGUE
+      cable_entry: +Y              # back long edge (opposite the front); the cable leaves toward the main board
+      mating_face_y: 12.36         # 0.64 inside the bottom edge
+      center_x: 15.0               # pin 1 (GND) at x 13.5, pin 4 (SCL) at x 16.5
+      body: [[12.0, 8.1], [18.0, 12.36]]  # 2.95 high
+
+  # Main board (hardware/src/main/layout.yaml, hardware/kicad/main/), shared by the airQ and the airQ
+  # mini. Frame: origin at the board's top-left corner (KiCad grid origin, as in layout.yaml), +X right,
+  # +Y toward the FRONT edge, +Z up from the top (component) surface. Seen from in front of the device
+  # (looking at the front edge, +Y toward the viewer), +X is the viewer's right: left/right below are as
+  # the user sees them. All parts are on top; the bottom is flat (pours, vias; J6's pads are unfitted).
+  main:
+    front_edge: +Y                 # LEDs, FPC, J_LED_EXT and the button look out of the y = 30 edge
+    outline: [60.0, 30.0]          # W x H rectangle, square corners (global limit 60 x 30)
+    thickness: 1.6
+    max_part_height: 4.25          # J_SEN66 (JST GH side entry); the module is 3.1, the button 3.35
+    step:                          # hardware/step/airq-main.step (build.py main --step: --grid-origin)
+      x: X                         # STEP x = X
+      y: -Y                        # STEP y = -Y (KiCad's 3-D frame has Y up)
+      z: Z + 1.6                   # parts sit on the top face at STEP z = 1.6; board bottom at z = 0
+      # KiCad's board body is the dielectric only (no copper, mask): z 0 .. 1.51; checked in
+      # SolidCraft 2026-11-25: board x 0..60, y -30..0; J2 body x 0.35..5.21, y -23.38..-12.63, top 5.845
+    mounting_holes:                # M2, non-plated
+      diameter: 2.2
+      centers: [[8.55, 2.6], [57.4, 22.8]]   # H1 rear-left (8 mm from the USB-C), H2 front-right (button)
+      clear_diameter: 4.4          # no tracks or vias (screw head / boss); the GND pour runs up to the hole
+    antenna:                       # ESP32-C6-WROOM-1 (U3; option A, owner-confirmed 2026-11-25) at the rear-right corner
+      module_body: [[41.0, -5.99], [59.0, 19.51]]   # 18 x 25.5, 3.1 high; part of it hangs over the edge
+      overhang: 5.99               # the 6.0 mm antenna strip lies beyond the rear edge (y < 0)
+      feed_side: +X                # Espressif keep-out: >= 15 mm toward -X, 2 mm toward +X
+      keepout: [[26.0, -6.0], [61.0, 0.5]]   # rule area ANTENNA_KEEPOUT: no copper, no pour, both layers
+      clearance_note: keep >= 15 mm of plastic-only space round the antenna strip in the enclosure
+    usb_c:                         # J1, 16-pin USB-C receptacle (C2765186), top mount
+      edge: -Y                     # rear edge; plug enters along +Y
+      center_x: 16.2
+      mouth_y: 0.03                # shell front face, flush with the rear edge
+      shell: [8.94, 3.16]          # W x H of the shell (z 0 .. 3.16); length 7.35 into the board
+    fpc:                           # J7, J_EPD, 24-pin 0.5 mm FPC, back-flip, double-sided contacts
+      edge: +Y                     # the panel's FPC tail enters along -Y
+      center_x: 28.8
+      mouth_y: 30.0                # body front face on the edge; body 15.5 wide x 5.4 deep x 2.0 high
+      pin1_x: 34.55                # pin 1 on the viewer's right, pin 24 at x 23.05
+      insertion: unfolded, display side up -> FPC pin i on connector pin i (lib README, R27)
+      # Any route (folds, twists): the order in J7 depends only on which tail face is up inside it.
+      pin_order: contacts (display side) up -> FPC pin i on pin i; contacts down -> mirrored (pin 1 on 24)
+      airq_fit:                    # owner decision 2026-11-26, option (b) (hardware/README.md, E-ink FPC fit)
+        route: extension           # the tail cannot reach J7 directly: about 22.7 mm short (24.9 turned 180)
+        adapter: 24-pin 0.5 mm FPC adapter at the panel's tail end, behind the panel
+        tail_fold: 180 deg behind the panel into the adapter  # 79.0 + 14.4 = 93.4 > ~91 mm interior (95 mm case)
+        ffc: 24-pin 0.5 mm pitch FFC from the adapter to J7 as placed; length and contact sides from Plan 3
+        board_change: none
+        pin_order: pin_order above, applied to the FFC face inside J7; a 180 deg twist in the FFC fixes a mirror
+        prototype_check: pin 1 on J7 pin 1 (meter, before power); clean refreshes with GDR/RESE through it
+        mini: not needed           # the mini's panel lies flat with its tail straight into J7
+      panel_tail:                  # the GDEY029T94's FPC tail, read from GoodDisplay "GDEY029T94 Product
+        # Specifications" Rev 1.0 (2021/03/15), section 4 "Mechanical Drawing of EPD module" (p. 7):
+        # front view (display side, panel landscape, tail on the left) and side view ("CONTACT SIDE",
+        # "STIFFENER"). Quoted labels are the drawing's dimensions.
+        exits: short end           # one 36.7 mm end of the 79.0 x 36.7 outline, flat in the panel plane
+        length: 14.40              # outline to the finger end ("14.40")
+        width: 12.50               # "12.50+-0.1" over the 9.56 mm next to the finger end ("9.56")
+        offset: 0.60               # narrow part's centre off the end's centre, toward the pin-24 long edge:
+                                   # 11.50 from that edge ("11.50"), 12.70 from the pin-1 edge
+        root:                      # then it flares; full width from 11.98 mm ("11.98") from the finger end
+          width: 15.31             # to the outline, i.e. the last 2.42 mm outside the glass
+          from_finger_end: 11.98
+          edge_gaps: [10.97, 10.42]  # to the pin-24 ("10.97") and pin-1 ("10.42") long edges; + width = 36.70
+        contacts: [24, 0.5, 3.66]  # count, pitch ("P0.5X23=11.50+-0.05"), length ("3.66"); on the display side
+        stiffener: 6.20            # "6.20+-0.3" from the finger end, on the back (dashed in the front view);
+                                   # 0.3 +-0.03 thick there, so only the 8.2 mm next to the glass can bend
+        pin1: upper contact        # front view: display toward you, tail on the left -> pin 1 ("1") on top,
+                                   # nearer the long edge 12.70 mm away; pin 24 ("24") below
+    j_sen66:                       # J2, JST GH 6-pin side entry (SM06B-GHS-TB), front half of the left edge
+      edge: -X                     # left edge; the cable leaves toward -X
+      center_y: 18.0
+      mating_face_x: 0.35
+      pin1_y: 14.87                # pin 1 (VDD) at the rear end
+      body: [[0.35, 12.63], [5.21, 23.38]]  # 4.25 high
+    j_qwiic_aux:                   # J4, JST SH 4-pin side entry (SM04B-SRSS-TB), rear of the left edge
+      edge: -X
+      center_y: 8.4
+      mating_face_x: 0.64
+      pin1_y: 6.9                  # GND; pin 1 on the left seen into the mouth
+      body: [[0.64, 5.4], [5.59, 11.4]]  # 2.9 high
+    j_qwiic_tongue:                # J3, JST SH 4-pin side entry, front-left corner, cable to the sense tongue
+      edge: +Y                     # front edge: the cable leaves toward the tongue behind the intake lip
+      center_x: 4.4
+      mating_face_y: 29.37
+      pin1_x: 2.9                  # GND; pin 1 on the viewer's left
+      body: [[1.4, 24.42], [7.4, 29.37]]  # 2.9 high
+    j_led_ext:                     # J5, JST SH 3-pin side entry (SM03B-SRSS-TB)
+      edge: +Y
+      center_x: 50.85
+      mating_face_y: 29.21
+      pin1_x: 49.85                # +5V; pin 1 on the viewer's left
+      body: [[48.35, 24.26], [53.35, 29.21]]  # 2.9 high
+    leds:                          # SK6812SIDE-A, side emitting toward +Y; chain D1 -> D2 -> D3 -> D4
+      faces: +Y
+      face_y: 30.0                 # light face on the front edge; body 4.0 x 1.6 x 2.0 high
+      light_center_z: 1.0          # centre of the 4.0 x 2.0 light face, above the board
+      chain:                       # firmware index -> position: 0, 1 = mini CO2 half (left), 2, 3 = PM2.5 (right)
+        - {index: 0, ref: D1, center_x: 12.6, half: co2}
+        - {index: 1, ref: D2, center_x: 17.7, half: co2}
+        - {index: 2, ref: D3, center_x: 39.9, half: pm25}
+        - {index: 3, ref: D4, center_x: 45.0, half: pm25}
+      divider_gap: [19.7, 37.9]    # clear x between LED1 and LED2 (the FPC sits there); halves meet at 28.8
+    button:                        # SW1, Alps SKRTLAE010, side push toward -Y, 1.6 N, 0.2 mm travel
+      edge: +Y                     # front-right
+      actuator_center_x: 57.0
+      actuator_width: 2.0
+      actuator_tip_y: 30.24        # 0.24 mm beyond the front edge (at rest)
+      actuator_center_z: 1.7       # Alps drawing; body 4.5 x 3.4, 3.3 high
+    aux_uart:                      # J6, J_AUX_UART, 1 x 6 2.54 mm through-hole pads, not fitted
+      pin1: [8.0, 17.45]           # pins 1..6 along +X to x 20.7
 
 # GPIOs the design must not use.
-# GPIO12/13 are USB D-/D+. GPIO10/11 are not exposed by the ESP32-C6-MINI-1 module,
-# so they cannot appear in `signals` anyway.
+# GPIO12/13 are USB D-/D+. GPIO14 is not exposed by the ESP32-C6-WROOM-1 module,
+# so it cannot appear in `signals` anyway.
 reserved: [GPIO12, GPIO13]

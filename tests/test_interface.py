@@ -6,11 +6,11 @@ import yaml
 
 IFACE_PATH = Path(__file__).resolve().parent.parent / "hardware" / "interface.yaml"
 
-# GPIOs exposed by the ESP32-C6-MINI-1 module (GPIO10/11 are not broken out).
-# Source: ESP32-C6-MINI-1 & MINI-1U Datasheet v1.5, section 3 "Pin Definitions",
-# Table 3-1 Pin Description:
-# https://documentation.espressif.com/esp32-c6-mini-1_mini-1u_datasheet_en.pdf
-MODULE_GPIOS = {f"GPIO{n}" for n in [*range(0, 10), *range(12, 24)]}
+# GPIOs exposed by the ESP32-C6-WROOM-1 module (GPIO14 is not broken out).
+# Source: ESP32-C6-WROOM-1 & WROOM-1U Datasheet, section "Pin Definitions",
+# Table "Pin Definitions" (IO0-IO13, IO15-IO23; IO16/IO17 are TXD0/RXD0):
+# https://documentation.espressif.com/esp32-c6-wroom-1_wroom-1u_datasheet_en.pdf
+MODULE_GPIOS = {f"GPIO{n}" for n in [*range(0, 14), *range(15, 24)]}
 
 
 @pytest.fixture(scope="module")
@@ -62,3 +62,41 @@ def test_sen66_connector_on_3v3(iface):
     # SEN66 runs on 3.15-3.45 V (spec section 3): never wire it to 5 V.
     pins = iface["connectors"]["J_SEN66"]
     assert "+3V3" in pins and "+5V" not in pins
+
+
+def test_aux_uart_pinout(iface):
+    assert iface["connectors"]["J_AUX_UART"] == [
+        "GND", "+3V3", "AUX_UART_TX", "AUX_UART_RX", "EN", "BUTTON"]
+
+
+def test_epd_connector(iface, sig):
+    pins = iface["connectors"]["J_EPD"]
+    assert len(pins) == 24
+    assert pins[7] == "GND"  # pin 8 = BS1, low = 4-wire SPI
+    for net in ["EPD_BUSY", "EPD_RST", "EPD_DC", "EPD_CS", "EPD_CLK", "EPD_MOSI"]:
+        assert pins.count(net) == 1
+        assert net in sig
+    # GDEY029T94 spec Rev 1.0 s5 / Waveshare V2 spec Rev 2.1 s1.5: pin 4 NC, pin 5 VSH2.
+    assert pins[3] == "NC" and pins[4] == "EPD_VSH2"
+    # TSCL/TSDA (pins 6, 7) unused.
+    assert pins[5] == "NC" and pins[6] == "NC"
+
+
+def test_sen66_connector_pins(iface):
+    pins = iface["connectors"]["J_SEN66"]
+    assert len(pins) == 6
+    assert pins.count("I2C_SDA") == 1 and pins.count("I2C_SCL") == 1
+    assert pins == ["+3V3", "GND", "I2C_SDA", "I2C_SCL", "NC", "NC"]
+
+
+def test_tongue_interface_subset_matches(iface):
+    # check_netlist runs the sense tongue against this subset (connector rules only); its copy of
+    # J_QWIIC_TONGUE must never drift from this file, the single source of truth.
+    sub = yaml.safe_load((IFACE_PATH.parent / "src" / "tongue" / "interface.yaml")
+                         .read_text(encoding="utf-8"))
+    assert sub["checks"] == ["connectors"]
+    assert sub["connectors"] == {"J_QWIIC_TONGUE": iface["connectors"]["J_QWIIC_TONGUE"]}
+
+
+def test_no_todo_in_interface_yaml():
+    assert "TODO" not in IFACE_PATH.read_text(encoding="utf-8")

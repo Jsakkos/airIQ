@@ -1,0 +1,75 @@
+(kicad_sch
+	(version 20260306)
+	(generator "eeschema")
+	(generator_version "10.0")
+	(uuid "2cbd4646-61bc-5006-8a5d-c23c3120ae8a")
+	(paper "A4")
+	(title_block
+		(title "airQ v3 sense tongue")
+		(rev "3.0-dev")
+		(company "airQ open hardware (CC BY-SA 4.0)")
+		(comment 1 "Generated from hardware/src/tongue/project.yaml by tools/hw/build.py: edit the source, not this file")
+	)
+	(lib_symbols)
+	(text "Sense tongue: SHT45, VEML7700, Qwiic socket"
+		(exclude_from_sim no)
+		(at 26.67 50.8 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "c26a42fa-a5b4-5ecd-b2b2-60d9d9071d71")
+	)
+	(sheet
+		(at 25.4 38.1)
+		(size 45.72 25.4)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0)
+		)
+		(uuid "3ce4e155-a923-523a-8d88-102e6cb35965")
+		(property "Sheetname" "sense"
+			(at 25.4 37.3884 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "sense.kicad_sch"
+			(at 25.4 64.0846 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(instances
+			(project "airq-tongue"
+				(path "/2cbd4646-61bc-5006-8a5d-c23c3120ae8a"
+					(page "2")
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+)

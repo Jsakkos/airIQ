@@ -1,0 +1,54 @@
+(export
+	(version "E")
+	(design
+		(source "fixture.kicad_sch")
+		(tool "Eeschema 10.0.8")
+	)
+	(components
+		(comp
+			(ref "J1")
+			(value "QWIIC")
+			(fields
+				(field (name "Role") "J_QWIIC_TONGUE")
+			)
+		)
+	)
+	(nets
+		(net
+			(code "1")
+			(name "GND")
+			(node
+				(ref "J1")
+				(pin "1")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "2")
+			(name "+3V3")
+			(node
+				(ref "J1")
+				(pin "2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "3")
+			(name "I2C_SDA")
+			(node
+				(ref "J1")
+				(pin "3")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "4")
+			(name "I2C_SCL")
+			(node
+				(ref "J1")
+				(pin "4")
+				(pintype "passive")
+			)
+		)
+	)
+)

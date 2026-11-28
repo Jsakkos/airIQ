@@ -1,0 +1,7 @@
+# Small interface used by the checker tests (NOT the real hardware/interface.yaml).
+signals:
+  I2C_SDA: GPIO6
+  I2C_SCL: GPIO7
+  BUTTON: GPIO9
+connectors:
+  J_SEN66: [+3V3, GND, I2C_SDA, I2C_SCL, GND, NC]

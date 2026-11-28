@@ -1,0 +1,32 @@
+# airQ v3 main board: project settings for the generator (tools/hw/build.py main).
+# The KiCad files in hardware/kicad/main/ are generated from this folder: edit here, then rebuild.
+# Format: hardware/README.md, "Design source".
+
+project: airq-main                 # KiCad project name: <output>/airq-main.kicad_pro
+title: airQ v3 main board
+company: airQ open hardware (CC BY-SA 4.0)
+rev: 3.0-dev
+output: ../../kicad/main           # KiCad project folder, relative to this file
+fab: ../../fab/main                # JLC upload files (Gerber zip, bom.csv, cpl.csv), rewritten by every build
+step: ../../step/airq-main.step    # 3-D model for the enclosure: build.py --step
+
+# The interface contract: the MCU (Role MCU) takes its GPIO signals from it, and each interface
+# connector (Role J_SEN66, J_EPD, ...) its pinout, so neither is typed in the sheets (gen_sch.py).
+interface: ../../interface.yaml
+
+# Schematic sheets, in page order; each one is <name>.yaml in this folder.
+sheets: [power, mcu, connectors, leds_button, epd]
+
+# Nets drawn with a KiCad power symbol instead of a label.
+power_symbols:
+  GND: power:GND
+  +5V: power:+5V                   # USB VBUS
+  +3V3: power:+3V3
+
+# Project libraries (paths relative to this file). Other library names (Device, power,
+# Resistor_SMD, ...) are KiCad 10's stock libraries.
+libraries:
+  symbols:
+    airq: ../../kicad/lib/airq.kicad_sym
+  footprints:
+    airq: ../../kicad/lib/airq.pretty

@@ -1,0 +1,59 @@
+{
+  "board": {
+    "design_settings": {
+      "rule_severities": {
+        "duplicate_footprints": "error",
+        "extra_footprint": "error",
+        "footprint_symbol_mismatch": "error",
+        "lib_footprint_mismatch": "error",
+        "missing_footprint": "error",
+        "net_conflict": "error"
+      },
+      "rules": {
+        "min_clearance": 0.15,
+        "min_copper_edge_clearance": 0.3,
+        "min_hole_to_hole": 0.25,
+        "min_through_hole_diameter": 0.3,
+        "min_track_width": 0.15,
+        "min_via_annular_width": 0.15,
+        "min_via_diameter": 0.6
+      }
+    }
+  },
+  "erc": {
+    "rule_severities": {
+      "lib_symbol_mismatch": "error"
+    }
+  },
+  "meta": {
+    "filename": "airq-tongue.kicad_pro",
+    "version": 3
+  },
+  "net_settings": {
+    "classes": [
+      {
+        "bus_width": 12,
+        "clearance": 0.15,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "Default",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 2147483647,
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 0.2,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      }
+    ],
+    "meta": {
+      "version": 4
+    },
+    "netclass_patterns": []
+  }
+}

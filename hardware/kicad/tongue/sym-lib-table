@@ -1,0 +1,7 @@
+(sym_lib_table
+	(version 7)
+	(lib (name "Device") (type "KiCad") (uri "${KICAD10_SYMBOL_DIR}/Device.kicad_sym") (options "") (descr "KiCad stock library"))
+	(lib (name "Mechanical") (type "KiCad") (uri "${KICAD10_SYMBOL_DIR}/Mechanical.kicad_sym") (options "") (descr "KiCad stock library"))
+	(lib (name "airq") (type "KiCad") (uri "${KIPRJMOD}/../lib/airq.kicad_sym") (options "") (descr "airQ project library"))
+	(lib (name "power") (type "KiCad") (uri "${KICAD10_SYMBOL_DIR}/power.kicad_sym") (options "") (descr "KiCad stock library"))
+)

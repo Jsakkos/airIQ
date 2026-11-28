@@ -1,0 +1,289 @@
+(export
+	(version "E")
+	(design
+		(source "fixture.kicad_sch")
+		(tool "Eeschema 10.0.8")
+	)
+	(components
+		(comp
+			(ref "U1")
+			(value "ESP32-C6-MINI-1")
+			(fields
+				(field (name "Role") "MCU")
+			)
+		)
+		(comp
+			(ref "J1")
+			(value "SEN66")
+			(fields
+				(field (name "Role") "J_SEN66")
+				(field (name "LCSC") "C1001")
+			)
+		)
+		(comp
+			(ref "J2")
+			(value "USB_C")
+			(fields
+				(field (name "Role") "J_USB")
+			)
+		)
+		(comp
+			(ref "R1")
+			(value "5.1k")
+			(fields
+			)
+		)
+		(comp
+			(ref "R2")
+			(value "10k")
+			(fields
+			)
+		)
+		(comp
+			(ref "R3")
+			(value "4.7k")
+			(fields
+			)
+		)
+		(comp
+			(ref "R4")
+			(value "4.7k")
+			(fields
+			)
+		)
+		(comp
+			(ref "R5")
+			(value "10k")
+			(fields
+			)
+		)
+		(comp
+			(ref "R9")
+			(value "10k")
+			(fields
+			)
+		)
+		(comp
+			(ref "C1")
+			(value "10u")
+			(fields
+			)
+		)
+		(comp
+			(ref "C2")
+			(value "22u")
+			(fields
+			)
+		)
+		(comp
+			(ref "C3")
+			(value "100n")
+			(fields
+			)
+		)
+	)
+	(nets
+		(net
+			(code "1")
+			(name "+3V3")
+			(node
+				(ref "U1")
+				(pin "2")
+				(pinfunction "3V3_2")
+				(pintype "passive")
+			)
+			(node
+				(ref "J1")
+				(pin "1")
+				(pintype "passive")
+			)
+			(node
+				(ref "R3")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "R4")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "R5")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "R9")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "C1")
+				(pin "1")
+				(pintype "passive")
+			)
+			(node
+				(ref "C2")
+				(pin "1")
+				(pintype "passive")
+			)
+			(node
+				(ref "C3")
+				(pin "1")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "2")
+			(name "GND")
+			(node
+				(ref "U1")
+				(pin "1")
+				(pinfunction "GND_1")
+				(pintype "passive")
+			)
+			(node
+				(ref "J1")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "J1")
+				(pin "5")
+				(pintype "passive")
+			)
+			(node
+				(ref "R1")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "R2")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "C1")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "C2")
+				(pin "2")
+				(pintype "passive")
+			)
+			(node
+				(ref "C3")
+				(pin "2")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "3")
+			(name "I2C_SDA")
+			(node
+				(ref "U1")
+				(pin "6")
+				(pinfunction "IO6_6")
+				(pintype "passive")
+			)
+			(node
+				(ref "J1")
+				(pin "3")
+				(pintype "passive")
+			)
+			(node
+				(ref "R3")
+				(pin "1")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "4")
+			(name "I2C_SCL")
+			(node
+				(ref "U1")
+				(pin "7")
+				(pinfunction "IO7_7")
+				(pintype "passive")
+			)
+			(node
+				(ref "J1")
+				(pin "4")
+				(pintype "passive")
+			)
+			(node
+				(ref "R4")
+				(pin "1")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "5")
+			(name "BUTTON")
+			(node
+				(ref "U1")
+				(pin "9")
+				(pinfunction "IO9_9")
+				(pintype "passive")
+			)
+			(node
+				(ref "R5")
+				(pin "1")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "6")
+			(name "STRAP15")
+			(node
+				(ref "U1")
+				(pin "15")
+				(pinfunction "IO15_15")
+				(pintype "passive")
+			)
+			(node
+				(ref "R9")
+				(pin "1")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "7")
+			(name "USB_CC1")
+			(node
+				(ref "J2")
+				(pin "A5")
+				(pintype "passive")
+			)
+			(node
+				(ref "R1")
+				(pin "1")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "8")
+			(name "USB_CC2")
+			(node
+				(ref "J2")
+				(pin "B5")
+				(pintype "passive")
+			)
+			(node
+				(ref "R2")
+				(pin "1")
+				(pintype "passive")
+			)
+		)
+		(net
+			(code "9")
+			(name "unconnected-(J1-Pad6)")
+			(node
+				(ref "J1")
+				(pin "6")
+				(pintype "passive")
+			)
+		)
+	)
+)
